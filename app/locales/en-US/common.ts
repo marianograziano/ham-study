@@ -307,6 +307,12 @@ export default {
         feed: "Feedpoint",
       },
     },
+    cw: {
+      title: "CW Trainer",
+      description:
+        "Morse Code trainer based on Web Audio API, supporting real-time decoding and visualization.",
+      keywords: "CW, Morse Code, Trainer, Web Audio API",
+    },
   },
 
   footer: {

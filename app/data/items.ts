@@ -103,4 +103,9 @@ export const tools: Item[] = [
     href: "/tools/moxon-calculator",
     category: "tool",
   },
+  {
+    i18nKey: "tools.cw",
+    href: "/tools/cw",
+    category: "tool",
+  },
 ];

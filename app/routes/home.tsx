@@ -454,6 +454,27 @@ export default function Home() {
               />
             ),
           };
+        case "tools.cw":
+          return {
+            title: t(`${item.i18nKey}.title` as never),
+            description: t(`${item.i18nKey}.description` as never),
+            href: item.href,
+            preview: (
+              <div className="flex items-center justify-center w-full h-full bg-slate-900 text-green-500">
+                <div className="text-center">
+                  <span className="text-6xl font-mono font-bold tracking-widest">
+                    CW
+                  </span>
+                  <div className="flex justify-center gap-1 mt-2">
+                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                    <div className="w-6 h-2 bg-green-500 rounded-full animate-pulse delay-75" />
+                    <div className="w-6 h-2 bg-green-500 rounded-full animate-pulse delay-150" />
+                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse delay-300" />
+                  </div>
+                </div>
+              </div>
+            ),
+          };
         default:
           return {
             title: t(`${item.i18nKey}.title` as never),

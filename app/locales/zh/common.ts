@@ -291,6 +291,12 @@ export default {
         feed: "馈电点",
       },
     },
+    cw: {
+      title: "CW 练习器 (CW Trainer)",
+      description:
+        "基于 Web Audio API 的莫尔斯电码练习器，支持即时解码与可视化。",
+      keywords: "CW, 莫尔斯电码, 练习器, Morse Code, Trainer",
+    },
   },
 
   footer: {
