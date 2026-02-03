@@ -615,6 +615,78 @@ export default function CwTrainer() {
         }}
       ></div>
 
+      {/* 左侧参考面板：字母 */}
+      <div className="absolute left-4 top-1/2 -translate-y-1/2 hidden md:flex flex-col gap-4 z-10 max-h-[80%] overflow-y-auto no-scrollbar pointer-events-auto">
+        <div className="bg-[#1a2e22]/90 border border-[#2c3e30] rounded-lg p-3 shadow-lg backdrop-blur-sm w-32">
+          <div className="text-[10px] text-[#4caf50] font-bold tracking-widest border-b border-[#2c5c3e] pb-1 mb-2 text-center">
+            LETTERS
+          </div>
+          <div className="flex flex-col gap-1 text-xs font-mono">
+            {Object.entries(MORSE_CODE_MAP)
+              .filter(
+                ([_, char]) =>
+                  /^[A-Z]$/.test(char) ||
+                  ["CH", "Ä", "Ö", "Ü", "Ð"].includes(char),
+              )
+              .sort((a, b) => a[1].localeCompare(b[1]))
+              .map(([code, char]) => (
+                <div
+                  key={char}
+                  className="flex justify-between items-center text-[#a5d6a7]/80 hover:text-white transition-colors"
+                >
+                  <span className="font-bold w-6">{char}</span>
+                  <span className="tracking-widest text-[#4caf50]">{code}</span>
+                </div>
+              ))}
+          </div>
+        </div>
+      </div>
+
+      {/* 右侧参考面板：数字与符号 */}
+      <div className="absolute right-4 top-1/2 -translate-y-1/2 hidden md:flex flex-col gap-4 z-10 max-h-[80%] overflow-y-auto no-scrollbar pointer-events-auto">
+        <div className="bg-[#1a2e22]/90 border border-[#2c3e30] rounded-lg p-3 shadow-lg backdrop-blur-sm w-36">
+          <div className="text-[10px] text-[#4caf50] font-bold tracking-widest border-b border-[#2c5c3e] pb-1 mb-2 text-center">
+            NUMBERS
+          </div>
+          <div className="flex flex-col gap-1 text-xs font-mono mb-4">
+            {Object.entries(MORSE_CODE_MAP)
+              .filter(([_, char]) => /^[0-9]$/.test(char))
+              .sort((a, b) => a[1].localeCompare(b[1]))
+              .map(([code, char]) => (
+                <div
+                  key={char}
+                  className="flex justify-between items-center text-[#a5d6a7]/80 hover:text-white transition-colors"
+                >
+                  <span className="font-bold w-6">{char}</span>
+                  <span className="tracking-widest text-[#4caf50]">{code}</span>
+                </div>
+              ))}
+          </div>
+
+          <div className="text-[10px] text-[#4caf50] font-bold tracking-widest border-b border-[#2c5c3e] pb-1 mb-2 text-center">
+            SYMBOLS
+          </div>
+          <div className="flex flex-col gap-1 text-xs font-mono">
+            {Object.entries(MORSE_CODE_MAP)
+              .filter(
+                ([_, char]) =>
+                  !/^[A-Z0-9]$/.test(char) &&
+                  !["CH", "Ä", "Ö", "Ü", "Ð"].includes(char),
+              )
+              .sort((a, b) => a[1].localeCompare(b[1]))
+              .map(([code, char]) => (
+                <div
+                  key={char}
+                  className="flex justify-between items-center text-[#a5d6a7]/80 hover:text-white transition-colors"
+                >
+                  <span className="font-bold w-6">{char}</span>
+                  <span className="tracking-widest text-[#4caf50]">{code}</span>
+                </div>
+              ))}
+          </div>
+        </div>
+      </div>
+
       {/* 顶部显示区：RX LOG + 速度控制 */}
       <div className="w-full max-w-4xl bg-[#1a2e22] border-4 border-[#2c3e30] rounded-lg p-2 shadow-lg relative mt-2 z-20 flex flex-col h-36">
         <div className="flex justify-between items-center mb-1 border-b border-[#2c5c3e] pb-1">
