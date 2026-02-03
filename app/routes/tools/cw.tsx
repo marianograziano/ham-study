@@ -9,11 +9,35 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { MetaFunction } from "react-router";
+import i18next from "i18next";
+import { initReactI18next } from "react-i18next";
+import resources from "~/locales";
+import { getLocale } from "~/middleware/i18next";
+import type { Route } from "./+types/cw";
 
-export const meta: MetaFunction = () => {
+export const loader = async ({ request }: Route.LoaderArgs) => {
+  const locale = getLocale(request);
+  const t = await i18next.use(initReactI18next).init({
+    lng: locale,
+    ns: "common",
+    resources,
+  });
+  return {
+    title: t("tools.cw.title") + " | Ham Study",
+    description: t("tools.cw.description"),
+    keywords: t("tools.cw.keywords"),
+  };
+};
+
+export const meta: MetaFunction<typeof loader> = ({ data }) => {
+  if (!data) return [{ title: "CW Trainer" }];
+  const { title, description, keywords } = data;
   return [
-    { title: "CW Trainer | Ham Study" },
-    { name: "description", content: "Morse Code Visualization and Trainer" },
+    { title },
+    { name: "description", content: description },
+    { property: "og:title", content: title },
+    { property: "og:description", content: description },
+    { name: "keywords", content: keywords },
   ];
 };
 
@@ -737,7 +761,9 @@ export default function CwTrainer() {
         {showRef && (
           <div className="absolute inset-0 z-50 bg-[#0d1b11]/95 backdrop-blur-md p-4 overflow-y-auto flex flex-col gap-4 md:hidden">
             <div className="flex justify-between items-center mb-2">
-              <h3 className="text-[#4caf50] font-bold">Morse Code Reference</h3>
+              <h3 className="text-[#4caf50] font-bold">
+                {t("tools.cw.panel.morse_code_reference")}
+              </h3>
               <button
                 type="button"
                 onClick={() => setShowRef(false)}
@@ -783,7 +809,8 @@ export default function CwTrainer() {
                 onClick={() => setShowRef((p) => !p)}
                 className="md:hidden text-[9px] bg-[#0d1b11] px-2 py-0.5 rounded border border-[#2c5c3e] text-[#a5d6a7] hover:text-white transition-colors"
               >
-                <BookIcon size={10} className="inline" /> REF
+                <BookIcon size={10} className="inline" />{" "}
+                {t("tools.cw.panel.ref")}
               </button>
 
               <button
@@ -826,7 +853,7 @@ export default function CwTrainer() {
               className="h-full w-auto min-w-[800px] md:min-w-0 md:w-full drop-shadow-[0_10px_20px_rgba(0,0,0,0.5)] mx-auto"
               preserveAspectRatio="xMidYMid meet"
             >
-              <title>Morse Code Circuit Board Visualization</title>
+              <title>{t("tools.cw.circuit_board_visualization")}</title>
               {Object.entries(NODES).map(([char, node]) =>
                 renderLine(char, node),
               )}
@@ -890,7 +917,7 @@ export default function CwTrainer() {
                 autoCorrect="off"
                 autoComplete="off"
                 spellCheck="false"
-                aria-label="Morse Code Input"
+                aria-label={t("tools.cw.input_aria_label")}
               />
               <span
                 className="text-xl font-mono text-[#111] tracking-widest font-bold opacity-80"

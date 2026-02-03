@@ -303,7 +303,11 @@ export default {
         rx_log: "接收记录 (RX LOG)",
         speed: "速度",
         clear: "清空",
+        morse_code_reference: "莫尔斯电码参考表",
+        ref: "参考",
       },
+      circuit_board_visualization: "莫尔斯电码电路板可视化",
+      input_aria_label: "莫尔斯电码输入",
       control: {
         dit: "点 DIT [J / ←]",
         dah: "划 DAH [K / →]",
