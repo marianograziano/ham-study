@@ -295,7 +295,53 @@ export default {
       title: "CW 练习器 (CW Trainer)",
       description:
         "基于 Web Audio API 的莫尔斯电码练习器，支持即时解码与可视化。",
-      keywords: "CW, 莫尔斯电码, 练习器, Morse Code, Trainer",
+      keywords: "CW, 莫尔斯电码, 练习器, Morse Code, Trainer, 业余无线电",
+      panel: {
+        letters: "字母 (LETTERS)",
+        numbers: "数字 (NUMBERS)",
+        symbols: "符号 (SYMBOLS)",
+        rx_log: "接收记录 (RX LOG)",
+        speed: "速度",
+        clear: "清空",
+      },
+      control: {
+        dit: "点 DIT [J / ←]",
+        dah: "划 DAH [K / →]",
+        backspace: "删除 [BS]",
+        reset: "重置 [ESC]",
+      },
+      status: {
+        ready: "就绪 (READY)",
+      },
+      speed: {
+        slow: "慢速",
+        med: "中速",
+        fast: "快速",
+        beginner: "初级",
+        intermediate: "中级",
+        advanced: "高级",
+      },
+      instructions: {
+        title: "操作说明与指南",
+        operation: {
+          title: "如何操作",
+          keyboard: "键盘控制",
+          keyboard_desc:
+            "使用 '.' / 'J' / '左箭头' 输入点 (DIT)。使用 '-' / 'K' / '右箭头' 输入划 (DAH)。空格键输入词间隔。退格键删除。",
+          buttons: "屏幕按钮",
+          buttons_desc:
+            "点击底部的两个大按钮分别输入点 (DIT) 和划 (DAH)。顶部按钮可清空记录，底部小按钮用于删除和重置。",
+        },
+        speed_guide: {
+          title: "速度设置说明",
+          beginner:
+            "初级 (Beginner): 较慢的速度，字符间距较大。非常适合初学者听辨点划节奏，建立肌肉记忆。",
+          intermediate:
+            "中级 (Intermediate): 中等速度。减少了夸张的字符间距，接近正常的发报节奏，适合进阶练习。",
+          advanced:
+            "高级 (Advanced): 快速模式。极短的间距，模拟真实的高速通信或竞赛环境，适合老手挑战。",
+        },
+      },
     },
   },
 

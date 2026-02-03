@@ -6,6 +6,7 @@ import {
   TrashIcon,
 } from "@phosphor-icons/react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { MetaFunction } from "react-router";
 
 export const meta: MetaFunction = () => {
@@ -228,28 +229,29 @@ interface SpeedSetting {
 const SPEED_SETTINGS: Record<string, SpeedSetting> = {
   beginner: {
     id: "beginner",
-    label: "SLOW",
-    desc: "初级",
+    label: "slow",
+    desc: "beginner",
     charDelay: 2000,
     wordDelay: 4000,
   },
   intermediate: {
     id: "intermediate",
-    label: "MED",
-    desc: "中级",
+    label: "med",
+    desc: "intermediate",
     charDelay: 1000,
     wordDelay: 2200,
   },
   advanced: {
     id: "advanced",
-    label: "FAST",
-    desc: "高级",
+    label: "fast",
+    desc: "advanced",
     charDelay: 600,
     wordDelay: 1200,
   },
 };
 
 export default function CwTrainer() {
+  const { t } = useTranslation("common");
   const [currentPath, setCurrentPath] = useState("");
   const [lastChar, setLastChar] = useState("");
   const [message, setMessage] = useState("");
@@ -605,10 +607,10 @@ export default function CwTrainer() {
   };
 
   return (
-    <div className="h-[80dvh] w-full bg-[#0d1b11] flex flex-col items-center justify-between overflow-hidden font-mono relative select-none text-[#a5d6a7] p-4">
+    <div className="min-h-screen w-full bg-[#0d1b11] flex flex-col items-center font-mono relative select-none text-[#a5d6a7]">
       {/* Background Grid */}
       <div
-        className="absolute inset-0 pointer-events-none opacity-40"
+        className="absolute inset-0 pointer-events-none opacity-40 h-full"
         style={{
           backgroundImage: `
                radial-gradient(#1b5e20 1px, transparent 1px),
@@ -619,230 +621,288 @@ export default function CwTrainer() {
         }}
       ></div>
 
-      {/* 左侧参考面板：字母 */}
-      <div className="absolute left-4 top-1/2 -translate-y-1/2 hidden md:flex flex-col gap-4 z-20 max-h-[80%] overflow-y-auto custom-scrollbar pointer-events-auto">
-        <div className="bg-[#1a2e22]/90 border border-[#2c3e30] rounded-lg p-3 shadow-lg backdrop-blur-sm w-60">
-          <div className="text-[10px] text-[#4caf50] font-bold tracking-widest border-b border-[#2c5c3e] pb-1 mb-2 text-center">
-            LETTERS
-          </div>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs font-mono">
-            {Object.entries(MORSE_CODE_MAP)
-              .filter(([_, char]) => /^[A-Z]$/.test(char))
-              .sort((a, b) => a[1].localeCompare(b[1]))
-              .map(([code, char]) => (
-                <div
-                  key={char}
-                  className="flex justify-between items-center text-[#a5d6a7]/80 hover:text-white transition-colors"
-                >
-                  <span className="font-bold w-4">{char}</span>
-                  <span className="tracking-widest text-[#4caf50]">{code}</span>
-                </div>
-              ))}
-          </div>
-        </div>
-      </div>
-
-      {/* 右侧参考面板：数字与符号 */}
-      <div className="absolute right-4 top-1/2 -translate-y-1/2 hidden md:flex flex-col gap-4 z-20 max-h-[80%] overflow-y-auto custom-scrollbar pointer-events-auto">
-        <div className="bg-[#1a2e22]/90 border border-[#2c3e30] rounded-lg p-3 shadow-lg backdrop-blur-sm w-36">
-          <div className="text-[10px] text-[#4caf50] font-bold tracking-widest border-b border-[#2c5c3e] pb-1 mb-2 text-center">
-            NUMBERS
-          </div>
-          <div className="flex flex-col gap-1 text-xs font-mono mb-4">
-            {Object.entries(MORSE_CODE_MAP)
-              .filter(([_, char]) => /^[0-9]$/.test(char))
-              .sort((a, b) => a[1].localeCompare(b[1]))
-              .map(([code, char]) => (
-                <div
-                  key={char}
-                  className="flex justify-between items-center text-[#a5d6a7]/80 hover:text-white transition-colors"
-                >
-                  <span className="font-bold w-6">{char}</span>
-                  <span className="tracking-widest text-[#4caf50]">{code}</span>
-                </div>
-              ))}
-          </div>
-
-          <div className="text-[10px] text-[#4caf50] font-bold tracking-widest border-b border-[#2c5c3e] pb-1 mb-2 text-center">
-            SYMBOLS
-          </div>
-          <div className="flex flex-col gap-1 text-xs font-mono">
-            {Object.entries(MORSE_CODE_MAP)
-              .filter(
-                ([_, char]) =>
-                  !/^[A-Z0-9]$/.test(char) &&
-                  !["CH", "Ä", "Ö", "Ü", "Ð"].includes(char),
-              )
-              .sort((a, b) => a[1].localeCompare(b[1]))
-              .map(([code, char]) => (
-                <div
-                  key={char}
-                  className="flex justify-between items-center text-[#a5d6a7]/80 hover:text-white transition-colors"
-                >
-                  <span className="font-bold w-6">{char}</span>
-                  <span className="tracking-widest text-[#4caf50]">{code}</span>
-                </div>
-              ))}
+      <div className="relative h-[80dvh] w-full flex flex-col items-center justify-between overflow-hidden p-4 z-10">
+        {/* 左侧参考面板：字母 */}
+        <div className="absolute left-4 top-1/2 -translate-y-1/2 hidden md:flex flex-col gap-4 z-20 max-h-[80%] overflow-y-auto custom-scrollbar pointer-events-auto">
+          <div className="bg-[#1a2e22]/90 border border-[#2c3e30] rounded-lg p-3 shadow-lg backdrop-blur-sm w-60">
+            <div className="text-[10px] text-[#4caf50] font-bold tracking-widest border-b border-[#2c5c3e] pb-1 mb-2 text-center">
+              {t("tools.cw.panel.letters")}
+            </div>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs font-mono">
+              {Object.entries(MORSE_CODE_MAP)
+                .filter(([_, char]) => /^[A-Z]$/.test(char))
+                .sort((a, b) => a[1].localeCompare(b[1]))
+                .map(([code, char]) => (
+                  <div
+                    key={char}
+                    className="flex justify-between items-center text-[#a5d6a7]/80 hover:text-white transition-colors"
+                  >
+                    <span className="font-bold w-4">{char}</span>
+                    <span className="tracking-widest text-[#4caf50]">
+                      {code}
+                    </span>
+                  </div>
+                ))}
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* 顶部显示区：RX LOG + 速度控制 */}
-      <div className="w-full max-w-4xl bg-[#1a2e22] border-4 border-[#2c3e30] rounded-lg p-2 shadow-lg relative mt-2 z-20 flex flex-col h-36">
-        <div className="flex justify-between items-center mb-1 border-b border-[#2c5c3e] pb-1">
-          <div className="flex items-center gap-4">
-            <span className="text-[10px] text-[#4caf50] font-bold tracking-widest flex items-center gap-2">
-              <ActivityIcon size={12} /> RX LOG
-            </span>
+        {/* 右侧参考面板：数字与符号 */}
+        <div className="absolute right-4 top-1/2 -translate-y-1/2 hidden md:flex flex-col gap-4 z-20 max-h-[80%] overflow-y-auto custom-scrollbar pointer-events-auto">
+          <div className="bg-[#1a2e22]/90 border border-[#2c3e30] rounded-lg p-3 shadow-lg backdrop-blur-sm w-36">
+            <div className="text-[10px] text-[#4caf50] font-bold tracking-widest border-b border-[#2c5c3e] pb-1 mb-2 text-center">
+              {t("tools.cw.panel.numbers")}
+            </div>
+            <div className="flex flex-col gap-1 text-xs font-mono mb-4">
+              {Object.entries(MORSE_CODE_MAP)
+                .filter(([_, char]) => /^[0-9]$/.test(char))
+                .sort((a, b) => a[1].localeCompare(b[1]))
+                .map(([code, char]) => (
+                  <div
+                    key={char}
+                    className="flex justify-between items-center text-[#a5d6a7]/80 hover:text-white transition-colors"
+                  >
+                    <span className="font-bold w-6">{char}</span>
+                    <span className="tracking-widest text-[#4caf50]">
+                      {code}
+                    </span>
+                  </div>
+                ))}
+            </div>
+
+            <div className="text-[10px] text-[#4caf50] font-bold tracking-widest border-b border-[#2c5c3e] pb-1 mb-2 text-center">
+              {t("tools.cw.panel.symbols")}
+            </div>
+            <div className="flex flex-col gap-1 text-xs font-mono">
+              {Object.entries(MORSE_CODE_MAP)
+                .filter(
+                  ([_, char]) =>
+                    !/^[A-Z0-9]$/.test(char) &&
+                    !["CH", "Ä", "Ö", "Ü", "Ð"].includes(char),
+                )
+                .sort((a, b) => a[1].localeCompare(b[1]))
+                .map(([code, char]) => (
+                  <div
+                    key={char}
+                    className="flex justify-between items-center text-[#a5d6a7]/80 hover:text-white transition-colors"
+                  >
+                    <span className="font-bold w-6">{char}</span>
+                    <span className="tracking-widest text-[#4caf50]">
+                      {code}
+                    </span>
+                  </div>
+                ))}
+            </div>
+          </div>
+        </div>
+
+        {/* 顶部显示区：RX LOG + 速度控制 */}
+        <div className="w-full max-w-4xl bg-[#1a2e22] border-4 border-[#2c3e30] rounded-lg p-2 shadow-lg relative mt-2 z-20 flex flex-col h-36">
+          <div className="flex justify-between items-center mb-1 border-b border-[#2c5c3e] pb-1">
+            <div className="flex items-center gap-4">
+              <span className="text-[10px] text-[#4caf50] font-bold tracking-widest flex items-center gap-2">
+                <ActivityIcon size={12} /> {t("tools.cw.panel.rx_log")}
+              </span>
+
+              <button
+                type="button"
+                onClick={cycleSpeed}
+                className="flex items-center gap-1 text-[9px] bg-[#0d1b11] px-2 py-0.5 rounded border border-[#2c5c3e] text-[#a5d6a7] hover:text-white transition-colors"
+              >
+                <GaugeIcon size={10} />
+                <span>
+                  {t("tools.cw.panel.speed")}:{" "}
+                  {t(`tools.cw.speed.${currentSpeed.label}` as any)} (
+                  {t(`tools.cw.speed.${currentSpeed.desc}` as any)})
+                </span>
+              </button>
+            </div>
 
             <button
               type="button"
-              onClick={cycleSpeed}
-              className="flex items-center gap-1 text-[9px] bg-[#0d1b11] px-2 py-0.5 rounded border border-[#2c5c3e] text-[#a5d6a7] hover:text-white transition-colors"
-              title={`Char: ${currentSpeed.charDelay}ms | Word: ${currentSpeed.wordDelay}ms`}
+              onClick={() => setMessage("")}
+              className="text-[10px] text-[#4caf50] hover:text-white flex items-center gap-1"
             >
-              <GaugeIcon size={10} />
-              <span>
-                SPEED: {currentSpeed.label} ({currentSpeed.desc})
-              </span>
+              <TrashIcon size={10} /> {t("tools.cw.panel.clear")}
             </button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto font-mono text-sm p-1 leading-relaxed custom-scrollbar whitespace-pre-wrap break-all text-[#81c784] shadow-[inset_0_0_10px_rgba(0,0,0,0.5)] bg-[#0f1f15]">
+            {message}
+            <span className="animate-pulse inline-block w-2 h-4 bg-[#4caf50] align-middle ml-1"></span>
+          </div>
+        </div>
+
+        {/* 主电路板区域 */}
+        <div className="flex-1 w-full max-w-7xl flex items-center justify-center relative z-10">
+          <svg
+            viewBox="-400 -30 800 280"
+            className="w-full h-full drop-shadow-[0_10px_20px_rgba(0,0,0,0.5)]"
+            preserveAspectRatio="xMidYMid meet"
+          >
+            <title>Morse Code Circuit Board Visualization</title>
+            {Object.entries(NODES).map(([char, node]) =>
+              renderLine(char, node),
+            )}
+
+            <g transform="translate(0, 0)">
+              <rect
+                x="-8"
+                y="-8"
+                width="16"
+                height="16"
+                rx="2"
+                className="fill-[#212121] stroke-[#d4af37] stroke-[0.5]"
+              />
+              <path
+                d="M-8 -4 H-10 M-8 0 H-10 M-8 4 H-10 M8 -4 H10 M8 0 H10 M8 4 H10 M-4 -8 V-10 M0 -8 V-10 M4 -8 V-10 M-4 8 V10 M0 8 V10 M4 8 V10"
+                stroke="#d4af37"
+                strokeWidth="1"
+              />
+              <text
+                x="0"
+                y="2.5"
+                textAnchor="middle"
+                className="text-[5px] fill-[#d4af37] font-mono font-bold tracking-widest"
+              >
+                IC1
+              </text>
+            </g>
+
+            {Object.entries(NODES).map(([char, node]) =>
+              renderNode(char, node),
+            )}
+          </svg>
+        </div>
+
+        {/* 底部控制器 */}
+        <div className="w-full max-w-4xl flex items-end justify-between px-4 pb-4 z-20">
+          <button
+            type="button"
+            onClick={addDit}
+            className="group flex flex-col items-center gap-2 active:scale-95 transition-transform"
+          >
+            <div
+              className={`w-16 h-16 rounded-full border-4 border-[#1b3323] flex items-center justify-center bg-[#2e5c3e] shadow-[inset_0_2px_5px_rgba(255,255,255,0.2),0_5px_10px_rgba(0,0,0,0.5)] active:shadow-[inset_0_2px_10px_rgba(0,0,0,0.8)] transition-all ${activeSignal === "dit" ? "bg-[#3e7c53] translate-y-1" : ""}`}
+            >
+              <div className="w-3 h-3 bg-white rounded-full shadow-[0_0_5px_white]"></div>
+            </div>
+            <span className="text-[10px] text-white/50 font-bold tracking-widest bg-[#00000033] px-2 py-0.5 rounded">
+              {t("tools.cw.control.dit")}
+            </span>
+          </button>
+
+          <div className="flex flex-col items-center justify-end pb-2 gap-3 mx-4">
+            <div className="relative h-10 flex items-center justify-center min-w-[100px] bg-[#4a5e4d] border-2 border-[#2c3e30] rounded shadow-[inset_0_0_5px_rgba(0,0,0,0.8)] cursor-text">
+              <input
+                ref={inputRef}
+                type="text"
+                className="absolute inset-0 w-full h-full opacity-0 cursor-text p-0 m-0 border-0 bg-transparent text-transparent caret-transparent z-10"
+                tabIndex={-1}
+                autoCapitalize="off"
+                autoCorrect="off"
+                autoComplete="off"
+                spellCheck="false"
+                aria-label="Morse Code Input"
+              />
+              <span
+                className="text-xl font-mono text-[#111] tracking-widest font-bold opacity-80"
+                style={{ fontFamily: "monospace" }}
+              >
+                {currentPath || t("tools.cw.status.ready")}
+              </span>
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={handleBackspace}
+                className="text-[9px] text-amber-400/80 hover:text-amber-400 uppercase tracking-widest flex items-center gap-1 transition-colors border border-amber-900/50 px-2 py-1 rounded hover:bg-amber-900/20"
+              >
+                <BackspaceIcon size={12} /> {t("tools.cw.control.backspace")}
+              </button>
+              <button
+                type="button"
+                onClick={reset}
+                className="text-[9px] text-red-400/80 hover:text-red-400 uppercase tracking-widest flex items-center gap-1 transition-colors border border-red-900/50 px-2 py-1 rounded hover:bg-red-900/20"
+              >
+                <ArrowCounterClockwiseIcon size={12} />{" "}
+                {t("tools.cw.control.reset")}
+              </button>
+            </div>
           </div>
 
           <button
             type="button"
-            onClick={() => setMessage("")}
-            className="text-[10px] text-[#4caf50] hover:text-white flex items-center gap-1"
+            onClick={addDah}
+            className="group flex flex-col items-center gap-2 active:scale-95 transition-transform"
           >
-            <TrashIcon size={10} /> CLEAR
+            <div
+              className={`w-16 h-16 rounded-full border-4 border-[#1b3323] flex items-center justify-center bg-[#2e5c3e] shadow-[inset_0_2px_5px_rgba(255,255,255,0.2),0_5px_10px_rgba(0,0,0,0.5)] active:shadow-[inset_0_2px_10px_rgba(0,0,0,0.8)] transition-all ${activeSignal === "dah" ? "bg-[#3e7c53] translate-y-1" : ""}`}
+            >
+              <div className="w-8 h-3 bg-white rounded-sm shadow-[0_0_5px_white]"></div>
+            </div>
+            <span className="text-[10px] text-white/50 font-bold tracking-widest bg-[#00000033] px-2 py-0.5 rounded">
+              {t("tools.cw.control.dah")}
+            </span>
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto font-mono text-sm p-1 leading-relaxed custom-scrollbar whitespace-pre-wrap break-all text-[#81c784] shadow-[inset_0_0_10px_rgba(0,0,0,0.5)] bg-[#0f1f15]">
-          {message}
-          <span className="animate-pulse inline-block w-2 h-4 bg-[#4caf50] align-middle ml-1"></span>
-        </div>
-      </div>
-
-      {/* 主电路板区域 */}
-      <div className="flex-1 w-full max-w-7xl flex items-center justify-center relative z-10">
-        <svg
-          viewBox="-400 -30 800 280"
-          className="w-full h-full drop-shadow-[0_10px_20px_rgba(0,0,0,0.5)]"
-          preserveAspectRatio="xMidYMid meet"
-        >
-          <title>Morse Code Circuit Board Visualization</title>
-          {Object.entries(NODES).map(([char, node]) => renderLine(char, node))}
-
-          <g transform="translate(0, 0)">
-            <rect
-              x="-8"
-              y="-8"
-              width="16"
-              height="16"
-              rx="2"
-              className="fill-[#212121] stroke-[#d4af37] stroke-[0.5]"
-            />
-            <path
-              d="M-8 -4 H-10 M-8 0 H-10 M-8 4 H-10 M8 -4 H10 M8 0 H10 M8 4 H10 M-4 -8 V-10 M0 -8 V-10 M4 -8 V-10 M-4 8 V10 M0 8 V10 M4 8 V10"
-              stroke="#d4af37"
-              strokeWidth="1"
-            />
-            <text
-              x="0"
-              y="2.5"
-              textAnchor="middle"
-              className="text-[5px] fill-[#d4af37] font-mono font-bold tracking-widest"
-            >
-              IC1
-            </text>
-          </g>
-
-          {Object.entries(NODES).map(([char, node]) => renderNode(char, node))}
-        </svg>
-      </div>
-
-      {/* 底部控制器 */}
-      <div className="w-full max-w-4xl flex items-end justify-between px-4 pb-4 z-20">
-        <button
-          type="button"
-          onClick={addDit}
-          className="group flex flex-col items-center gap-2 active:scale-95 transition-transform"
-        >
-          <div
-            className={`w-16 h-16 rounded-full border-4 border-[#1b3323] flex items-center justify-center bg-[#2e5c3e] shadow-[inset_0_2px_5px_rgba(255,255,255,0.2),0_5px_10px_rgba(0,0,0,0.5)] active:shadow-[inset_0_2px_10px_rgba(0,0,0,0.8)] transition-all ${activeSignal === "dit" ? "bg-[#3e7c53] translate-y-1" : ""}`}
-          >
-            <div className="w-3 h-3 bg-white rounded-full shadow-[0_0_5px_white]"></div>
-          </div>
-          <span className="text-[10px] text-white/50 font-bold tracking-widest bg-[#00000033] px-2 py-0.5 rounded">
-            DIT [J / ←]
-          </span>
-        </button>
-
-        <div className="flex flex-col items-center justify-end pb-2 gap-3 mx-4">
-          <div className="relative h-10 flex items-center justify-center min-w-[100px] bg-[#4a5e4d] border-2 border-[#2c3e30] rounded shadow-[inset_0_0_5px_rgba(0,0,0,0.8)] cursor-text">
-            <input
-              ref={inputRef}
-              type="text"
-              className="absolute inset-0 w-full h-full opacity-0 cursor-text p-0 m-0 border-0 bg-transparent text-transparent caret-transparent z-10"
-              tabIndex={-1}
-              autoCapitalize="off"
-              autoCorrect="off"
-              autoComplete="off"
-              spellCheck="false"
-              aria-label="Morse Code Input"
-            />
+        {lastChar && (
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-0">
             <span
-              className="text-xl font-mono text-[#111] tracking-widest font-bold opacity-80"
-              style={{ fontFamily: "monospace" }}
+              key={Date.now()}
+              className={`text-[20vw] font-black animate-ping select-none font-mono ${lastChar === "ERR" ? "text-red-500/20" : "text-[#ffffff15]"}`}
             >
-              {currentPath || "READY"}
+              {lastChar}
             </span>
           </div>
-
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={handleBackspace}
-              className="text-[9px] text-amber-400/80 hover:text-amber-400 uppercase tracking-widest flex items-center gap-1 transition-colors border border-amber-900/50 px-2 py-1 rounded hover:bg-amber-900/20"
-            >
-              <BackspaceIcon size={12} /> DEL [BS]
-            </button>
-            <button
-              type="button"
-              onClick={reset}
-              className="text-[9px] text-red-400/80 hover:text-red-400 uppercase tracking-widest flex items-center gap-1 transition-colors border border-red-900/50 px-2 py-1 rounded hover:bg-red-900/20"
-            >
-              <ArrowCounterClockwiseIcon size={12} /> RESET [ESC]
-            </button>
-          </div>
-        </div>
-
-        <button
-          type="button"
-          onClick={addDah}
-          className="group flex flex-col items-center gap-2 active:scale-95 transition-transform"
-        >
-          <div
-            className={`w-16 h-16 rounded-full border-4 border-[#1b3323] flex items-center justify-center bg-[#2e5c3e] shadow-[inset_0_2px_5px_rgba(255,255,255,0.2),0_5px_10px_rgba(0,0,0,0.5)] active:shadow-[inset_0_2px_10px_rgba(0,0,0,0.8)] transition-all ${activeSignal === "dah" ? "bg-[#3e7c53] translate-y-1" : ""}`}
-          >
-            <div className="w-8 h-3 bg-white rounded-sm shadow-[0_0_5px_white]"></div>
-          </div>
-          <span className="text-[10px] text-white/50 font-bold tracking-widest bg-[#00000033] px-2 py-0.5 rounded">
-            DAH [K / →]
-          </span>
-        </button>
+        )}
       </div>
 
-      {lastChar && (
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-0">
-          <span
-            key={Date.now()}
-            className={`text-[20vw] font-black animate-ping select-none font-mono ${lastChar === "ERR" ? "text-red-500/20" : "text-[#ffffff15]"}`}
-          >
-            {lastChar}
-          </span>
+      {/* Instructions Section */}
+      <div className="w-full max-w-4xl mt-8 px-4 border-t border-[#2c3e30] pt-6 pb-12 z-10">
+        <h2 className="text-xl font-bold text-[#4caf50] mb-4">
+          {t("tools.cw.instructions.title")}
+        </h2>
+
+        <div className="grid md:grid-cols-2 gap-8">
+          <div>
+            <h3 className="text-lg font-bold text-[#81c784] mb-2">
+              {t("tools.cw.instructions.operation.title")}
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <h4 className="font-bold text-[#a5d6a7]">
+                  {t("tools.cw.instructions.operation.keyboard")}
+                </h4>
+                <p className="text-xs md:text-sm text-[#a5d6a7]/80 leading-relaxed">
+                  {t("tools.cw.instructions.operation.keyboard_desc")}
+                </p>
+              </div>
+              <div>
+                <h4 className="font-bold text-[#a5d6a7]">
+                  {t("tools.cw.instructions.operation.buttons")}
+                </h4>
+                <p className="text-xs md:text-sm text-[#a5d6a7]/80 leading-relaxed">
+                  {t("tools.cw.instructions.operation.buttons_desc")}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <h3 className="text-lg font-bold text-[#81c784] mb-2">
+              {t("tools.cw.instructions.speed_guide.title")}
+            </h3>
+            <ul className="space-y-3 text-xs md:text-sm text-[#a5d6a7]/80 list-disc pl-4 leading-relaxed">
+              <li>{t("tools.cw.instructions.speed_guide.beginner")}</li>
+              <li>{t("tools.cw.instructions.speed_guide.intermediate")}</li>
+              <li>{t("tools.cw.instructions.speed_guide.advanced")}</li>
+            </ul>
+          </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }

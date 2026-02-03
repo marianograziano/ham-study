@@ -312,6 +312,52 @@ export default {
       description:
         "Morse Code trainer based on Web Audio API, supporting real-time decoding and visualization.",
       keywords: "CW, Morse Code, Trainer, Web Audio API",
+      panel: {
+        letters: "LETTERS",
+        numbers: "NUMBERS",
+        symbols: "SYMBOLS",
+        rx_log: "RX LOG",
+        speed: "SPEED",
+        clear: "CLEAR",
+      },
+      control: {
+        dit: "DIT [J / ←]",
+        dah: "DAH [K / →]",
+        backspace: "DEL [BS]",
+        reset: "RESET [ESC]",
+      },
+      status: {
+        ready: "READY",
+      },
+      speed: {
+        slow: "SLOW",
+        med: "MED",
+        fast: "FAST",
+        beginner: "Beginner",
+        intermediate: "Intermediate",
+        advanced: "Advanced",
+      },
+      instructions: {
+        title: "Instructions",
+        operation: {
+          title: "How to Operate",
+          keyboard: "Keyboard Control",
+          keyboard_desc:
+            "Use '.' / 'J' / 'Left Arrow' for DIT. Use '-' / 'K' / 'Right Arrow' for DAH. Space for word gap. Backspace to delete.",
+          buttons: "On-Screen Buttons",
+          buttons_desc:
+            "Tap the large buttons at the bottom for DIT and DAH. Use the small buttons for Clear, Delete, and Reset.",
+        },
+        speed_guide: {
+          title: "Speed Settings",
+          beginner:
+            "Beginner: Slow speed (WPM lower) with longer inter-character spacing. Ideal for first-time learners to distinguish dots and dashes.",
+          intermediate:
+            "Intermediate: Moderate speed. Reduces the exaggerated spacing. Good for practicing rhythm and standard character formation.",
+          advanced:
+            "Advanced: Fast speed. Minimal spacing. Simulates real-world high-speed CW operation or contesting conditions.",
+        },
+      },
     },
   },
 
