@@ -1,6 +1,7 @@
 import { ArrowLeftIcon, HouseIcon } from "@phosphor-icons/react";
 import { useTranslation } from "react-i18next";
 import { Link, Outlet, useLocation } from "react-router";
+import { LocaleLink } from "~/components/locale-link";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -60,10 +61,10 @@ export default function DemosLayout() {
             <BreadcrumbList>
               <BreadcrumbItem>
                 <BreadcrumbLink asChild>
-                  <Link to="/" className="flex items-center gap-2">
+                  <LocaleLink to="/" className="flex items-center gap-2">
                     <HouseIcon className="h-4 w-4" weight="bold" />
                     {t("nav.home")}
-                  </Link>
+                  </LocaleLink>
                 </BreadcrumbLink>
               </BreadcrumbItem>
               <BreadcrumbSeparator />
