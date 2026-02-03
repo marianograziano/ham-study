@@ -80,6 +80,9 @@ const getDemoRoutes = (idPrefix: string) => [
   route("tools/moxon-calculator", "routes/tools/moxon-calculator.tsx", {
     id: `${idPrefix}-moxon-tools`,
   }),
+  route("tools/cw", "routes/tools/cw.tsx", {
+    id: `${idPrefix}-cw-tool`,
+  }),
 ];
 
 export default [
