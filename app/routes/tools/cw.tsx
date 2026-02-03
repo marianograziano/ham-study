@@ -328,7 +328,7 @@ export default function CwTrainer() {
   const addDit = useCallback(() => {
     if (currentPath.length < 8) {
       clearTimers();
-      setCurrentPath((prev) => prev + ".");
+      setCurrentPath((prev) => `${prev}.`);
       playBeep(0.08);
       triggerSignal("dit");
     }
@@ -337,7 +337,7 @@ export default function CwTrainer() {
   const addDah = useCallback(() => {
     if (currentPath.length < 8) {
       clearTimers();
-      setCurrentPath((prev) => prev + "-");
+      setCurrentPath((prev) => `${prev}-`);
       playBeep(0.2);
       triggerSignal("dah");
     }
@@ -348,14 +348,14 @@ export default function CwTrainer() {
       const char = CODE_TO_CHAR[currentPath];
       if (char) {
         setLastChar(char);
-        setMessage((prev) => prev + char);
+        setMessage((prev) => `${prev}${char}`);
       } else {
-        setMessage((prev) => prev + "?");
+        setMessage((prev) => `${prev}?`);
       }
       setCurrentPath("");
 
       wordTimeoutRef.current = setTimeout(() => {
-        setMessage((prev) => (prev.endsWith(" ") ? prev : prev + " "));
+        setMessage((prev) => (prev.endsWith(" ") ? prev : `${prev} `));
       }, currentSpeed.wordDelay);
     }
   }, [currentPath, currentSpeed]);
@@ -416,7 +416,7 @@ export default function CwTrainer() {
         e.preventDefault();
         commitChar();
         setTimeout(
-          () => setMessage((prev) => (prev.endsWith(" ") ? prev : prev + " ")),
+          () => setMessage((prev) => (prev.endsWith(" ") ? prev : `${prev} `)),
           10,
         );
       }
