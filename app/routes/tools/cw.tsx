@@ -282,7 +282,7 @@ export default function CwTrainer() {
   };
 
   const playBeep = useCallback(
-    (duration: number, type: OscillatorType = "square") => {
+    (duration: number, type: OscillatorType = "sine") => {
       if (!isSoundEnabled) return;
       try {
         const audioCtx = new (
@@ -294,18 +294,22 @@ export default function CwTrainer() {
         const gainNode = audioCtx.createGain();
         oscillator.type = type;
 
-        const freq = type === "sawtooth" ? 150 : 600;
+        const freq = type === "sawtooth" ? 150 : 800;
         oscillator.frequency.setValueAtTime(freq, audioCtx.currentTime);
 
-        gainNode.gain.setValueAtTime(0.05, audioCtx.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(
-          0.001,
-          audioCtx.currentTime + duration,
-        );
+        const now = audioCtx.currentTime;
+        const attack = 0.005;
+        const release = 0.005;
+
+        gainNode.gain.setValueAtTime(0, now);
+        gainNode.gain.linearRampToValueAtTime(0.1, now + attack);
+        gainNode.gain.setValueAtTime(0.1, now + duration - release);
+        gainNode.gain.linearRampToValueAtTime(0, now + duration);
+
         oscillator.connect(gainNode);
         gainNode.connect(audioCtx.destination);
         oscillator.start();
-        oscillator.stop(audioCtx.currentTime + duration);
+        oscillator.stop(now + duration + 0.1);
       } catch (_e) {}
     },
     [isSoundEnabled],
