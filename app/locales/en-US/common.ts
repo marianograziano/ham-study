@@ -319,7 +319,11 @@ export default {
         rx_log: "RX LOG",
         speed: "SPEED",
         clear: "CLEAR",
+        morse_code_reference: "Morse Code Reference",
+        ref: "REF",
       },
+      circuit_board_visualization: "Morse Code Circuit Board Visualization",
+      input_aria_label: "Morse Code Input",
       control: {
         dit: "DIT [J / ←]",
         dah: "DAH [K / →]",

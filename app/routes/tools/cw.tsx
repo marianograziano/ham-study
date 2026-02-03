@@ -4,15 +4,40 @@ import {
   BackspaceIcon,
   GaugeIcon,
   TrashIcon,
+  BookIcon,
 } from "@phosphor-icons/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { MetaFunction } from "react-router";
+import i18next from "i18next";
+import { initReactI18next } from "react-i18next";
+import resources from "~/locales";
+import { getLocale } from "~/middleware/i18next";
+import type { Route } from "./+types/cw";
 
-export const meta: MetaFunction = () => {
+export const loader = async ({ request }: Route.LoaderArgs) => {
+  const locale = getLocale(request);
+  const t = await i18next.use(initReactI18next).init({
+    lng: locale,
+    ns: "common",
+    resources,
+  });
+  return {
+    title: t("tools.cw.title") + " | Ham Study",
+    description: t("tools.cw.description"),
+    keywords: t("tools.cw.keywords"),
+  };
+};
+
+export const meta: MetaFunction<typeof loader> = ({ data }) => {
+  if (!data) return [{ title: "CW Trainer" }];
+  const { title, description, keywords } = data;
   return [
-    { title: "CW Trainer | Ham Study" },
-    { name: "description", content: "Morse Code Visualization and Trainer" },
+    { title },
+    { name: "description", content: description },
+    { property: "og:title", content: title },
+    { property: "og:description", content: description },
+    { name: "keywords", content: keywords },
   ];
 };
 
@@ -218,15 +243,17 @@ const TEXT_POSITIONS: Record<string, string> = {
 };
 
 // === 速度预设配置 ===
+type SpeedMode = "beginner" | "intermediate" | "advanced";
+
 interface SpeedSetting {
-  id: string;
-  label: string;
-  desc: string;
+  id: SpeedMode;
+  label: "slow" | "med" | "fast";
+  desc: "beginner" | "intermediate" | "advanced";
   charDelay: number;
   wordDelay: number;
 }
 
-const SPEED_SETTINGS: Record<string, SpeedSetting> = {
+const SPEED_SETTINGS: Record<SpeedMode, SpeedSetting> = {
   beginner: {
     id: "beginner",
     label: "slow",
@@ -250,6 +277,40 @@ const SPEED_SETTINGS: Record<string, SpeedSetting> = {
   },
 };
 
+const ReferenceList = ({
+  title,
+  filter,
+  twoCols = false,
+}: {
+  title: string;
+  filter: (char: string) => boolean;
+  twoCols?: boolean;
+}) => {
+  return (
+    <div className="bg-[#1a2e22]/90 border border-[#2c3e30] rounded-lg p-3 shadow-lg backdrop-blur-sm w-full">
+      <div className="text-[10px] text-[#4caf50] font-bold tracking-widest border-b border-[#2c5c3e] pb-1 mb-2 text-center">
+        {title}
+      </div>
+      <div
+        className={`grid ${twoCols ? "grid-cols-2" : "grid-cols-1"} gap-x-4 gap-y-1 text-xs font-mono`}
+      >
+        {Object.entries(MORSE_CODE_MAP)
+          .filter(([_, char]) => filter(char))
+          .sort((a, b) => a[1].localeCompare(b[1]))
+          .map(([code, char]) => (
+            <div
+              key={char}
+              className="flex justify-between items-center text-[#a5d6a7]/80 hover:text-white transition-colors"
+            >
+              <span className="font-bold w-4 md:w-6">{char}</span>
+              <span className="tracking-widest text-[#4caf50]">{code}</span>
+            </div>
+          ))}
+      </div>
+    </div>
+  );
+};
+
 export default function CwTrainer() {
   const { t } = useTranslation("common");
   const [currentPath, setCurrentPath] = useState("");
@@ -257,13 +318,64 @@ export default function CwTrainer() {
   const [message, setMessage] = useState("");
   const [isSoundEnabled] = useState(true);
   const [activeSignal, setActiveSignal] = useState<string | null>(null);
-  const [speedMode, setSpeedMode] = useState("intermediate");
+  const [speedMode, setSpeedMode] = useState<SpeedMode>("intermediate");
+  const [showRef, setShowRef] = useState(false);
 
   const charTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const wordTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const currentSpeed = SPEED_SETTINGS[speedMode];
+
+  // Auto-scroll to active node
+  useEffect(() => {
+    if (!scrollContainerRef.current) return;
+
+    let targetX = 0;
+    if (currentPath) {
+      const char = CODE_TO_CHAR[currentPath];
+      if (char && NODES[char]) {
+        targetX = NODES[char].x * 40;
+      } else {
+        // If current path doesn't match a clear node yet (incomplete),
+        // try to follow the path visually or just keep center?
+        // Actually, let's try to find the last valid node or just stay centered if unknown.
+        // For partial matches that don't map to a char (like just "."), CODE_TO_CHAR["."] is "E", so it works.
+        // But what if it's ".-.-" (Ä) -> it works.
+        // If it's something invalid?
+      }
+    }
+
+    // SVG coordinate space: -400 to 400.
+    // X=0 is at center (400px from left in SVG space).
+    // pixelX in SVG = targetX + 400.
+
+    // We want this pixelX to be in the center of the container.
+    const container = scrollContainerRef.current;
+
+    // However, the SVG is scaled to fit height or width.
+    // On mobile (overflowing), the SVG has min-width 800px.
+    // If exact 800px width, then 1 SVG unit = 1 px.
+    // If wider, we need to account for scale.
+    // But since we set h-full and w-auto, and the container handles overflow.
+    // And min-width is 800px.
+    // Let's assume standard 1:1 mapping for simplicity first, or calculate scale.
+
+    const svgWidth = container.scrollWidth;
+    const viewPortWidth = 800; // viewBox width
+    const scale = svgWidth / viewPortWidth;
+
+    const pixelX = (targetX + 400) * scale;
+    const containerWidth = container.clientWidth;
+
+    const scrollTo = pixelX - containerWidth / 2;
+
+    container.scrollTo({
+      left: scrollTo,
+      behavior: "smooth",
+    });
+  }, [currentPath]);
 
   // 自动清除大字提示 (Fix: Clear lastChar after 800ms)
   useEffect(() => {
@@ -622,87 +734,84 @@ export default function CwTrainer() {
       ></div>
 
       <div className="relative h-[80dvh] w-full flex flex-col items-center justify-between overflow-hidden p-4 z-10">
-        {/* 左侧参考面板：字母 */}
-        <div className="absolute left-4 top-1/2 -translate-y-1/2 hidden md:flex flex-col gap-4 z-20 max-h-[80%] overflow-y-auto custom-scrollbar pointer-events-auto">
-          <div className="bg-[#1a2e22]/90 border border-[#2c3e30] rounded-lg p-3 shadow-lg backdrop-blur-sm w-60">
-            <div className="text-[10px] text-[#4caf50] font-bold tracking-widest border-b border-[#2c5c3e] pb-1 mb-2 text-center">
-              {t("tools.cw.panel.letters")}
-            </div>
-            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs font-mono">
-              {Object.entries(MORSE_CODE_MAP)
-                .filter(([_, char]) => /^[A-Z]$/.test(char))
-                .sort((a, b) => a[1].localeCompare(b[1]))
-                .map(([code, char]) => (
-                  <div
-                    key={char}
-                    className="flex justify-between items-center text-[#a5d6a7]/80 hover:text-white transition-colors"
-                  >
-                    <span className="font-bold w-4">{char}</span>
-                    <span className="tracking-widest text-[#4caf50]">
-                      {code}
-                    </span>
-                  </div>
-                ))}
-            </div>
-          </div>
+        {/* 左侧参考面板：字母 (Desktop) */}
+        <div className="absolute left-4 top-1/2 -translate-y-1/2 hidden md:flex flex-col gap-4 z-20 max-h-[80%] overflow-y-auto custom-scrollbar pointer-events-auto w-60">
+          <ReferenceList
+            title={t("tools.cw.panel.letters")}
+            filter={(c) => /^[A-Z]$/.test(c)}
+            twoCols
+          />
         </div>
 
-        {/* 右侧参考面板：数字与符号 */}
-        <div className="absolute right-4 top-1/2 -translate-y-1/2 hidden md:flex flex-col gap-4 z-20 max-h-[80%] overflow-y-auto custom-scrollbar pointer-events-auto">
-          <div className="bg-[#1a2e22]/90 border border-[#2c3e30] rounded-lg p-3 shadow-lg backdrop-blur-sm w-36">
-            <div className="text-[10px] text-[#4caf50] font-bold tracking-widest border-b border-[#2c5c3e] pb-1 mb-2 text-center">
-              {t("tools.cw.panel.numbers")}
-            </div>
-            <div className="flex flex-col gap-1 text-xs font-mono mb-4">
-              {Object.entries(MORSE_CODE_MAP)
-                .filter(([_, char]) => /^[0-9]$/.test(char))
-                .sort((a, b) => a[1].localeCompare(b[1]))
-                .map(([code, char]) => (
-                  <div
-                    key={char}
-                    className="flex justify-between items-center text-[#a5d6a7]/80 hover:text-white transition-colors"
-                  >
-                    <span className="font-bold w-6">{char}</span>
-                    <span className="tracking-widest text-[#4caf50]">
-                      {code}
-                    </span>
-                  </div>
-                ))}
-            </div>
+        {/* 右侧参考面板：数字与符号 (Desktop) */}
+        <div className="absolute right-4 top-1/2 -translate-y-1/2 hidden md:flex flex-col gap-4 z-20 max-h-[80%] overflow-y-auto custom-scrollbar pointer-events-auto w-36">
+          <ReferenceList
+            title={t("tools.cw.panel.numbers")}
+            filter={(c) => /^[0-9]$/.test(c)}
+          />
+          <ReferenceList
+            title={t("tools.cw.panel.symbols")}
+            filter={(c) =>
+              !/^[A-Z0-9]$/.test(c) && !["CH", "Ä", "Ö", "Ü", "Ð"].includes(c)
+            }
+          />
+        </div>
 
-            <div className="text-[10px] text-[#4caf50] font-bold tracking-widest border-b border-[#2c5c3e] pb-1 mb-2 text-center">
-              {t("tools.cw.panel.symbols")}
+        {/* Mobile Reference Overlay */}
+        {showRef && (
+          <div className="absolute inset-0 z-50 bg-[#0d1b11]/95 backdrop-blur-md p-4 overflow-y-auto flex flex-col gap-4 md:hidden">
+            <div className="flex justify-between items-center mb-2">
+              <h3 className="text-[#4caf50] font-bold">
+                {t("tools.cw.panel.morse_code_reference")}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowRef(false)}
+                className="p-2 text-white/50 hover:text-white"
+              >
+                ✕
+              </button>
             </div>
-            <div className="flex flex-col gap-1 text-xs font-mono">
-              {Object.entries(MORSE_CODE_MAP)
-                .filter(
-                  ([_, char]) =>
-                    !/^[A-Z0-9]$/.test(char) &&
-                    !["CH", "Ä", "Ö", "Ü", "Ð"].includes(char),
-                )
-                .sort((a, b) => a[1].localeCompare(b[1]))
-                .map(([code, char]) => (
-                  <div
-                    key={char}
-                    className="flex justify-between items-center text-[#a5d6a7]/80 hover:text-white transition-colors"
-                  >
-                    <span className="font-bold w-6">{char}</span>
-                    <span className="tracking-widest text-[#4caf50]">
-                      {code}
-                    </span>
-                  </div>
-                ))}
+            <div className="space-y-4 pb-10">
+              <ReferenceList
+                title={t("tools.cw.panel.letters")}
+                filter={(c) => /^[A-Z]$/.test(c)}
+                twoCols
+              />
+              <div className="grid grid-cols-2 gap-4">
+                <ReferenceList
+                  title={t("tools.cw.panel.numbers")}
+                  filter={(c) => /^[0-9]$/.test(c)}
+                />
+                <ReferenceList
+                  title={t("tools.cw.panel.symbols")}
+                  filter={(c) =>
+                    !/^[A-Z0-9]$/.test(c) &&
+                    !["CH", "Ä", "Ö", "Ü", "Ð"].includes(c)
+                  }
+                />
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* 顶部显示区：RX LOG + 速度控制 */}
-        <div className="w-full max-w-4xl bg-[#1a2e22] border-4 border-[#2c3e30] rounded-lg p-2 shadow-lg relative mt-2 z-20 flex flex-col h-36">
+        <div className="w-full max-w-4xl bg-[#1a2e22] border-4 border-[#2c3e30] rounded-lg p-2 shadow-lg relative mt-2 z-20 flex flex-col h-28 md:h-36">
           <div className="flex justify-between items-center mb-1 border-b border-[#2c5c3e] pb-1">
             <div className="flex items-center gap-4">
               <span className="text-[10px] text-[#4caf50] font-bold tracking-widest flex items-center gap-2">
                 <ActivityIcon size={12} /> {t("tools.cw.panel.rx_log")}
               </span>
+
+              {/* Mobile Reference Toggle */}
+              <button
+                type="button"
+                onClick={() => setShowRef((p) => !p)}
+                className="md:hidden text-[9px] bg-[#0d1b11] px-2 py-0.5 rounded border border-[#2c5c3e] text-[#a5d6a7] hover:text-white transition-colors"
+              >
+                <BookIcon size={10} className="inline" />{" "}
+                {t("tools.cw.panel.ref")}
+              </button>
 
               <button
                 type="button"
@@ -712,8 +821,8 @@ export default function CwTrainer() {
                 <GaugeIcon size={10} />
                 <span>
                   {t("tools.cw.panel.speed")}:{" "}
-                  {t(`tools.cw.speed.${currentSpeed.label}` as any)} (
-                  {t(`tools.cw.speed.${currentSpeed.desc}` as any)})
+                  {t(`tools.cw.speed.${currentSpeed.label}`)} (
+                  {t(`tools.cw.speed.${currentSpeed.desc}`)})
                 </span>
               </button>
             </div>
@@ -734,45 +843,50 @@ export default function CwTrainer() {
         </div>
 
         {/* 主电路板区域 */}
-        <div className="flex-1 w-full max-w-7xl flex items-center justify-center relative z-10">
-          <svg
-            viewBox="-400 -30 800 280"
-            className="w-full h-full drop-shadow-[0_10px_20px_rgba(0,0,0,0.5)]"
-            preserveAspectRatio="xMidYMid meet"
+        <div className="flex-1 w-full max-w-7xl relative z-10 overflow-hidden flex flex-col justify-center my-2">
+          <div
+            ref={scrollContainerRef}
+            className="w-full h-full overflow-x-auto overflow-y-hidden custom-scrollbar flex items-center"
           >
-            <title>Morse Code Circuit Board Visualization</title>
-            {Object.entries(NODES).map(([char, node]) =>
-              renderLine(char, node),
-            )}
+            <svg
+              viewBox="-400 -30 800 280"
+              className="h-full w-auto min-w-[800px] md:min-w-0 md:w-full drop-shadow-[0_10px_20px_rgba(0,0,0,0.5)] mx-auto"
+              preserveAspectRatio="xMidYMid meet"
+            >
+              <title>{t("tools.cw.circuit_board_visualization")}</title>
+              {Object.entries(NODES).map(([char, node]) =>
+                renderLine(char, node),
+              )}
 
-            <g transform="translate(0, 0)">
-              <rect
-                x="-8"
-                y="-8"
-                width="16"
-                height="16"
-                rx="2"
-                className="fill-[#212121] stroke-[#d4af37] stroke-[0.5]"
-              />
-              <path
-                d="M-8 -4 H-10 M-8 0 H-10 M-8 4 H-10 M8 -4 H10 M8 0 H10 M8 4 H10 M-4 -8 V-10 M0 -8 V-10 M4 -8 V-10 M-4 8 V10 M0 8 V10 M4 8 V10"
-                stroke="#d4af37"
-                strokeWidth="1"
-              />
-              <text
-                x="0"
-                y="2.5"
-                textAnchor="middle"
-                className="text-[5px] fill-[#d4af37] font-mono font-bold tracking-widest"
-              >
-                IC1
-              </text>
-            </g>
+              <g transform="translate(0, 0)">
+                <rect
+                  x="-8"
+                  y="-8"
+                  width="16"
+                  height="16"
+                  rx="2"
+                  className="fill-[#212121] stroke-[#d4af37] stroke-[0.5]"
+                />
+                <path
+                  d="M-8 -4 H-10 M-8 0 H-10 M-8 4 H-10 M8 -4 H10 M8 0 H10 M8 4 H10 M-4 -8 V-10 M0 -8 V-10 M4 -8 V-10 M-4 8 V10 M0 8 V10 M4 8 V10"
+                  stroke="#d4af37"
+                  strokeWidth="1"
+                />
+                <text
+                  x="0"
+                  y="2.5"
+                  textAnchor="middle"
+                  className="text-[5px] fill-[#d4af37] font-mono font-bold tracking-widest"
+                >
+                  IC1
+                </text>
+              </g>
 
-            {Object.entries(NODES).map(([char, node]) =>
-              renderNode(char, node),
-            )}
-          </svg>
+              {Object.entries(NODES).map(([char, node]) =>
+                renderNode(char, node),
+              )}
+            </svg>
+          </div>
         </div>
 
         {/* 底部控制器 */}
@@ -785,7 +899,7 @@ export default function CwTrainer() {
             <div
               className={`w-16 h-16 rounded-full border-4 border-[#1b3323] flex items-center justify-center bg-[#2e5c3e] shadow-[inset_0_2px_5px_rgba(255,255,255,0.2),0_5px_10px_rgba(0,0,0,0.5)] active:shadow-[inset_0_2px_10px_rgba(0,0,0,0.8)] transition-all ${activeSignal === "dit" ? "bg-[#3e7c53] translate-y-1" : ""}`}
             >
-              <div className="w-3 h-3 bg-white rounded-full shadow-[0_0_5px_white]"></div>
+              <div className="w-2.5 h-2.5 bg-white rounded-full shadow-[0_0_5px_white]"></div>
             </div>
             <span className="text-[10px] text-white/50 font-bold tracking-widest bg-[#00000033] px-2 py-0.5 rounded">
               {t("tools.cw.control.dit")}
@@ -803,7 +917,7 @@ export default function CwTrainer() {
                 autoCorrect="off"
                 autoComplete="off"
                 spellCheck="false"
-                aria-label="Morse Code Input"
+                aria-label={t("tools.cw.input_aria_label")}
               />
               <span
                 className="text-xl font-mono text-[#111] tracking-widest font-bold opacity-80"
