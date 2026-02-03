@@ -216,3 +216,16 @@ export const SPEED_SETTINGS: Record<SpeedMode, SpeedSetting> = {
     wordDelay: 1200,
   },
 };
+
+// === 练习范本 ===
+export const PRACTICE_TEXTS = [
+  { id: 1, title: "基础字母", text: "CQ CQ DE BG8A BG8A K" },
+  { id: 2, title: "常用缩写", text: "GM OM UR RST 599 73 TU" },
+  { id: 3, title: "SOS信号", text: "SOS SOS SOS DE TITANIC" },
+  {
+    id: 4,
+    title: "全字母句",
+    text: "THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG",
+  },
+  { id: 5, title: "数字练习", text: "12345 67890 555 7388" },
+];

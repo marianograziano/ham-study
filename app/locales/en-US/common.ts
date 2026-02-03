@@ -321,6 +321,14 @@ export default {
         clear: "CLEAR",
         morse_code_reference: "Morse Code Reference",
         ref: "REF",
+        training_mode: "TRAINING MODE",
+        free_play: "FREE PLAY",
+        edit: "EDIT",
+        next: "NEXT",
+        custom_text: "CUSTOM TEXT",
+        custom_text_placeholder: "ENTER TEXT (A-Z 0-9)...",
+        cancel: "CANCEL",
+        confirm: "CONFIRM",
       },
       circuit_board_visualization: "Morse Code Circuit Board Visualization",
       input_aria_label: "Morse Code Input",
@@ -361,6 +369,8 @@ export default {
           advanced:
             "Advanced: Fast speed. Minimal spacing. Simulates real-world high-speed CW operation or contesting conditions.",
         },
+        training_desc:
+          "Switch to Training Mode to practice with on-screen text. The system validates your input in real-time and calculates your WPM. You can also enter custom text for targeted practice.",
       },
     },
   },

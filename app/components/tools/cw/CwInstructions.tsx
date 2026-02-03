@@ -44,6 +44,16 @@ export const CwInstructions = () => {
             <li>{t("tools.cw.instructions.speed_guide.advanced")}</li>
           </ul>
         </div>
+
+        <div>
+          <h3 className="text-[#a5d6a7] font-bold mb-2">
+            {t("tools.cw.panel.training_mode")}
+          </h3>
+          <p className="mb-2">
+            {t("tools.cw.panel.training_mode")}:{" "}
+            {t("tools.cw.instructions.training_desc")}
+          </p>
+        </div>
       </div>
     </div>
   );

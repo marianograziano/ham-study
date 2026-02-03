@@ -7,6 +7,7 @@ import { CwControls } from "~/components/tools/cw/CwControls";
 import { CwHeader } from "~/components/tools/cw/CwHeader";
 import { CwInstructions } from "~/components/tools/cw/CwInstructions";
 import { CwMobileRef } from "~/components/tools/cw/CwMobileRef";
+import { CwPracticeModal } from "~/components/tools/cw/CwPracticeModal";
 import { ReferenceList } from "~/components/tools/cw/ReferenceList";
 import { useCwGame } from "~/components/tools/cw/useCwGame";
 import resources from "~/locales";
@@ -47,7 +48,6 @@ export default function CwTrainer() {
     currentPath,
     lastChar,
     message,
-    setMessage,
     activeSignal,
     cycleSpeed,
     addDit,
@@ -56,10 +56,34 @@ export default function CwTrainer() {
     reset,
     inputRef,
     currentSpeed,
+    // Practice Mode
+    isPracticeMode,
+    setIsPracticeMode,
+    practiceText,
+    practiceIndex,
+    practiceStats,
+    changePracticeText,
+    openCustomTextModal,
+    saveCustomText,
+    lastInputCorrect,
+    isEditing,
+    setIsEditing,
+    customTextBuffer,
+    setCustomTextBuffer,
   } = useCwGame();
 
   return (
     <div className="min-h-screen w-full bg-[#0d1b11] flex flex-col items-center font-mono relative select-none text-[#a5d6a7]">
+      {/* Custom Text Modal */}
+      {isEditing && (
+        <CwPracticeModal
+          customTextBuffer={customTextBuffer}
+          setCustomTextBuffer={setCustomTextBuffer}
+          setIsEditing={setIsEditing}
+          saveCustomText={saveCustomText}
+        />
+      )}
+
       {/* Background Grid */}
       <div
         className="absolute inset-0 pointer-events-none opacity-40 h-full"
@@ -103,10 +127,19 @@ export default function CwTrainer() {
         {/* 顶部显示区：RX LOG + 速度控制 */}
         <CwHeader
           message={message}
-          setMessage={setMessage}
           cycleSpeed={cycleSpeed}
           currentSpeed={currentSpeed}
           setShowRef={setShowRef}
+          // Practice Mode Props
+          isPracticeMode={isPracticeMode}
+          setIsPracticeMode={setIsPracticeMode}
+          practiceText={practiceText}
+          practiceIndex={practiceIndex}
+          practiceStats={practiceStats}
+          lastInputCorrect={lastInputCorrect}
+          changePracticeText={changePracticeText}
+          openCustomTextModal={openCustomTextModal}
+          reset={reset}
         />
 
         {/* 主电路板区域 */}
@@ -127,7 +160,11 @@ export default function CwTrainer() {
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-0">
             <span
               key={Date.now()}
-              className={`text-[20vw] font-black animate-ping select-none font-mono ${lastChar === "ERR" ? "text-red-500/20" : "text-[#ffffff15]"}`}
+              className={`text-[20vw] font-black animate-ping select-none font-mono ${
+                lastChar === "ERR" || lastChar === "WAIT!"
+                  ? "text-red-500/20"
+                  : "text-[#ffffff15]"
+              }`}
             >
               {lastChar}
             </span>
