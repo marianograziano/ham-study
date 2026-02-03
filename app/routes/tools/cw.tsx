@@ -376,7 +376,7 @@ export default function CwTrainer() {
       clearTimers();
       setCurrentPath("");
       setMessage((prev) => prev.slice(0, -1));
-      setLastChar("ERR");
+      setLastChar("DEL");
       playBeep(0.3, "sawtooth");
       return;
     }
