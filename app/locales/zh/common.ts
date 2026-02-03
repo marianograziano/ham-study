@@ -305,6 +305,14 @@ export default {
         clear: "清空",
         morse_code_reference: "莫尔斯电码参考表",
         ref: "参考",
+        training_mode: "训练模式",
+        free_play: "自由练习",
+        edit: "编辑",
+        next: "下一个",
+        custom_text: "自定义文本",
+        custom_text_placeholder: "输入文本 (A-Z 0-9)...",
+        cancel: "取消",
+        confirm: "确认",
       },
       circuit_board_visualization: "莫尔斯电码电路板可视化",
       input_aria_label: "莫尔斯电码输入",
@@ -345,6 +353,8 @@ export default {
           advanced:
             "高级 (Advanced): 快速模式。极短的间距，模拟真实的高速通信或竞赛环境，适合老手挑战。",
         },
+        training_desc:
+          "切换到训练模式后，您可以跟随屏幕上的文本进行练习。系统会实时判断您的输入是否正确，并统计您的抄收速度 (WPM)。您也可以输入自定义文本进行针对性练习。",
       },
     },
   },
