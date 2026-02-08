@@ -127,8 +127,8 @@ export function useCwGameLogic() {
     });
 
     // 2. Check Wall Collisions
-    // Add a buffer (5%) so the char visually crosses the wall before disappearing
-    const HIT_BUFFER = 5;
+    // Remove buffer so char disappears exactly at wall
+    const HIT_BUFFER = 0;
     const wallHits = movedChars.filter(
       (char) => char.y >= WALL_Y + HIT_BUFFER && !char.isHit,
     );
@@ -151,6 +151,8 @@ export function useCwGameLogic() {
       // Mark as processed immediately
       newHits.forEach((char) => {
         processedHitsRef.current.add(char.id);
+        // Add blood effect (red explosion)
+        createExplosion(char.x, char.y, "#ef4444");
       });
 
       setGameState((gs) => {
@@ -187,7 +189,7 @@ export function useCwGameLogic() {
     }
 
     animationRef.current = requestAnimationFrame(gameLoop);
-  }, []); // 不依赖 gameState，通过 ref 访问
+  }, [createExplosion]); // 不依赖 gameState，通过 ref 访问
 
   // Particle animation merged into gameLoop
   // useEffect removed
