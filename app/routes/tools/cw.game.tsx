@@ -53,8 +53,8 @@ export default function CwGame() {
 
   const {
     gameState,
-    fallingChars,
-    particles,
+    fallingCharsRef,
+    particlesRef,
     currentPattern,
     addDit,
     addDah,
@@ -122,8 +122,8 @@ export default function CwGame() {
       {/* Game Board */}
       <CwGameBoard
         gameState={gameState}
-        fallingChars={fallingChars}
-        particles={particles}
+        fallingCharsRef={fallingCharsRef}
+        particlesRef={particlesRef}
         onPause={pauseGame}
       />
 

@@ -21,9 +21,8 @@ const MORSE_CODE = Object.entries(MORSE_CODE_MAP).map(([pattern, char]) => ({
 export function useCwGameLogic() {
   const animationRef = useRef<number>(0);
   const spawnTimeoutRef = useRef<NodeJS.Timeout>(undefined);
-  const processedHitsRef = useRef<Set<string>>(new Set());
   const lastFrameTimeRef = useRef<number>(0);
-  const fallingCharsSourceRef = useRef<FallingChar[]>([]);
+  const processedHitsRef = useRef<Set<string>>(new Set());
 
   // Game state
   const [gameState, setGameState] = useState<GameState>({
@@ -40,8 +39,9 @@ export function useCwGameLogic() {
   const gameStateRef = useRef(gameState);
   gameStateRef.current = gameState;
 
-  const [fallingChars, setFallingChars] = useState<FallingChar[]>([]);
-  const [particles, setParticles] = useState<Particle[]>([]);
+  // Use refs for high-frequency updates (Canvas rendering)
+  const fallingCharsRef = useRef<FallingChar[]>([]);
+  const particlesRef = useRef<Particle[]>([]);
   const [currentPattern, setCurrentPattern] = useState<string>("");
 
   // Difficulty scaling
@@ -69,9 +69,7 @@ export function useCwGameLogic() {
       speed: difficulty.fallSpeed + Math.random() * 0.2,
     };
 
-    fallingCharsSourceRef.current = [...fallingCharsSourceRef.current, newChar];
-    // Sync to state for render
-    setFallingChars(fallingCharsSourceRef.current);
+    fallingCharsRef.current = [...fallingCharsRef.current, newChar];
   }, [difficulty.fallSpeed]);
 
   // Create explosion particles
@@ -91,7 +89,7 @@ export function useCwGameLogic() {
           color,
         });
       }
-      setParticles((prev) => [...prev, ...newParticles]);
+      particlesRef.current = [...particlesRef.current, ...newParticles];
     },
     [],
   );
@@ -112,7 +110,7 @@ export function useCwGameLogic() {
     lastFrameTimeRef.current = now;
 
     // Use Ref as source of truth
-    const currentChars = fallingCharsSourceRef.current;
+    const currentChars = fallingCharsRef.current;
 
     // 1. Move characters (Time-based: speed is units per 16.67ms frame)
     // speed is vh/frame at 60fps.
@@ -141,7 +139,7 @@ export function useCwGameLogic() {
     );
 
     // Update Ref with new positions immediatey
-    fallingCharsSourceRef.current = survivors;
+    fallingCharsRef.current = survivors;
 
     // 4. Update Health (Side Effect)
     // Filter out hits that have already been processed
@@ -175,35 +173,24 @@ export function useCwGameLogic() {
       });
     }
 
-    // 5. Update Falling Chars State
-    // We update state to trigger render.
-    // Optimization: only update if positions changed significantly or count changed?
-    // For now, always update to ensure smooth animation
-    setFallingChars(survivors);
+    // 5. Update Particles
+    if (particlesRef.current.length > 0) {
+      particlesRef.current = particlesRef.current
+        .map((p) => ({
+          ...p,
+          x: p.x + p.vx * timeScale,
+          y: p.y + p.vy * timeScale,
+          vy: (p.vy + 0.2) * timeScale, // Gravity
+          life: p.life - 0.02 * timeScale,
+        }))
+        .filter((p) => p.life > 0);
+    }
 
     animationRef.current = requestAnimationFrame(gameLoop);
   }, []); // 不依赖 gameState，通过 ref 访问
 
-  // Particle animation
-  useEffect(() => {
-    if (particles.length === 0) return;
-
-    const interval = setInterval(() => {
-      setParticles((prev) =>
-        prev
-          .map((p) => ({
-            ...p,
-            x: p.x + p.vx,
-            y: p.y + p.vy,
-            vy: p.vy + 0.2,
-            life: p.life - 0.05,
-          }))
-          .filter((p) => p.life > 0),
-      );
-    }, 33);
-
-    return () => clearInterval(interval);
-  }, [particles.length]);
+  // Particle animation merged into gameLoop
+  // useEffect removed
 
   // Start game loop
   useEffect(() => {
@@ -300,7 +287,7 @@ export function useCwGameLogic() {
   useEffect(() => {
     if (!currentPattern) return;
 
-    const chars = fallingCharsSourceRef.current;
+    const chars = fallingCharsRef.current;
 
     // Find if pattern matches any falling char exactly
     const matchIndex = chars.findIndex((c) => {
@@ -313,17 +300,16 @@ export function useCwGameLogic() {
     if (matchIndex !== -1) {
       // Hit!
       // Update Ref first!
-      const chars = fallingCharsSourceRef.current;
+      const chars = fallingCharsRef.current;
       const idx = chars.findIndex((c) => c.id === chars[matchIndex].id);
 
       if (idx !== -1) {
         const newChars = [...chars];
         newChars[idx] = { ...newChars[idx], isHit: true };
-        fallingCharsSourceRef.current = newChars;
+        fallingCharsRef.current = newChars;
 
         createExplosion(newChars[idx].x, newChars[idx].y);
-        // Update state to render explosion
-        setFallingChars(newChars);
+        // Note: No setFallingChars, canvas will pick this up next frame
 
         setGameState((gs) => {
           const newCombo = gs.combo + 1;
@@ -340,17 +326,16 @@ export function useCwGameLogic() {
 
         // Remove after animation
         setTimeout(() => {
-          fallingCharsSourceRef.current = fallingCharsSourceRef.current.filter(
+          fallingCharsRef.current = fallingCharsRef.current.filter(
             (c) => c.id !== chars[idx].id,
           );
-          setFallingChars(fallingCharsSourceRef.current);
         }, 200);
       }
 
       clearPattern();
     } else {
       // No exact match, check if it's a prefix of any falling char
-      const chars = fallingCharsSourceRef.current;
+      const chars = fallingCharsRef.current;
       const isPrefix = chars.some((c) => {
         const p = MORSE_CODE.find((m) => m.char === c.char)?.pattern;
         return p?.startsWith(currentPattern) && !c.isHit;
@@ -364,7 +349,6 @@ export function useCwGameLogic() {
     }
   }, [currentPattern, clearPattern, createExplosion, playErrorSound]);
 
-  // Game controls
   const startGame = () => {
     console.error("ACTION: startGame called");
     setGameState({
@@ -376,9 +360,8 @@ export function useCwGameLogic() {
       combo: 0,
       maxCombo: 0,
     });
-    setFallingChars([]);
-    fallingCharsSourceRef.current = [];
-    setParticles([]);
+    fallingCharsRef.current = [];
+    particlesRef.current = [];
     setCurrentPattern("");
     processedHitsRef.current.clear();
   };
@@ -397,17 +380,16 @@ export function useCwGameLogic() {
       combo: 0,
       maxCombo: 0,
     });
-    setFallingChars([]);
-    fallingCharsSourceRef.current = [];
-    setParticles([]);
+    fallingCharsRef.current = [];
+    particlesRef.current = [];
     setCurrentPattern("");
     processedHitsRef.current.clear();
   };
 
   return {
     gameState,
-    fallingChars,
-    particles,
+    fallingCharsRef,
+    particlesRef,
     currentPattern,
     addDit,
     addDah,
