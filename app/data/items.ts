@@ -108,4 +108,9 @@ export const tools: Item[] = [
     href: "/tools/cw",
     category: "tool",
   },
+  {
+    i18nKey: "tools.cwGame",
+    href: "/tools/cw/game",
+    category: "tool",
+  },
 ];

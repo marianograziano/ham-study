@@ -1,6 +1,7 @@
 import {
   ArrowClockwiseIcon,
   CalculatorIcon,
+  GameController as GameControllerIcon,
   GithubLogoIcon,
   HouseIcon,
   WarningIcon,
@@ -471,6 +472,31 @@ export default function Home() {
                     <div className="w-6 h-2 bg-green-500 rounded-full animate-pulse delay-150" />
                     <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse delay-300" />
                   </div>
+                </div>
+              </div>
+            ),
+          };
+        case "tools.cwGame":
+          return {
+            title: t(`${item.i18nKey}.title` as never),
+            description: t(`${item.i18nKey}.description` as never),
+            href: item.href,
+            preview: (
+              <div className="flex items-center justify-center w-full h-full bg-gradient-to-b from-slate-950 to-slate-900 text-green-500 relative overflow-hidden">
+                {/* Falling chars animation */}
+                <div className="absolute inset-0">
+                  <div className="absolute top-4 left-4 text-2xl font-bold text-green-400/60 animate-pulse">A</div>
+                  <div className="absolute top-8 right-8 text-2xl font-bold text-green-400/40">B</div>
+                  <div className="absolute top-16 left-1/2 text-2xl font-bold text-green-400/50">5</div>
+                </div>
+                {/* Wall */}
+                <div className="absolute bottom-8 left-0 right-0 border-t-2 border-dashed border-red-500/50" />
+                {/* Game title */}
+                <div className="text-center z-10">
+                  <GameControllerIcon className="w-12 h-12 mx-auto mb-2 text-green-500" weight="fill" />
+                  <span className="text-2xl font-mono font-bold tracking-wider">
+                    CW DEFENSE
+                  </span>
                 </div>
               </div>
             ),
