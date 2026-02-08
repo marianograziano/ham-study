@@ -209,6 +209,34 @@ export function useCwGameLogic() {
     fallingCharsRef.current = fallingChars;
   }, [fallingChars]);
 
+  // Audio context for sound effects
+  const playErrorSound = useCallback(() => {
+    try {
+      const AudioContext =
+        window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioContext) return;
+
+      const ctx = new AudioContext();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(150, ctx.currentTime);
+      osc.frequency.linearRampToValueAtTime(100, ctx.currentTime + 0.1);
+
+      gain.gain.setValueAtTime(0.1, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start();
+      osc.stop(ctx.currentTime + 0.1);
+    } catch (e) {
+      console.error("Audio play failed", e);
+    }
+  }, []);
+
   // Check pattern match
   useEffect(() => {
     if (!currentPattern) return;
@@ -265,11 +293,11 @@ export function useCwGameLogic() {
 
       if (!isPrefix) {
         // Not a valid prefix for any current target, clear it
-        // Add a small delay/feedback? For now just clear.
+        playErrorSound();
         clearPattern();
       }
     }
-  }, [currentPattern, clearPattern, createExplosion]);
+  }, [currentPattern, clearPattern, createExplosion, playErrorSound]);
 
   // Game controls
   const startGame = () => {
