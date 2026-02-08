@@ -21,25 +21,6 @@ export function CwGameBoard({
       className="relative w-full flex-1 overflow-hidden"
       style={{ maxHeight: "80vh" }}
     >
-      {/* Start Screen */}
-      {!gameState.isPlaying && !gameState.isGameOver && (
-        <div className="absolute inset-0 flex items-center justify-center z-30 bg-slate-950/90">
-          <div className="text-center">
-            <Play
-              className="w-24 h-24 text-green-500 mx-auto mb-6"
-              weight="fill"
-            />
-            <h2 className="text-4xl font-bold text-green-400 mb-4">
-              准备好了吗？
-            </h2>
-            <p className="text-slate-400 mb-8 max-w-md">
-              按 'J' 键输入 ·（点），按 'K' 键输入
-              −（划）。在字符掉落到城墙前输入正确的摩尔斯电码来消灭它们！
-            </p>
-          </div>
-        </div>
-      )}
-
       {/* Pause Overlay */}
       {gameState.isPaused && (
         <div className="absolute inset-0 flex items-center justify-center z-30 bg-slate-950/80">
@@ -64,7 +45,7 @@ export function CwGameBoard({
           className="absolute w-2 h-2 rounded-full pointer-events-none"
           style={{
             left: `${p.x}%`,
-            top: `${p.y}vh`,
+            top: `${p.y}%`,
             backgroundColor: p.color,
             opacity: p.life,
             transform: `scale(${p.life})`,
@@ -81,7 +62,7 @@ export function CwGameBoard({
           }`}
           style={{
             left: `${char.x}%`,
-            top: `${char.y}vh`,
+            top: `${char.y}%`,
             transform: "translateX(-50%)",
           }}
         >
@@ -100,7 +81,7 @@ export function CwGameBoard({
       {/* Wall Line */}
       <div
         className="absolute left-0 right-0 border-t-4 border-dashed border-red-500/50 z-10"
-        style={{ top: `${WALL_Y}vh` }}
+        style={{ top: `${WALL_Y}%` }}
       >
         <div className="absolute right-4 -top-8 text-red-500 text-sm font-bold uppercase tracking-wider">
           防御城墙

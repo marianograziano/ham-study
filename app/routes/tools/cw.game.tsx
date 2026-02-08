@@ -42,6 +42,7 @@ export const meta: MetaFunction<typeof loader> = ({ data }) => {
 };
 
 export default function CwGame() {
+  console.error("RENDER: CwGame Component Mounted");
   const { t } = useTranslation("common");
   const [highScore, setHighScore] = useState<number>(() => {
     if (typeof window !== "undefined") {
@@ -175,6 +176,15 @@ export default function CwGame() {
           startGame();
         }}
       />
+      {/* Debug Info */}
+      <div data-testid="debug-state" style={{ display: "none" }}>
+        {JSON.stringify({
+          health: gameState.health,
+          // fallingCount: fallingChars.length,
+          score: gameState.score,
+          isPlaying: gameState.isPlaying,
+        })}
+      </div>
     </div>
   );
 }

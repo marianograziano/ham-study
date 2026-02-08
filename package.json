@@ -14,7 +14,9 @@
     "format:check": "prettier --check .",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
-    "release:start": "node scripts/start-release.js"
+    "release:start": "node scripts/start-release.js",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
     "@base-ui/react": "^1.0.0",
