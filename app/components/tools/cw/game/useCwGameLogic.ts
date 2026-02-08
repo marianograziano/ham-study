@@ -19,12 +19,6 @@ const MORSE_CODE = Object.entries(MORSE_CODE_MAP).map(([pattern, char]) => ({
   pattern: pattern.replace(/\./g, "·").replace(/-/g, "−"),
 }));
 
-// Convert dit/dah pattern to character
-const patternToChar = (pattern: string): string | null => {
-  const entry = MORSE_CODE.find((m) => m.pattern === pattern);
-  return entry?.char || null;
-};
-
 export function useCwGameLogic() {
   const animationRef = useRef<number>();
   const spawnTimeoutRef = useRef<NodeJS.Timeout>();
@@ -48,10 +42,9 @@ export function useCwGameLogic() {
   const difficulty = {
     spawnInterval: Math.max(
       800,
-      SPAWN_INTERVAL_INITIAL - Math.floor(gameState.score / 100) * 100
+      SPAWN_INTERVAL_INITIAL - Math.floor(gameState.score / 100) * 100,
     ),
-    fallSpeed:
-      FALL_SPEED_INITIAL + Math.floor(gameState.score / 100) * 0.05,
+    fallSpeed: FALL_SPEED_INITIAL + Math.floor(gameState.score / 100) * 0.05,
   };
 
   // Spawn new character
@@ -90,7 +83,7 @@ export function useCwGameLogic() {
       }
       setParticles((prev) => [...prev, ...newParticles]);
     },
-    []
+    [],
   );
 
   // Game loop
@@ -151,7 +144,7 @@ export function useCwGameLogic() {
             vy: p.vy + 0.2,
             life: p.life - 0.05,
           }))
-          .filter((p) => p.life > 0)
+          .filter((p) => p.life > 0),
       );
     }, 33);
 
@@ -164,12 +157,15 @@ export function useCwGameLogic() {
       animationRef.current = requestAnimationFrame(gameLoop);
 
       const scheduleSpawn = () => {
-        spawnTimeoutRef.current = setTimeout(() => {
-          if (gameState.isPlaying && !gameState.isPaused) {
-            spawnChar();
-            scheduleSpawn();
-          }
-        }, difficulty.spawnInterval + Math.random() * 500);
+        spawnTimeoutRef.current = setTimeout(
+          () => {
+            if (gameState.isPlaying && !gameState.isPaused) {
+              spawnChar();
+              scheduleSpawn();
+            }
+          },
+          difficulty.spawnInterval + Math.random() * 500,
+        );
       };
       scheduleSpawn();
     }
@@ -182,7 +178,13 @@ export function useCwGameLogic() {
         clearTimeout(spawnTimeoutRef.current);
       }
     };
-  }, [gameState.isPlaying, gameState.isPaused, gameLoop, spawnChar, difficulty.spawnInterval]);
+  }, [
+    gameState.isPlaying,
+    gameState.isPaused,
+    gameLoop,
+    spawnChar,
+    difficulty.spawnInterval,
+  ]);
 
   // Handle morse code input
   const addDit = useCallback(() => {
@@ -201,52 +203,71 @@ export function useCwGameLogic() {
     setCurrentPattern("");
   }, []);
 
+  // Ref for falling chars to access in effect without dependency issues
+  const fallingCharsRef = useRef(fallingChars);
+  useEffect(() => {
+    fallingCharsRef.current = fallingChars;
+  }, [fallingChars]);
+
   // Check pattern match
   useEffect(() => {
     if (!currentPattern) return;
 
-    const matchedChar = patternToChar(currentPattern);
-    if (matchedChar) {
-      setFallingChars((chars) => {
-        const matchIndex = chars.findIndex(
-          (c) => c.char === matchedChar && !c.isHit
-        );
+    const chars = fallingCharsRef.current;
 
-        if (matchIndex !== -1) {
-          const newChars = [...chars];
-          newChars[matchIndex] = { ...newChars[matchIndex], isHit: true };
+    // Find if pattern matches any falling char exactly
+    const matchIndex = chars.findIndex((c) => {
+      const p = MORSE_CODE.find((m) => m.char === c.char)?.pattern;
+      return p === currentPattern && !c.isHit;
+    });
 
-          createExplosion(
-            newChars[matchIndex].x,
-            newChars[matchIndex].y
+    if (matchIndex !== -1) {
+      // Hit!
+      setFallingChars((prev) => {
+        // Find the char in the current state (it might have moved slightly, but ID is stable)
+        const idx = prev.findIndex((c) => c.id === chars[matchIndex].id);
+        if (idx === -1) return prev;
+
+        const newChars = [...prev];
+        newChars[idx] = { ...newChars[idx], isHit: true };
+
+        createExplosion(newChars[idx].x, newChars[idx].y);
+
+        setGameState((gs) => {
+          const newCombo = gs.combo + 1;
+          const points = 10 + Math.floor(newCombo / 5) * 5;
+          const newScore = gs.score + points;
+
+          return {
+            ...gs,
+            score: newScore,
+            combo: newCombo,
+            maxCombo: Math.max(gs.maxCombo, newCombo),
+          };
+        });
+
+        // Remove after animation
+        setTimeout(() => {
+          setFallingChars((current) =>
+            current.filter((c) => c.id !== prev[idx].id),
           );
+        }, 200);
 
-          setGameState((gs) => {
-            const newCombo = gs.combo + 1;
-            const points = 10 + Math.floor(newCombo / 5) * 5;
-            const newScore = gs.score + points;
-
-            return {
-              ...gs,
-              score: newScore,
-              combo: newCombo,
-              maxCombo: Math.max(gs.maxCombo, newCombo),
-            };
-          });
-
-          setTimeout(() => {
-            setFallingChars((prev) =>
-              prev.filter((c) => c.id !== chars[matchIndex].id)
-            );
-          }, 200);
-
-          return newChars;
-        }
-
-        return chars;
+        return newChars;
+      });
+      clearPattern();
+    } else {
+      // No exact match, check if it's a prefix of any falling char
+      const isPrefix = chars.some((c) => {
+        const p = MORSE_CODE.find((m) => m.char === c.char)?.pattern;
+        return p?.startsWith(currentPattern) && !c.isHit;
       });
 
-      clearPattern();
+      if (!isPrefix) {
+        // Not a valid prefix for any current target, clear it
+        // Add a small delay/feedback? For now just clear.
+        clearPattern();
+      }
     }
   }, [currentPattern, clearPattern, createExplosion]);
 

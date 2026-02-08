@@ -1,8 +1,4 @@
-import {
-  ArrowClockwise,
-  GameController,
-  Play,
-} from "@phosphor-icons/react";
+import { ArrowClockwise, GameController, Play } from "@phosphor-icons/react";
 import i18next from "i18next";
 import { useEffect, useState } from "react";
 import { initReactI18next, useTranslation } from "react-i18next";
@@ -82,13 +78,11 @@ export default function CwGame() {
       if (!gameState.isPlaying) return;
 
       switch (e.code) {
-        case "Space":
-        case "ArrowLeft":
+        case "KeyJ":
           e.preventDefault();
           addDit();
           break;
-        case "Enter":
-        case "ArrowRight":
+        case "KeyK":
           e.preventDefault();
           addDah();
           break;
@@ -108,7 +102,7 @@ export default function CwGame() {
   }, [gameState.isPlaying, addDit, addDah, handleBackspace, pauseGame]);
 
   return (
-    <div className="min-h-screen w-full bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 flex flex-col items-center font-mono relative overflow-hidden text-slate-200">
+    <div className="min-h-screen w-full bg-linear-to-b from-slate-950 via-slate-900 to-slate-950 flex flex-col items-center font-mono relative overflow-hidden text-slate-200">
       {/* Background Grid */}
       <div
         className="absolute inset-0 pointer-events-none opacity-20"
@@ -136,14 +130,17 @@ export default function CwGame() {
       {!gameState.isPlaying && !gameState.isGameOver && (
         <div className="absolute inset-0 flex items-center justify-center z-30 bg-slate-950/90">
           <div className="text-center">
-            <GameController className="w-24 h-24 text-green-500 mx-auto mb-6" weight="fill" />
+            <GameController
+              className="w-24 h-24 text-green-500 mx-auto mb-6"
+              weight="fill"
+            />
             <h2 className="text-4xl font-bold text-green-400 mb-4">
               {t("tools.cw.game.ready", "Ready to Play?")}
             </h2>
             <p className="text-slate-400 mb-8 max-w-md">
               {t(
                 "tools.cw.game.instructions",
-                "Use SPACE for · (dit) and ENTER for − (dah). Type the morse code to eliminate falling characters before they reach the wall!"
+                "Use 'J' for · (dit) and 'K' for − (dah). Type the morse code to eliminate falling characters before they reach the wall!",
               )}
             </p>
             <Button

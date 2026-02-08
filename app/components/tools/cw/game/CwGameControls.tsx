@@ -57,7 +57,7 @@ export function CwGameControls({
           >
             <span className="text-green-400 mr-2 text-3xl">·</span>
             <span className="hidden sm:inline">点</span>
-            <span className="text-xs text-slate-500 ml-2">(Space)</span>
+            <span className="text-xs text-slate-500 ml-2">(J)</span>
           </Button>
           <Button
             size="lg"
@@ -67,13 +67,13 @@ export function CwGameControls({
           >
             <span className="text-green-400 mr-2 text-3xl">−</span>
             <span className="hidden sm:inline">划</span>
-            <span className="text-xs text-slate-500 ml-2">(Enter)</span>
+            <span className="text-xs text-slate-500 ml-2">(K)</span>
           </Button>
         </div>
 
         {/* Keyboard hint */}
         <div className="mt-4 text-center text-xs text-slate-500">
-          空格 = ·（点） | 回车 = −（划） | 退格 = 删除 | ESC = 暂停
+          J = ·（点） | K = −（划） | 退格 = 删除 | ESC = 暂停
         </div>
       </div>
     </div>

@@ -1,7 +1,7 @@
 // Game constants
 export const GAME_WIDTH = 100; // percentage
-export const GAME_HEIGHT = 80; // vh
-export const WALL_Y = 85; // percentage from top
+export const GAME_HEIGHT = 65; // vh
+export const WALL_Y = 60; // percentage from top
 export const MAX_HEALTH = 5;
 export const SPAWN_INTERVAL_INITIAL = 2500; // ms
 export const FALL_SPEED_INITIAL = 0.3; // vh per frame
