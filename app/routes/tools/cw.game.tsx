@@ -103,7 +103,7 @@ export default function CwGame() {
   }, [gameState.isPlaying, addDit, addDah, handleBackspace, pauseGame]);
 
   return (
-    <div className="min-h-screen w-full bg-linear-to-b from-slate-950 via-slate-900 to-slate-950 flex flex-col items-center font-mono relative overflow-hidden text-slate-200">
+    <div className="h-screen w-full bg-linear-to-b from-slate-950 via-slate-900 to-slate-950 flex flex-col items-center font-mono relative overflow-hidden text-slate-200">
       {/* Background Grid */}
       <div
         className="absolute inset-0 pointer-events-none opacity-20"

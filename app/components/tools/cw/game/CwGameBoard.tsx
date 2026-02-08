@@ -1,3 +1,4 @@
+import { useRef, useState, useEffect } from "react";
 import { Pause, Play } from "@phosphor-icons/react";
 import { Button } from "~/components/ui/button";
 import { WALL_Y } from "./constants";
@@ -16,11 +17,36 @@ export function CwGameBoard({
   particles,
   onPause,
 }: CwGameBoardProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
+
+  // 监听容器尺寸变化
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const updateSize = () => {
+      setContainerSize({
+        width: container.clientWidth,
+        height: container.clientHeight,
+      });
+    };
+
+    updateSize();
+
+    const resizeObserver = new ResizeObserver(updateSize);
+    resizeObserver.observe(container);
+
+    return () => resizeObserver.disconnect();
+  }, []);
+
+  // 将百分比坐标转换为像素
+  const toPixelY = (percentY: number) =>
+    (percentY / 100) * containerSize.height;
+  const toPixelX = (percentX: number) => (percentX / 100) * containerSize.width;
+
   return (
-    <div
-      className="relative w-full flex-1 overflow-hidden"
-      style={{ maxHeight: "80vh" }}
-    >
+    <div ref={containerRef} className="relative w-full flex-1 overflow-hidden">
       {/* Pause Overlay */}
       {gameState.isPaused && (
         <div className="absolute inset-0 flex items-center justify-center z-30 bg-slate-950/80">
@@ -44,11 +70,14 @@ export function CwGameBoard({
           key={p.id}
           className="absolute w-2 h-2 rounded-full pointer-events-none"
           style={{
-            left: `${p.x}%`,
-            top: `${p.y}%`,
+            left: 0,
+            top: 0,
             backgroundColor: p.color,
             opacity: p.life,
-            transform: `scale(${p.life})`,
+            transform: `translate3d(${toPixelX(p.x)}px, ${toPixelY(
+              p.y,
+            )}px, 0) scale(${p.life})`,
+            willChange: "transform",
           }}
         />
       ))}
@@ -57,13 +86,14 @@ export function CwGameBoard({
       {fallingChars.map((char) => (
         <div
           key={char.id}
-          className={`absolute transition-all duration-200 ${
+          className={`absolute transition-opacity duration-200 ${
             char.isHit ? "opacity-0 scale-150" : "opacity-100"
           }`}
           style={{
-            left: `${char.x}%`,
-            top: `${char.y}%`,
-            transform: "translateX(-50%)",
+            left: toPixelX(char.x),
+            top: 0,
+            transform: `translate3d(-50%, ${toPixelY(char.y)}px, 0)`,
+            willChange: "transform",
           }}
         >
           <div
@@ -81,7 +111,7 @@ export function CwGameBoard({
       {/* Wall Line */}
       <div
         className="absolute left-0 right-0 border-t-4 border-dashed border-red-500/50 z-10"
-        style={{ top: `${WALL_Y}%` }}
+        style={{ top: toPixelY(WALL_Y) }}
       >
         <div className="absolute right-4 -top-8 text-red-500 text-sm font-bold uppercase tracking-wider">
           防御城墙
