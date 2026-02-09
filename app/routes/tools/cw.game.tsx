@@ -43,7 +43,6 @@ export const meta: MetaFunction<typeof loader> = ({ data }) => {
 };
 
 export default function CwGame() {
-  console.error("RENDER: CwGame Component Mounted");
   const { t } = useTranslation("common");
   const [highScore, setHighScore] = useState<number>(0);
 
