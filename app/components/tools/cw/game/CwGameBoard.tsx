@@ -3,6 +3,7 @@ import { Pause, Play } from "@phosphor-icons/react";
 import { Button } from "~/components/ui/button";
 import { WALL_Y } from "./constants";
 import type { FallingChar, Particle, GameState } from "./constants";
+import { MORSE_CODE_MAP } from "~/components/tools/cw/constants";
 
 interface CwGameBoardProps {
   gameState: GameState;
@@ -21,6 +22,8 @@ export function CwGameBoard({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationFrameRef = useRef<number>(0);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
+  const difficultyRef = useRef(gameState.difficulty);
+  difficultyRef.current = gameState.difficulty;
 
   // Handle Resize
   useEffect(() => {
@@ -130,6 +133,23 @@ export function CwGameBoard({
         // Draw Text
         ctx.fillStyle = char.isHit ? "#ffffff" : "#4ade80"; // white or green-400
         ctx.fillText(char.char, x, y + boxSize / 2);
+
+        // Draw Morse Hint (Easy Mode)
+        if (difficultyRef.current === "EASY" && !char.isHit) {
+          const pattern = Object.entries(MORSE_CODE_MAP).find(
+            ([_, c]) => c === char.char,
+          )?.[0];
+          if (pattern) {
+            const displayPattern = pattern
+              .replace(/\./g, "·")
+              .replace(/-/g, "−");
+            ctx.font = "bold 16px monospace";
+            ctx.fillStyle = "#94a3b8"; // slate-400
+            ctx.fillText(displayPattern, x, y + boxSize + 10);
+            // Restore font for next char
+            ctx.font = "bold 24px monospace";
+          }
+        }
 
         ctx.restore();
       });

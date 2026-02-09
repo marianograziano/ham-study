@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MORSE_CODE_MAP } from "~/components/tools/cw/constants";
 import {
-  FALL_SPEED_INITIAL,
   GAME_WIDTH,
   MAX_HEALTH,
-  SPAWN_INTERVAL_INITIAL,
   WALL_Y,
   type FallingChar,
   type GameState,
   type Particle,
   getRandomChar,
+  type DifficultyLevel,
+  DIFFICULTY_SETTINGS,
 } from "./constants";
 import { soundManager } from "./SoundManager";
 
@@ -34,6 +34,7 @@ export function useCwGameLogic() {
     isGameOver: false,
     combo: 0,
     maxCombo: 0,
+    difficulty: "MEDIUM",
   });
 
   // 使用 ref 追踪最新 gameState，解决闭包问题
@@ -46,12 +47,14 @@ export function useCwGameLogic() {
   const [currentPattern, setCurrentPattern] = useState<string>("");
 
   // Difficulty scaling
+  const baseSettings = DIFFICULTY_SETTINGS[gameState.difficulty];
   const difficulty = {
     spawnInterval: Math.max(
       800,
-      SPAWN_INTERVAL_INITIAL - Math.floor(gameState.score / 100) * 100,
+      baseSettings.spawnInterval - Math.floor(gameState.score / 100) * 100,
     ),
-    fallSpeed: FALL_SPEED_INITIAL + Math.floor(gameState.score / 100) * 0.05,
+    fallSpeed:
+      baseSettings.fallSpeed + Math.floor(gameState.score / 100) * 0.05,
   };
 
   // Spawn new character
@@ -171,6 +174,7 @@ export function useCwGameLogic() {
             isGameOver: true,
             combo: 0,
             maxCombo: 0,
+            difficulty: gs.difficulty,
           };
         }
         return {
@@ -329,8 +333,8 @@ export function useCwGameLogic() {
     }
   }, [currentPattern, clearPattern, createExplosion]);
 
-  const startGame = () => {
-    console.error("ACTION: startGame called");
+  const startGame = (difficulty: DifficultyLevel = "MEDIUM") => {
+    console.error("ACTION: startGame called with difficulty:", difficulty);
     setGameState({
       score: 0,
       health: MAX_HEALTH,
@@ -339,6 +343,7 @@ export function useCwGameLogic() {
       isGameOver: false,
       combo: 0,
       maxCombo: 0,
+      difficulty,
     });
     fallingCharsRef.current = [];
     particlesRef.current = [];
@@ -351,7 +356,7 @@ export function useCwGameLogic() {
   };
 
   const resetGame = () => {
-    setGameState({
+    setGameState((prev) => ({
       score: 0,
       health: MAX_HEALTH,
       isPlaying: false,
@@ -359,7 +364,8 @@ export function useCwGameLogic() {
       isGameOver: false,
       combo: 0,
       maxCombo: 0,
-    });
+      difficulty: prev.difficulty,
+    }));
     fallingCharsRef.current = [];
     particlesRef.current = [];
     setCurrentPattern("");

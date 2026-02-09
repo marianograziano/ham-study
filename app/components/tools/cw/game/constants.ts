@@ -23,6 +23,7 @@ export interface GameState {
   isGameOver: boolean;
   combo: number;
   maxCombo: number;
+  difficulty: DifficultyLevel;
 }
 
 export interface Particle {
@@ -39,4 +40,27 @@ export interface Particle {
 export const getRandomChar = () => {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
   return chars[Math.floor(Math.random() * chars.length)];
+};
+
+export type DifficultyLevel = "EASY" | "MEDIUM" | "HARD";
+
+export const DIFFICULTY_SETTINGS: Record<
+  DifficultyLevel,
+  { spawnInterval: number; fallSpeed: number; pointMultiplier: number }
+> = {
+  EASY: {
+    spawnInterval: 3500,
+    fallSpeed: 0.2, // Slower
+    pointMultiplier: 1,
+  },
+  MEDIUM: {
+    spawnInterval: 2500, // Matches initial
+    fallSpeed: 0.3, // Matches initial
+    pointMultiplier: 1.5,
+  },
+  HARD: {
+    spawnInterval: 1500,
+    fallSpeed: 0.4,
+    pointMultiplier: 2,
+  },
 };

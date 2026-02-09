@@ -1,4 +1,4 @@
-import { ArrowClockwise, GameController, Play } from "@phosphor-icons/react";
+import { GameController, Play } from "@phosphor-icons/react";
 import i18next from "i18next";
 import { useEffect, useRef, useState } from "react";
 import { initReactI18next, useTranslation } from "react-i18next";
@@ -10,6 +10,7 @@ import {
   CwGameHUD,
   CwGameOver,
   useCwGameLogic,
+  type DifficultyLevel,
 } from "~/components/tools/cw/game";
 import resources from "~/locales";
 import { getLocale } from "~/middleware/i18next";
@@ -50,6 +51,7 @@ export default function CwGame() {
     }
     return 0;
   });
+  const [difficulty, setDifficulty] = useState<DifficultyLevel>("MEDIUM");
 
   const {
     gameState,
@@ -161,9 +163,29 @@ export default function CwGame() {
                 "Use 'J' for · (dit) and 'K' for − (dah). Type the morse code to eliminate falling characters before they reach the wall!",
               )}
             </p>
+
+            {/* Difficulty Selector */}
+            <div className="flex justify-center gap-4 mb-8">
+              {(["EASY", "MEDIUM", "HARD"] as const).map((level) => (
+                <button
+                  key={level}
+                  type="button"
+                  onClick={() => setDifficulty(level)}
+                  className={`px-4 py-2 rounded-lg font-bold transition-all ${
+                    difficulty === level
+                      ? "bg-green-600 text-white scale-110 shadow-lg shadow-green-500/20"
+                      : "bg-slate-800 text-slate-400 hover:bg-slate-700"
+                  }`}
+                >
+                  {t(`tools.cw.game.difficulty.${level.toLowerCase()}`, level)}
+                </button>
+              ))}
+            </div>
+
             <Button
               size="lg"
-              onClick={startGame}
+              type="button"
+              onClick={() => startGame(difficulty)}
               className="bg-green-600 hover:bg-green-700 text-white px-8"
             >
               <Play className="w-5 h-5 mr-2" weight="fill" />
