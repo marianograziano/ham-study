@@ -45,12 +45,14 @@ export const meta: MetaFunction<typeof loader> = ({ data }) => {
 export default function CwGame() {
   console.error("RENDER: CwGame Component Mounted");
   const { t } = useTranslation("common");
-  const [highScore, setHighScore] = useState<number>(() => {
-    if (typeof window !== "undefined") {
-      return Number.parseInt(localStorage.getItem("cwGameHighScore") || "0");
+  const [highScore, setHighScore] = useState<number>(0);
+
+  useEffect(() => {
+    const stored = localStorage.getItem("cwGameHighScore");
+    if (stored) {
+      setHighScore(Number.parseInt(stored));
     }
-    return 0;
-  });
+  }, []);
   const [difficulty, setDifficulty] = useState<DifficultyLevel>("MEDIUM");
 
   const {
