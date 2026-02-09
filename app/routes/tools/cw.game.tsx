@@ -1,6 +1,6 @@
 import { ArrowClockwise, GameController, Play } from "@phosphor-icons/react";
 import i18next from "i18next";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { initReactI18next, useTranslation } from "react-i18next";
 import type { MetaFunction } from "react-router";
 import { Button } from "~/components/ui/button";
@@ -65,6 +65,19 @@ export default function CwGame() {
     resetGame,
   } = useCwGameLogic();
 
+  // Damage effect
+  const [isDamaged, setIsDamaged] = useState(false);
+  const prevHealthRef = useRef(gameState.health);
+
+  useEffect(() => {
+    if (gameState.health < prevHealthRef.current) {
+      setIsDamaged(true);
+      const timer = setTimeout(() => setIsDamaged(false), 150);
+      return () => clearTimeout(timer);
+    }
+    prevHealthRef.current = gameState.health;
+  }, [gameState.health]);
+
   // Update high score
   useEffect(() => {
     if (gameState.score > highScore) {
@@ -103,7 +116,11 @@ export default function CwGame() {
   }, [gameState.isPlaying, addDit, addDah, handleBackspace, pauseGame]);
 
   return (
-    <div className="h-screen w-full bg-linear-to-b from-slate-950 via-slate-900 to-slate-950 flex flex-col items-center font-mono relative overflow-hidden text-slate-200">
+    <div
+      className={`h-screen w-full bg-linear-to-b from-slate-950 via-slate-900 to-slate-950 flex flex-col items-center font-mono relative overflow-hidden text-slate-200 transition-all duration-150 ease-in-out ${
+        isDamaged ? "shadow-[inset_0_0_100px_rgba(239,68,68,0.6)]" : ""
+      }`}
+    >
       {/* Background Grid */}
       <div
         className="absolute inset-0 pointer-events-none opacity-20"
