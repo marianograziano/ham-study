@@ -160,6 +160,133 @@ body {
   .animate-spin-slow {
     animation: spin 10s linear infinite;
   }
+
+  /* CRT / Retro Terminal Effects */
+  .bg-grid-pattern {
+    background-image:
+      linear-gradient(var(--scan-color) 1px, transparent 1px),
+      linear-gradient(90deg, var(--scan-color) 1px, transparent 1px);
+    background-size: 20px 20px;
+  }
+
+  .text-shadow-glow {
+    text-shadow:
+      0 0 5px currentColor,
+      0 0 10px currentColor;
+  }
+}
+
+@layer components {
+  .crt-screen {
+    @apply relative overflow-hidden;
+    background: radial-gradient(circle at center, #1a1a1a 0%, #000000 100%);
+  }
+
+  .crt-overlay {
+    @apply pointer-events-none absolute inset-0 z-50;
+    background:
+      linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%),
+      linear-gradient(
+        90deg,
+        rgba(255, 0, 0, 0.06),
+        rgba(0, 255, 0, 0.02),
+        rgba(0, 0, 255, 0.06)
+      );
+    background-size:
+      100% 2px,
+      3px 100%;
+    animation: flicker 0.15s infinite;
+  }
+
+  .crt-vignette {
+    @apply pointer-events-none absolute inset-0 z-40;
+    background: radial-gradient(
+      circle at center,
+      transparent 50%,
+      rgba(0, 0, 0, 0.4) 90%,
+      rgba(0, 0, 0, 0.8) 100%
+    );
+  }
+
+  .text-phosphor {
+    color: #33ff33;
+    text-shadow:
+      0 0 2px #28d628,
+      0 0 5px #249924;
+  }
+
+  .border-phosphor {
+    @apply border-[#33ff33];
+    box-shadow:
+      0 0 4px #28d628,
+      inset 0 0 4px #28d628;
+  }
+}
+
+@keyframes flicker {
+  0% {
+    opacity: 0.97;
+  }
+  5% {
+    opacity: 0.95;
+  }
+  10% {
+    opacity: 0.9;
+  }
+  15% {
+    opacity: 0.95;
+  }
+  20% {
+    opacity: 0.99;
+  }
+  25% {
+    opacity: 0.95;
+  }
+  30% {
+    opacity: 0.9;
+  }
+  35% {
+    opacity: 0.96;
+  }
+  40% {
+    opacity: 0.98;
+  }
+  45% {
+    opacity: 0.95;
+  }
+  50% {
+    opacity: 0.99;
+  }
+  55% {
+    opacity: 0.93;
+  }
+  60% {
+    opacity: 0.9;
+  }
+  65% {
+    opacity: 0.96;
+  }
+  70% {
+    opacity: 1;
+  }
+  75% {
+    opacity: 0.97;
+  }
+  80% {
+    opacity: 0.95;
+  }
+  85% {
+    opacity: 0.92;
+  }
+  90% {
+    opacity: 0.98;
+  }
+  95% {
+    opacity: 0.95;
+  }
+  100% {
+    opacity: 0.92;
+  }
 }
 
 @keyframes spin {

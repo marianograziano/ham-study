@@ -69,69 +69,90 @@ export function CwGameBoard({
       // 1. Draw Wall
       const wallY = (WALL_Y / 100) * containerSize.height;
 
+      // Glow effect for wall
+      ctx.shadowBlur = 10;
+      ctx.shadowColor = "#ef4444";
+
       // Draw dashed line
       ctx.beginPath();
-      ctx.setLineDash([10, 10]);
-      ctx.strokeStyle = "rgba(239, 68, 68, 0.5)"; // red-500/50
-      ctx.lineWidth = 4;
+      ctx.setLineDash([20, 10]);
+      ctx.strokeStyle = "rgba(239, 68, 68, 0.8)"; // red-500
+      ctx.lineWidth = 2;
       ctx.moveTo(0, wallY);
       ctx.lineTo(containerSize.width, wallY);
       ctx.stroke();
 
-      // Text "防御城墙" (DEFENSE WALL)
-      ctx.font = "bold 12px monospace";
+      ctx.shadowBlur = 0; // Reset shadow
+
+      // Text "CRITICAL THRESHOLD"
+      ctx.font = "bold 10px monospace";
       ctx.fillStyle = "#ef4444"; // red-500
       ctx.textAlign = "right";
-      ctx.fillText("防御城墙", containerSize.width - 16, wallY - 10);
+      ctx.letterSpacing = "2px";
+      ctx.fillText("CRITICAL THRESHOLD", containerSize.width - 16, wallY - 10);
 
       // 2. Draw Falling Characters
-      ctx.font = "bold 24px monospace";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
 
       fallingCharsRef.current.forEach((char) => {
         const x = (char.x / 100) * containerSize.width;
-        // Vertically center the char. char.y is the top position in %.
-        // Adding half height of the box (approx 24px) for visual center?
-        // Original CSS used translate3d(-50%, toPixelY(char.y)px, 0).
-        // Let's stick to the top Y for now and add some offset for text drawing.
         const y = (char.y / 100) * containerSize.height;
 
         // Draw Box
-        const boxSize = 48; // w-12 h-12 = 48px
+        const boxSize = 48;
         const boxX = x - boxSize / 2;
         const boxY = y;
 
         ctx.save();
 
-        // Animation for hit chars (scale up and fade out)
         if (char.isHit) {
-          // We can simulate the CSS transition "opacity-0 scale-150"
-          // but since logic removes it after 200ms, strictly following CSS transitions in canvas is hard without state tracking
-          // For now, let's just make it look "hit" (green filled)
-          // If we want smooth fade out we need a "hitTime" in the char object.
-          // CURRENTLY char.isHit is boolean.
-          // Simple approach: Draw it green and slightly larger.
-          ctx.globalAlpha = 0.8;
-          ctx.fillStyle = "#22c55e"; // green-500
-
-          // Scale effect loop-holed: we don't have time delta here easily without tracking per-char anim state.
-          // Just draw it static "hit" state for now.
+          // Hit effect: Solid green fill, expanding
+          ctx.fillStyle = "rgba(34, 197, 94, 0.8)"; // green-500
+          ctx.shadowColor = "#22c55e";
+          ctx.shadowBlur = 20;
+          ctx.beginPath();
+          ctx.rect(boxX, boxY, boxSize, boxSize);
+          ctx.fill();
         } else {
-          ctx.fillStyle = "#1e293b"; // slate-800
-          ctx.strokeStyle = "#22c55e"; // border-green-500
+          // Normal: Hollow box, corner accents
           ctx.lineWidth = 2;
+          ctx.strokeStyle = "#4ade80"; // green-400
+          ctx.shadowColor = "#4ade80";
+          ctx.shadowBlur = 5;
+
+          // Main box
+          ctx.strokeRect(boxX, boxY, boxSize, boxSize);
+
+          // Corner accents (brackets look)
+          ctx.lineWidth = 3;
+          const cornerLen = 8;
+
+          ctx.beginPath();
+          // Top-left
+          ctx.moveTo(boxX, boxY + cornerLen);
+          ctx.lineTo(boxX, boxY);
+          ctx.lineTo(boxX + cornerLen, boxY);
+          // Top-right
+          ctx.moveTo(boxX + boxSize - cornerLen, boxY);
+          ctx.lineTo(boxX + boxSize, boxY);
+          ctx.lineTo(boxX + boxSize, boxY + cornerLen);
+          // Bottom-right
+          ctx.moveTo(boxX + boxSize, boxY + boxSize - cornerLen);
+          ctx.lineTo(boxX + boxSize, boxY + boxSize);
+          ctx.lineTo(boxX + boxSize - cornerLen, boxY + boxSize);
+          // Bottom-left
+          ctx.moveTo(boxX + cornerLen, boxY + boxSize);
+          ctx.lineTo(boxX, boxY + boxSize);
+          ctx.lineTo(boxX, boxY + boxSize - cornerLen);
+
+          ctx.stroke();
         }
 
-        // Draw Rounded Rect (Box)
-        const radius = 8;
-        ctx.beginPath();
-        ctx.roundRect(boxX, boxY, boxSize, boxSize, radius);
-        ctx.fill();
-        if (!char.isHit) ctx.stroke();
-
         // Draw Text
-        ctx.fillStyle = char.isHit ? "#ffffff" : "#4ade80"; // white or green-400
+        ctx.font = "bold 24px monospace";
+        ctx.fillStyle = char.isHit ? "#000" : "#4ade80"; // Black text on hit, green otherwise
+        if (!char.isHit) ctx.shadowBlur = 5;
         ctx.fillText(char.char, x, y + boxSize / 2);
 
         // Draw Morse Hint (Easy Mode)
@@ -143,11 +164,10 @@ export function CwGameBoard({
             const displayPattern = pattern
               .replace(/\./g, "·")
               .replace(/-/g, "−");
-            ctx.font = "bold 16px monospace";
+            ctx.font = "bold 12px monospace";
             ctx.fillStyle = "#94a3b8"; // slate-400
-            ctx.fillText(displayPattern, x, y + boxSize + 10);
-            // Restore font for next char
-            ctx.font = "bold 24px monospace";
+            ctx.shadowBlur = 0;
+            ctx.fillText(displayPattern, x, y + boxSize + 16);
           }
         }
 
@@ -156,50 +176,19 @@ export function CwGameBoard({
 
       // 3. Draw Particles
       particlesRef.current.forEach((p) => {
-        // const x = p.x; // Unused
-        // Wait, logic says: createExplosion(newChars[idx].x, newChars[idx].y);
-        // newChars[idx].x keeps the PERCENTAGE unit?
-        // Let's check logic:
-        // spawnChar: x = Math.random() * (GAME_WIDTH - 10) + 5; (Percentage)
-        // createExplosion passed x, y directly.
-        // So particles actually store PERCENTAGE x, y?
-        // logic: x: p.x + p.vx, y: p.y + p.vy.
-        // speed was 2 + Math.random() * 3.
-        // If x is percentage, adding 2 (percent) is HUGE.
-        // If logic assumes pixels, then `spawnChar` x is percentage, `createExplosion` gets percentage.
-        // So `p.x` is percentage.
-        // BUT speed `vx` is `Math.cos(angle) * speed`. Speed is 2-5.
-        // moving 2% per frame is very fast.
-        // Let's check original CwGameBoard rendering for particles:
-        // left: 0, top: 0, transform: `translate3d(${toPixelX(p.x)}px, ...)`
-        // Wait, if p.x is percentage, toPixelX(p.x) makes sense.
-        // But the particle update logic: `x: p.x + p.vx`.
-        // If p.x is percentage, p.vx is treated as percentage.
-        // 5% of screen width per frame? That's crossing screen in 20 frames (0.3s). Explosion?
-        // Actually original Logic used CSS transform translate3d(toPixelX(p.x)).
-        // And update `x: p.x + p.vx`.
-        // So yes, particles move in percentage units.
-
-        // However, Canvas expects pixels.
-        // So we must convert p.x (percentage) to pixels to draw.
-        // but `vx` is also percentage?
-        // Let's assume yes.
-
-        // Wait, if vx is ~3 (percent), and screen is 1000px wide. 3% is 30px.
-        // 30px per frame is FAST.
-        // Maybe the original logic was intended for pixels but applied to percentage?
-        // Or maybe 3% is fine for explosion speed?
-
-        // Let's render assuming they are percentages.
         const px = (p.x / 100) * containerSize.width;
         const py = (p.y / 100) * containerSize.height;
 
+        ctx.save();
         ctx.beginPath();
-        ctx.arc(px, py, 4, 0, Math.PI * 2); // Radius 4 (w-2 h-2 is 8px width? no w-2 is 0.5rem = 8px. Radius 4.)
+        // Square pixels for retro feel
+        ctx.rect(px - 2, py - 2, 4, 4);
         ctx.fillStyle = p.color;
         ctx.globalAlpha = p.life;
+        ctx.shadowBlur = 5;
+        ctx.shadowColor = p.color;
         ctx.fill();
-        ctx.globalAlpha = 1.0;
+        ctx.restore();
       });
 
       animationFrameRef.current = requestAnimationFrame(render);
@@ -213,21 +202,32 @@ export function CwGameBoard({
   }, [containerSize, fallingCharsRef, particlesRef]);
 
   return (
-    <div ref={containerRef} className="relative w-full flex-1 overflow-hidden">
+    <div
+      ref={containerRef}
+      className="relative w-full flex-1 overflow-hidden pointer-events-none"
+    >
+      {/* Background Grid - moved here so it's behind canvas if needed, or controlled by parent */}
+      {/* Actually parent handles bg. */}
+
       <canvas ref={canvasRef} className="block w-full h-full" />
 
       {/* Pause Overlay - Keep as DOM overlay */}
       {gameState.isPaused && (
-        <div className="absolute inset-0 flex items-center justify-center z-30 bg-slate-950/80">
-          <div className="text-center">
+        <div className="absolute inset-0 flex items-center justify-center z-30 bg-black/80 backdrop-blur-sm pointer-events-auto">
+          <div className="text-center border-2 border-yellow-500/50 p-8 bg-black/90 shadow-[0_0_50px_rgba(234,179,8,0.2)]">
             <Pause
-              className="w-16 h-16 text-yellow-500 mx-auto mb-4"
+              className="w-16 h-16 text-yellow-500 mx-auto mb-4 animate-pulse"
               weight="fill"
             />
-            <h2 className="text-3xl font-bold text-yellow-400 mb-4">已暂停</h2>
-            <Button onClick={onPause} variant="outline" size="lg">
+            <h2 className="text-3xl font-bold text-yellow-500 mb-6 tracking-widest uppercase font-mono">
+              System Halted
+            </h2>
+            <Button
+              onClick={onPause}
+              className="bg-yellow-600 hover:bg-yellow-500 text-black font-bold font-mono tracking-widest px-8"
+            >
               <Play className="w-5 h-5 mr-2" weight="fill" />
-              继续
+              RESUME
             </Button>
           </div>
         </div>
