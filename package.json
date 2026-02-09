@@ -1,19 +1,22 @@
 {
   "name": "ham-study",
   "type": "module",
-  "version": "1.8.0",
+  "version": "1.9.0",
   "scripts": {
     "build": "react-router build",
     "dev": "react-router dev",
     "deploy": "npm run build && wrangler deploy",
     "start": "wrangler dev",
+    "start:https": "wrangler dev --local-protocol=https --https-key-path=./.cert/key.pem --https-cert-path=./.cert/cert.pem",
     "watch:hk": "node scripts/watch-translation.mjs",
     "typecheck": "react-router typegen && tsc",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
-    "release:start": "node scripts/start-release.js"
+    "release:start": "node scripts/start-release.js",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
     "@base-ui/react": "^1.0.0",
@@ -50,6 +53,7 @@
     "@biomejs/biome": "^2.3.10",
     "@cloudflare/vite-plugin": "^1.20.3",
     "@cloudflare/workers-types": "^4.20260114.0",
+    "@playwright/test": "^1.58.2",
     "@react-router/dev": "7.12.0",
     "@tailwindcss/typography": "^0.5.19",
     "@tailwindcss/vite": "^4.1.13",

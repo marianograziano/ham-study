@@ -290,6 +290,11 @@ export default {
         "基於 Web Audio API 的莫爾斯電碼練習器，支持即時解碼與可視化。",
       keywords: "CW, 莫爾斯電碼, 練習器, Morse Code, Trainer",
     },
+    cwGame: {
+      title: "CW 防禦戰 (CW Defense)",
+      description: "用莫爾斯電碼保衛城牆！下落式打字遊戲，鍛煉你的 CW 反應速度。",
+      keywords: "CW, 莫爾斯電碼, 遊戲, 打字遊戲, 業餘無線電",
+    },
   },
   footer: {
     feedback: {

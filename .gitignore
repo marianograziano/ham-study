@@ -9,3 +9,23 @@
 # Cloudflare
 /.wrangler/
 
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Testing
+playwright-report/
+test-results/
+
+# Local Certs
+.cert/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+
