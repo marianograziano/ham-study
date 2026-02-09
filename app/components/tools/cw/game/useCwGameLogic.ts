@@ -11,6 +11,7 @@ import {
   type Particle,
   getRandomChar,
 } from "./constants";
+import { soundManager } from "./SoundManager";
 
 // Convert MORSE_CODE_MAP to array format for game
 const MORSE_CODE = Object.entries(MORSE_CODE_MAP).map(([pattern, char]) => ({
@@ -157,6 +158,11 @@ export function useCwGameLogic() {
 
       setGameState((gs) => {
         const newHealth = gs.health - newHits.length;
+        // Play damage sound if health decreased
+        if (newHealth < gs.health) {
+          soundManager.playDamage();
+        }
+
         if (newHealth <= 0) {
           return {
             ...gs,
@@ -234,10 +240,12 @@ export function useCwGameLogic() {
 
   // Handle morse code input
   const addDit = useCallback(() => {
+    soundManager.playDit();
     setCurrentPattern((p) => p + "·");
   }, []);
 
   const addDah = useCallback(() => {
+    soundManager.playDah();
     setCurrentPattern((p) => p + "−");
   }, []);
 
@@ -254,36 +262,6 @@ export function useCwGameLogic() {
   // useEffect(() => {
   //   fallingCharsRef.current = fallingChars;
   // }, [fallingChars]);
-
-  // Audio context for sound effects
-  const playErrorSound = useCallback(() => {
-    try {
-      const AudioCtx =
-        window.AudioContext ||
-        (window as unknown as { webkitAudioContext: typeof AudioContext })
-          .webkitAudioContext;
-      if (!AudioCtx) return;
-
-      const ctx = new AudioCtx();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-
-      osc.type = "sawtooth";
-      osc.frequency.setValueAtTime(150, ctx.currentTime);
-      osc.frequency.linearRampToValueAtTime(100, ctx.currentTime + 0.1);
-
-      gain.gain.setValueAtTime(0.1, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
-
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-
-      osc.start();
-      osc.stop(ctx.currentTime + 0.1);
-    } catch (e) {
-      console.error("Audio play failed", e);
-    }
-  }, []);
 
   // Check pattern match
   useEffect(() => {
@@ -345,11 +323,11 @@ export function useCwGameLogic() {
 
       if (!isPrefix) {
         // Not a valid prefix for any current target, clear it
-        playErrorSound();
+        soundManager.playError();
         clearPattern();
       }
     }
-  }, [currentPattern, clearPattern, createExplosion, playErrorSound]);
+  }, [currentPattern, clearPattern, createExplosion]);
 
   const startGame = () => {
     console.error("ACTION: startGame called");
