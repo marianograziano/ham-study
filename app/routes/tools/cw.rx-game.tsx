@@ -75,7 +75,7 @@ export default function CwRxGame() {
         {/* Background Grid */}
         <div
           className="absolute inset-0 pointer-events-none opacity-20 bg-grid-pattern"
-          style={{ "--scan-color": "rgba(34, 197, 94, 0.4)" } as any}
+          style={{ "--scan-color": "rgba(34, 197, 94, 0.4)" } as never}
         />
 
         {/* HUD - Always Visible (or at least score) */}

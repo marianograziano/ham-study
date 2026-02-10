@@ -49,7 +49,7 @@ export default function CwGame() {
   useEffect(() => {
     const stored = localStorage.getItem("cwGameHighScore");
     if (stored) {
-      setHighScore(Number.parseInt(stored));
+      setHighScore(Number.parseInt(stored, 10));
     }
   }, []);
   const [difficulty, setDifficulty] = useState<DifficultyLevel>("MEDIUM");
@@ -140,7 +140,7 @@ export default function CwGame() {
         {/* Background Grid (Inside CRT) */}
         <div
           className="absolute inset-0 pointer-events-none opacity-20 bg-grid-pattern"
-          style={{ "--scan-color": "rgba(34, 197, 94, 0.4)" } as any}
+          style={{ "--scan-color": "rgba(34, 197, 94, 0.4)" } as never}
         />
 
         {/* HUD */}

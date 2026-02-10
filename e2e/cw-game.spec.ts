@@ -83,11 +83,6 @@ test.describe("CW Defense Game", () => {
     // 这里等待足够长的时间让第一个字符掉出屏幕
     await page.waitForTimeout(8000);
 
-    // 获取当前血量
-    const currentHearts = await page
-      .locator("svg[class*='text-red-500']")
-      .count();
-
     // 验证只扣了1滴血 (如果是双倍扣血bug，这里会剩下3个或者更少)
     // 注意：如果掉了多个字符，可能扣更多，但我们假设第一个掉落周期内只掉一个或两个
     // 关键是看是否发生了一次“双倍”扣除。

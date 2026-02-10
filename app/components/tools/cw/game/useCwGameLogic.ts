@@ -245,12 +245,12 @@ export function useCwGameLogic() {
   // Handle morse code input
   const addDit = useCallback(() => {
     soundManager.playDit();
-    setCurrentPattern((p) => p + "·");
+    setCurrentPattern((p) => `${p}·`);
   }, []);
 
   const addDah = useCallback(() => {
     soundManager.playDah();
-    setCurrentPattern((p) => p + "−");
+    setCurrentPattern((p) => `${p}−`);
   }, []);
 
   const handleBackspace = useCallback(() => {
