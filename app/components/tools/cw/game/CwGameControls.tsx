@@ -1,4 +1,4 @@
-import { Prohibit } from "@phosphor-icons/react";
+import { ProhibitIcon } from "@phosphor-icons/react";
 
 interface CwGameControlsProps {
   currentPattern: string;
@@ -39,10 +39,11 @@ export function CwGameControls({
             {/* Clear Button (Small tactile) */}
             <button
               onClick={onClear}
+              type="button"
               disabled={!currentPattern}
               className="absolute right-2 top-2 p-2 text-slate-600 hover:text-red-500 transition-colors"
             >
-              <Prohibit className="w-4 h-4" />
+              <ProhibitIcon className="w-4 h-4" />
             </button>
           </div>
         </div>
@@ -51,6 +52,7 @@ export function CwGameControls({
         <div className="grid grid-cols-2 gap-8 px-4 sm:px-12">
           {/* DIT Key */}
           <button
+            type="button"
             onClick={(e) => {
               const btn = e.currentTarget;
               btn.style.transform = "translate(0, 4px)";
@@ -77,6 +79,7 @@ export function CwGameControls({
 
           {/* DAH Key */}
           <button
+            type="button"
             onClick={(e) => {
               const btn = e.currentTarget;
               btn.style.transform = "translate(0, 4px)";

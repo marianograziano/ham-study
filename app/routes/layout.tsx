@@ -35,6 +35,9 @@ export default function DemosLayout() {
   };
   const toolKeyMap: Record<string, string> = {
     "yagi-calculator": "tools.yagiCalculator.title",
+    game: "tools.cwGame.title",
+    "rx-game": "tools.cwRxGame.title",
+    cw: "tools.cw.title",
   };
 
   const currentPath = location.pathname.split("/").pop() || "";

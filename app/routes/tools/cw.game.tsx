@@ -3,15 +3,15 @@ import i18next from "i18next";
 import { useEffect, useRef, useState } from "react";
 import { initReactI18next, useTranslation } from "react-i18next";
 import type { MetaFunction } from "react-router";
-import { Button } from "~/components/ui/button";
 import {
   CwGameBoard,
   CwGameControls,
   CwGameHUD,
   CwGameOver,
-  useCwGameLogic,
   type DifficultyLevel,
+  useCwGameLogic,
 } from "~/components/tools/cw/game";
+import { Button } from "~/components/ui/button";
 import resources from "~/locales";
 import { getLocale } from "~/middleware/i18next";
 import type { Route } from "./+types/cw.game";
@@ -49,7 +49,7 @@ export default function CwGame() {
   useEffect(() => {
     const stored = localStorage.getItem("cwGameHighScore");
     if (stored) {
-      setHighScore(Number.parseInt(stored));
+      setHighScore(Number.parseInt(stored, 10));
     }
   }, []);
   const [difficulty, setDifficulty] = useState<DifficultyLevel>("MEDIUM");
@@ -140,7 +140,7 @@ export default function CwGame() {
         {/* Background Grid (Inside CRT) */}
         <div
           className="absolute inset-0 pointer-events-none opacity-20 bg-grid-pattern"
-          style={{ "--scan-color": "rgba(34, 197, 94, 0.4)" } as any}
+          style={{ "--scan-color": "rgba(34, 197, 94, 0.4)" } as never}
         />
 
         {/* HUD */}

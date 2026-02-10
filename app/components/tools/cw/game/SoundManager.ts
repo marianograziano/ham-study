@@ -10,7 +10,9 @@ export class SoundManager {
   constructor() {
     if (typeof window !== "undefined") {
       const AudioCtx =
-        window.AudioContext || (window as any).webkitAudioContext;
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: AudioContext })
+          .webkitAudioContext;
       if (AudioCtx) {
         this.audioCtx = new AudioCtx();
         this.masterGain = this.audioCtx.createGain();

@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
 test.describe("CW Defense Game", () => {
   test.beforeEach(async ({ page }) => {
@@ -82,11 +82,6 @@ test.describe("CW Defense Game", () => {
     // 我们可以加速或者等待
     // 这里等待足够长的时间让第一个字符掉出屏幕
     await page.waitForTimeout(8000);
-
-    // 获取当前血量
-    const currentHearts = await page
-      .locator("svg[class*='text-red-500']")
-      .count();
 
     // 验证只扣了1滴血 (如果是双倍扣血bug，这里会剩下3个或者更少)
     // 注意：如果掉了多个字符，可能扣更多，但我们假设第一个掉落周期内只掉一个或两个

@@ -1,6 +1,6 @@
 import { GameController } from "@phosphor-icons/react";
-import { MAX_HEALTH } from "./constants";
 import type { GameState } from "./constants";
+import { MAX_HEALTH } from "./constants";
 
 interface CwGameHUDProps {
   gameState: GameState;
@@ -12,11 +12,11 @@ export function CwGameHUD({ gameState, highScore }: CwGameHUDProps) {
     // 10 segments for health? Or just 5 blocks.
     return (
       <div className="flex gap-1">
-        {Array.from({ length: MAX_HEALTH }).map((_, i) => (
+        {Array.from({ length: MAX_HEALTH }, (_, i) => i + 1).map((hp) => (
           <div
-            key={i}
+            key={hp}
             className={`w-6 h-4 border border-slate-700 ${
-              i < gameState.health
+              hp <= gameState.health
                 ? "bg-green-500 shadow-[0_0_5px_#22c55e]"
                 : "bg-slate-900/50"
             }`}
