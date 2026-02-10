@@ -1,6 +1,9 @@
 export class SoundManager {
   private audioCtx: AudioContext | null = null;
   private masterGain: GainNode | null = null;
+  private fadingGain: GainNode | null = null;
+  private fadingLfo: OscillatorNode | null = null;
+  private qsbDepth: number = 0;
   private noiseNode: AudioBufferSourceNode | null = null;
   private noiseGain: GainNode | null = null;
 
@@ -13,6 +16,11 @@ export class SoundManager {
         this.masterGain = this.audioCtx.createGain();
         this.masterGain.connect(this.audioCtx.destination);
         this.masterGain.gain.value = 0.3; // Global volume
+
+        // Fading Gain Node (QSB)
+        this.fadingGain = this.audioCtx.createGain();
+        this.fadingGain.connect(this.masterGain);
+        this.fadingGain.gain.value = 1.0; // Default to full volume (no fading)
 
         this.noiseGain = this.audioCtx.createGain();
         this.noiseGain.connect(this.masterGain);
@@ -98,6 +106,31 @@ export class SoundManager {
     }
   }
 
+  // --- QSB (Signal Fading) ---
+  public setQsb(depth: number) {
+    // depth: 0 to 100
+    this.qsbDepth = depth;
+    if (!this.ensureContext() || !this.audioCtx || !this.fadingGain) return;
+
+    // Reset fadingGain to 1.0 (we handle QSB in playSequence now)
+    this.stopQsb();
+  }
+
+  public stopQsb() {
+    if (this.fadingLfo) {
+      try {
+        this.fadingLfo.stop();
+        this.fadingLfo.disconnect();
+      } catch (_e) {}
+      this.fadingLfo = null;
+    }
+    // Reset gain to 1.0
+    if (this.fadingGain && this.audioCtx) {
+      this.fadingGain.gain.cancelScheduledValues(this.audioCtx.currentTime);
+      this.fadingGain.gain.setValueAtTime(1.0, this.audioCtx.currentTime);
+    }
+  }
+
   // --- Morse Sequencer ---
   public playSequence(
     text: string,
@@ -106,7 +139,13 @@ export class SoundManager {
     callback?: () => void,
     farnsworth?: number,
   ) {
-    if (!this.ensureContext() || !this.audioCtx || !this.masterGain) return;
+    if (
+      !this.ensureContext() ||
+      !this.audioCtx ||
+      !this.masterGain ||
+      !this.fadingGain
+    )
+      return;
 
     // Timing calculations
     const charWpm = wpm;
@@ -124,7 +163,8 @@ export class SoundManager {
     osc.frequency.value = frequency;
 
     osc.connect(gain);
-    gain.connect(this.masterGain);
+    // Connect to Fading Gain instead of Master directly, so QSB applies to the signal
+    gain.connect(this.fadingGain);
 
     let currentTime = now;
     gain.gain.value = 0;
@@ -184,7 +224,17 @@ export class SoundManager {
         const duration = symbol === "." ? 1 : 3;
 
         // Key Down
-        gain.gain.setValueAtTime(1, currentTime);
+        // Apply QSB (random amplitude per symbol)
+        let vol = 1.0;
+        if (this.qsbDepth > 0) {
+          // Random drop in volume based on depth
+          // Example: depth 50 means vol can drop to 0.5
+          // We want "some sounds to be smaller", not all.
+          // Let's use a random factor.
+          const variance = (Math.random() * this.qsbDepth) / 100;
+          vol = 1.0 - variance;
+        }
+        gain.gain.setValueAtTime(vol, currentTime);
         currentTime += duration * charUnitTime;
 
         // Key Up
@@ -236,7 +286,13 @@ export class SoundManager {
   }
 
   public playDit() {
-    if (!this.ensureContext() || !this.audioCtx || !this.masterGain) return;
+    if (
+      !this.ensureContext() ||
+      !this.audioCtx ||
+      !this.masterGain ||
+      !this.fadingGain
+    )
+      return;
 
     const osc = this.audioCtx.createOscillator();
     const gain = this.audioCtx.createGain();
@@ -259,7 +315,13 @@ export class SoundManager {
   }
 
   public playDah() {
-    if (!this.ensureContext() || !this.audioCtx || !this.masterGain) return;
+    if (
+      !this.ensureContext() ||
+      !this.audioCtx ||
+      !this.masterGain ||
+      !this.fadingGain
+    )
+      return;
 
     const osc = this.audioCtx.createOscillator();
     const gain = this.audioCtx.createGain();

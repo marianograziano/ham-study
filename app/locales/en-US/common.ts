@@ -423,6 +423,7 @@ export default {
         speed: "Speed (WPM)",
         spacing: "Spacing",
         noise: "Noise",
+        qsb: "QSB (Fading)",
         status: {
           transmitting: "TRANSMITTING...",
           waiting: "WAITING FOR INPUT",

@@ -172,6 +172,30 @@ export default function CwRxGame() {
                 className="w-32 accent-green-500"
               />
             </div>
+            {/* QSB Control */}
+            <div>
+              <label
+                htmlFor="qsb-slider"
+                className="text-xs text-green-700 uppercase tracking-widest block mb-2"
+              >
+                {t("tools.cwRxGame.ui.qsb")}: {gameState.qsb}%
+              </label>
+              <input
+                id="qsb-slider"
+                type="range"
+                min="0"
+                max="90"
+                step="5"
+                value={gameState.qsb}
+                onChange={(e) =>
+                  setGameState((prev) => ({
+                    ...prev,
+                    qsb: Number(e.target.value),
+                  }))
+                }
+                className="w-32 accent-green-500"
+              />
+            </div>
           </div>
         </div>
 

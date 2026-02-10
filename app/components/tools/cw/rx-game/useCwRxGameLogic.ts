@@ -6,7 +6,8 @@ export type RXGameState = {
   score: number;
   highScore: number;
   wpm: number;
-  noiseLevel: number;
+  noiseLevel: number; // 0-100
+  qsb: number; // 0-100 (Signal Fading)
   farnsworth: number; // Extra spacing
   currentTarget: string;
   userInput: string;
@@ -189,6 +190,7 @@ export function useCwRxGameLogic() {
     highScore: 0,
     wpm: 20,
     noiseLevel: 0,
+    qsb: 0,
     farnsworth: 20,
     currentTarget: "",
     userInput: "",
@@ -218,23 +220,40 @@ export function useCwRxGameLogic() {
     }
   }, [gameState.isPlaying, gameState.noiseLevel]);
 
+  // QSB Control
+  useEffect(() => {
+    if (gameState.isPlaying && gameState.qsb >= 0) {
+      soundManager.setQsb(gameState.qsb);
+    } else {
+      soundManager.stopQsb();
+    }
+  }, [gameState.isPlaying, gameState.qsb]);
+
   // Load Persistence
   useEffect(() => {
     try {
       const savedWpm = localStorage.getItem("ham-study:cw-rx:wpm");
       const savedNoise = localStorage.getItem("ham-study:cw-rx:noise");
+      const savedQsb = localStorage.getItem("ham-study:cw-rx:qsb");
       const savedFarnsworth = localStorage.getItem(
         "ham-study:cw-rx:farnsworth",
       );
       const savedHighScore = localStorage.getItem("ham-study:cw-rx:highScore");
 
-      if (savedWpm || savedNoise || savedFarnsworth || savedHighScore) {
+      if (
+        savedWpm ||
+        savedNoise ||
+        savedFarnsworth ||
+        savedHighScore ||
+        savedQsb
+      ) {
         setGameState((prev) => ({
           ...prev,
           wpm: savedWpm ? Number.parseInt(savedWpm, 10) : prev.wpm,
           noiseLevel: savedNoise
             ? Number.parseInt(savedNoise, 10)
             : prev.noiseLevel,
+          qsb: savedQsb ? Number.parseInt(savedQsb, 10) : prev.qsb,
           farnsworth: savedFarnsworth
             ? Number.parseInt(savedFarnsworth, 10)
             : prev.farnsworth,
@@ -256,6 +275,7 @@ export function useCwRxGameLogic() {
         "ham-study:cw-rx:noise",
         gameState.noiseLevel.toString(),
       );
+      localStorage.setItem("ham-study:cw-rx:qsb", gameState.qsb.toString());
       localStorage.setItem(
         "ham-study:cw-rx:farnsworth",
         gameState.farnsworth.toString(),
@@ -263,7 +283,12 @@ export function useCwRxGameLogic() {
     } catch (_e) {
       // ignore
     }
-  }, [gameState.wpm, gameState.noiseLevel, gameState.farnsworth]);
+  }, [
+    gameState.wpm,
+    gameState.noiseLevel,
+    gameState.farnsworth,
+    gameState.qsb,
+  ]);
 
   const playNext = useCallback(() => {
     // Pick a word or callsign

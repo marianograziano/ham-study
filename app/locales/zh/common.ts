@@ -404,6 +404,7 @@ export default {
         speed: "速度 (WPM)",
         spacing: "间距 (Spacing)",
         noise: "底噪 (Noise)",
+        qsb: "信号衰落 (QSB)",
         status: {
           transmitting: "正在发送...",
           waiting: "等待输入",
