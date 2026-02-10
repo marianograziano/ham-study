@@ -361,7 +361,7 @@ export default {
         subtitle: "用摩尔斯电码保卫城墙",
         ready: "准备好了吗？",
         instructions:
-          "按空格键输入 ·（点），按回车键输入 −（划）。在字符掉落到城墙前输入正确的摩尔斯电码来消灭它们！",
+          "按 J 键输入 ·（点），按 K 键输入 −（划）。在字符掉落到城墙前输入正确的摩尔斯电码来消灭它们！",
         start: "开始游戏",
         resume: "继续",
         paused: "已暂停",
@@ -374,7 +374,7 @@ export default {
         clear: "清空",
         dit: "点",
         dah: "划",
-        controls: "空格 = ·（点） | 回车 = −（划） | 退格 = 删除 | ESC = 暂停",
+        controls: "J = ·（点） | K = −（划） | 退格 = 删除 | ESC = 暂停",
         gameOver: "游戏结束",
         wallBreached: "城墙已被攻破！",
         finalScore: "最终得分",
@@ -386,8 +386,14 @@ export default {
     },
     cwGame: {
       title: "CW 防御战 (CW Defense)",
-      description: "用摩尔斯电码保卫城墙！下落式打字游戏，锻炼你的 CW 反应速度。",
+      description:
+        "用摩尔斯电码保卫城墙！下落式打字游戏，锻炼你的 CW 反应速度。",
       keywords: "CW, 摩尔斯电码, 游戏, 打字游戏, 业余无线电",
+    },
+    cwRxGame: {
+      title: "CW 听力训练 (RX Trainer)",
+      description: "摩尔斯电码接收练习工具，模拟真实短波底噪。",
+      keywords: "CW, 听力练习, 抄收, 摩尔斯电码, 业余无线电",
     },
   },
 
