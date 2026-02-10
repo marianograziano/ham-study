@@ -196,6 +196,51 @@ export default function CwRxGame() {
                 className="w-32 accent-green-500"
               />
             </div>
+
+            {/* Toggles */}
+            <div className="flex flex-col gap-4 pt-1">
+              {/* Chinese Callsigns Toggle */}
+              <label className="flex items-center gap-3 cursor-pointer group">
+                <div className="relative">
+                  <input
+                    type="checkbox"
+                    className="sr-only peer"
+                    checked={gameState.chineseCallsigns}
+                    onChange={(e) =>
+                      setGameState((prev) => ({
+                        ...prev,
+                        chineseCallsigns: e.target.checked,
+                      }))
+                    }
+                  />
+                  <div className="w-10 h-6 bg-green-900/30 border border-green-800 rounded-full peer peer-checked:bg-green-900/80 peer-focus:ring-2 peer-focus:ring-green-500/50 transition-all after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-green-700 after:border-green-500 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full peer-checked:after:bg-green-400"></div>
+                </div>
+                <span className="text-xs text-green-700 uppercase tracking-widest group-hover:text-green-500 transition-colors">
+                  {t("tools.cwRxGame.ui.chineseCallsigns")}
+                </span>
+              </label>
+
+              {/* QSO Mode Toggle */}
+              <label className="flex items-center gap-3 cursor-pointer group">
+                <div className="relative">
+                  <input
+                    type="checkbox"
+                    className="sr-only peer"
+                    checked={gameState.qsoMode}
+                    onChange={(e) =>
+                      setGameState((prev) => ({
+                        ...prev,
+                        qsoMode: e.target.checked,
+                      }))
+                    }
+                  />
+                  <div className="w-10 h-6 bg-green-900/30 border border-green-800 rounded-full peer peer-checked:bg-green-900/80 peer-focus:ring-2 peer-focus:ring-green-500/50 transition-all after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-green-700 after:border-green-500 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full peer-checked:after:bg-green-400"></div>
+                </div>
+                <span className="text-xs text-green-700 uppercase tracking-widest group-hover:text-green-500 transition-colors">
+                  {t("tools.cwRxGame.ui.qsoMode")}
+                </span>
+              </label>
+            </div>
           </div>
         </div>
 

@@ -405,6 +405,8 @@ export default {
         spacing: "间距 (Spacing)",
         noise: "底噪 (Noise)",
         qsb: "信号衰落 (QSB)",
+        chineseCallsigns: "仅中国呼号 (CN Call)",
+        qsoMode: "模拟 QSO (Simulate QSO)",
         status: {
           transmitting: "正在发送...",
           waiting: "等待输入",

@@ -12,18 +12,55 @@ export type RXGameState = {
   currentTarget: string;
   userInput: string;
   status: "idle" | "playing_audio" | "waiting_input" | "success" | "failure";
+  qsoMode: boolean; // Text will be QSO style sentences
+  chineseCallsigns: boolean; // Only generate Chinese callsigns
 };
 
 const WORDS = [
+  // Q-Codes (Comprehensive List)
+  "QRA",
+  "QRB",
+  "QRG",
+  "QRI",
+  "QRJ",
+  "QRK",
+  "QRL",
+  "QRM",
+  "QRN",
+  "QRO",
+  "QRP",
+  "QRQ",
+  "QRS",
+  "QRT",
+  "QRU",
+  "QRV",
+  "QRW",
+  "QRX",
+  "QRZ",
+  "QSA",
+  "QSB",
+  "QSD",
+  "QSL",
+  "QSO",
+  "QSP",
+  "QSU",
+  "QSV",
+  "QSW",
+  "QSX",
+  "QSY",
+  "QSZ",
+  "QTB",
+  "QTC",
+  "QTH",
+  "QTR",
+
+  // Common Abbreviations
   "CQ",
   "DE",
   "K",
   "R",
   "TNX",
   "73",
-  "QSO",
-  "QTH",
-  "RST",
   "NAME",
   "WX",
   "RIG",
@@ -101,7 +138,6 @@ const WORDS = [
   "PT",
   "PWR",
   "PX",
-  "R",
   "RCVR",
   "REF",
   "RFI",
@@ -151,36 +187,104 @@ const WORDS = [
   "Y",
   "YL",
   "YR",
-  "73",
   "88",
+  "55",
+  "73",
 ];
 
-const GENERATE_CALLSIGN = () => {
-  const P1 = [
-    "K",
-    "W",
-    "N",
-    "A",
-    "AA",
-    "AB",
-    "AC",
-    "AD",
-    "AE",
-    "AF",
-    "AG",
-    "AI",
-    "AJ",
-    "AK",
-    "AL",
+const GENERATE_CALLSIGN = (chineseOnly: boolean = false) => {
+  if (chineseOnly) {
+    // Chinese Callsign Rule: B[A-Z][0-9][A-Z]{2,3}
+    // Prefixes: BA, BD, BG, BY, BH, BI... usually B + Letter
+    const prefixes = ["BA", "BD", "BG", "BY", "BH", "BI"];
+    const prefix = prefixes[Math.floor(Math.random() * prefixes.length)];
+    const zone = Math.floor(Math.random() * 10).toString();
+
+    // Suffix: 2 or 3 letters
+    const suffixLen = 2 + Math.floor(Math.random() * 2);
+    let suffix = "";
+    for (let i = 0; i < suffixLen; i++) {
+      suffix += String.fromCharCode(65 + Math.floor(Math.random() * 26));
+    }
+    return prefix + zone + suffix;
+  } else {
+    // International
+    const P1 = [
+      "K",
+      "W",
+      "N",
+      "A",
+      "AA",
+      "AB",
+      "AC",
+      "AD",
+      "AE",
+      "AF",
+      "AG",
+      "AI",
+      "AJ",
+      "AK",
+      "AL",
+      "JA",
+      "JH",
+      "JR",
+      "JE",
+      "JF",
+      "JG",
+      "JI",
+      "JJ",
+      "JK",
+      "JL",
+      "JM",
+      "JN",
+      "JO",
+      "JP",
+      "JQ",
+      "JS",
+      "G",
+      "M",
+      "2E",
+      "VE",
+      "VA",
+      "VK",
+      "ZL",
+    ];
+    const N = Math.floor(Math.random() * 10).toString();
+    const S = () => String.fromCharCode(65 + Math.floor(Math.random() * 26));
+    // 1 to 3 letters
+    const sLen = 1 + Math.floor(Math.random() * 3);
+    let suffix = "";
+    for (let i = 0; i < sLen; i++) {
+      suffix += S();
+    }
+    return P1[Math.floor(Math.random() * P1.length)] + N + suffix;
+  }
+};
+
+const GENERATE_QSO = (chineseCallsigns: boolean) => {
+  // Generate a short QSO exchange
+  // Patterns:
+  // 1. CQ CQ DE [CALL] [CALL] K
+  // 2. [CALL] DE [CALL] [RST] [RST] K
+  // 3. [CALL] DE [CALL] UR RST 599 599 K
+  // 4. [CALL] DE [CALL] QSL ? K
+  // 5. TNX 73 TU E E
+
+  const myCall = GENERATE_CALLSIGN(chineseCallsigns);
+  const otherCall = GENERATE_CALLSIGN(chineseCallsigns);
+
+  const patterns = [
+    `CQ CQ DE ${myCall} ${myCall} K`,
+    `${otherCall} DE ${myCall} K`,
+    `${otherCall} DE ${myCall} = GA UR RST 599 599 = K`, // = is BT
+    `R ${otherCall} DE ${myCall} = TNX FB QSO 73 TU`,
+    `${otherCall} DE ${myCall} QSL ? K`,
+    `CQ CQ CQ DE ${myCall} ${myCall} PSE K`,
+    `${otherCall} DE ${myCall} KN`,
+    `QRZ ? DE ${myCall} K`,
   ];
-  const N = Math.floor(Math.random() * 10).toString();
-  const S = () => String.fromCharCode(65 + Math.floor(Math.random() * 26));
-  const S3 = S() + S() + S();
-  return (
-    P1[Math.floor(Math.random() * P1.length)] +
-    N +
-    S3.substring(0, 1 + Math.floor(Math.random() * 3))
-  );
+
+  return patterns[Math.floor(Math.random() * patterns.length)];
 };
 
 export function useCwRxGameLogic() {
@@ -195,6 +299,8 @@ export function useCwRxGameLogic() {
     currentTarget: "",
     userInput: "",
     status: "idle",
+    qsoMode: false,
+    chineseCallsigns: false,
   });
 
   const activeOscillatorRef = useRef<OscillatorNode | null | undefined>(null);
@@ -239,13 +345,17 @@ export function useCwRxGameLogic() {
         "ham-study:cw-rx:farnsworth",
       );
       const savedHighScore = localStorage.getItem("ham-study:cw-rx:highScore");
+      const savedQsoMode = localStorage.getItem("ham-study:cw-rx:qsoMode");
+      const savedCnCall = localStorage.getItem("ham-study:cw-rx:cnCall");
 
       if (
         savedWpm ||
         savedNoise ||
         savedFarnsworth ||
         savedHighScore ||
-        savedQsb
+        savedQsb ||
+        savedQsoMode ||
+        savedCnCall
       ) {
         setGameState((prev) => ({
           ...prev,
@@ -260,6 +370,8 @@ export function useCwRxGameLogic() {
           highScore: savedHighScore
             ? Number.parseInt(savedHighScore, 10)
             : prev.highScore,
+          qsoMode: savedQsoMode === "true",
+          chineseCallsigns: savedCnCall === "true",
         }));
       }
     } catch (_e) {
@@ -280,6 +392,14 @@ export function useCwRxGameLogic() {
         "ham-study:cw-rx:farnsworth",
         gameState.farnsworth.toString(),
       );
+      localStorage.setItem(
+        "ham-study:cw-rx:qsoMode",
+        gameState.qsoMode.toString(),
+      );
+      localStorage.setItem(
+        "ham-study:cw-rx:cnCall",
+        gameState.chineseCallsigns.toString(),
+      );
     } catch (_e) {
       // ignore
     }
@@ -288,15 +408,22 @@ export function useCwRxGameLogic() {
     gameState.noiseLevel,
     gameState.farnsworth,
     gameState.qsb,
+    gameState.qsoMode,
+    gameState.chineseCallsigns,
   ]);
 
   const playNext = useCallback(() => {
-    // Pick a word or callsign
+    // Pick a word or callsign depending on mode
     let nextText = "";
-    if (Math.random() > 0.5) {
-      nextText = WORDS[Math.floor(Math.random() * WORDS.length)];
+
+    if (gameState.qsoMode) {
+      nextText = GENERATE_QSO(gameState.chineseCallsigns);
     } else {
-      nextText = GENERATE_CALLSIGN();
+      if (Math.random() > 0.5) {
+        nextText = WORDS[Math.floor(Math.random() * WORDS.length)];
+      } else {
+        nextText = GENERATE_CALLSIGN(gameState.chineseCallsigns);
+      }
     }
 
     setGameState((prev: RXGameState) => ({
@@ -319,7 +446,12 @@ export function useCwRxGameLogic() {
       },
       gameState.farnsworth,
     );
-  }, [gameState.wpm, gameState.farnsworth]);
+  }, [
+    gameState.wpm,
+    gameState.farnsworth,
+    gameState.qsoMode,
+    gameState.chineseCallsigns,
+  ]);
 
   const startGame = useCallback(() => {
     setGameState((prev: RXGameState) => ({
@@ -351,14 +483,28 @@ export function useCwRxGameLogic() {
     setGameState((prev: RXGameState) => {
       if (prev.status !== "waiting_input") return prev;
 
-      const isCorrect =
-        prev.userInput.trim().toUpperCase() === prev.currentTarget;
+      // Clean up input and target for comparison
+      // Allow some flexibility? For now exact match.
+      const cleanInput = prev.userInput
+        .trim()
+        .toUpperCase()
+        .replace(/\s+/g, " ");
+      const cleanTarget = prev.currentTarget
+        .trim()
+        .toUpperCase()
+        .replace(/\s+/g, " ");
+
+      const isCorrect = cleanInput === cleanTarget;
 
       if (isCorrect) {
         // Correct!
         soundManager.playSuccess();
         setTimeout(playNext, 1000);
-        const newScore = prev.score + 10 + Math.floor(prev.wpm / 5);
+        // Score calc: base 10 + wpm. QSO mode gives bonus.
+        let scoreAdd = 10 + Math.floor(prev.wpm / 5);
+        if (prev.qsoMode) scoreAdd *= 2; // Bonus for longer text
+
+        const newScore = prev.score + scoreAdd;
         // Update High Score if needed
         let newHighScore = prev.highScore;
         if (newScore > prev.highScore) {

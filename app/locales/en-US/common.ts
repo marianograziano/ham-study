@@ -424,6 +424,8 @@ export default {
         spacing: "Spacing",
         noise: "Noise",
         qsb: "QSB (Fading)",
+        chineseCallsigns: "CN Calls Only",
+        qsoMode: "Simulate QSO",
         status: {
           transmitting: "TRANSMITTING...",
           waiting: "WAITING FOR INPUT",
