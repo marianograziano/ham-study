@@ -1,8 +1,9 @@
 import {
   ArrowClockwiseIcon,
   CalculatorIcon,
-  GameController as GameControllerIcon,
+  GameControllerIcon,
   GithubLogoIcon,
+  HeadphonesIcon,
   HouseIcon,
   WarningIcon,
 } from "@phosphor-icons/react";
@@ -482,21 +483,105 @@ export default function Home() {
             description: t(`${item.i18nKey}.description` as never),
             href: item.href,
             preview: (
-              <div className="flex items-center justify-center w-full h-full bg-gradient-to-b from-slate-950 to-slate-900 text-green-500 relative overflow-hidden">
+              <div className="flex items-center justify-center w-full h-full bg-linear-to-b from-slate-950 to-slate-900 text-green-500 relative overflow-hidden">
                 {/* Falling chars animation */}
                 <div className="absolute inset-0">
-                  <div className="absolute top-4 left-4 text-2xl font-bold text-green-400/60 animate-pulse">A</div>
-                  <div className="absolute top-8 right-8 text-2xl font-bold text-green-400/40">B</div>
-                  <div className="absolute top-16 left-1/2 text-2xl font-bold text-green-400/50">5</div>
+                  <div className="absolute top-4 left-4 text-2xl font-bold text-green-400/60 animate-pulse">
+                    A
+                  </div>
+                  <div className="absolute top-8 right-8 text-2xl font-bold text-green-400/40">
+                    B
+                  </div>
+                  <div className="absolute top-16 left-1/2 text-2xl font-bold text-green-400/50">
+                    5
+                  </div>
                 </div>
                 {/* Wall */}
                 <div className="absolute bottom-8 left-0 right-0 border-t-2 border-dashed border-red-500/50" />
                 {/* Game title */}
                 <div className="text-center z-10">
-                  <GameControllerIcon className="w-12 h-12 mx-auto mb-2 text-green-500" weight="fill" />
+                  <GameControllerIcon
+                    className="w-12 h-12 mx-auto mb-2 text-green-500"
+                    weight="fill"
+                  />
                   <span className="text-2xl font-mono font-bold tracking-wider">
                     CW DEFENSE
                   </span>
+                </div>
+              </div>
+            ),
+          };
+        case "tools.cwRxGame":
+          return {
+            title: t(`${item.i18nKey}.title` as never),
+            description: t(`${item.i18nKey}.description` as never),
+            href: item.href,
+            preview: (
+              <div className="flex items-center justify-center w-full h-full bg-slate-950 text-green-500 relative overflow-hidden">
+                {/* Audio Wave Animation Background */}
+                <div className="absolute inset-0 flex items-end justify-center gap-1 opacity-20 pb-8">
+                  {[
+                    1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17,
+                    18, 19, 20,
+                  ].map((i) => (
+                    <div
+                      key={i}
+                      className="w-1 bg-green-500 rounded-t-full animate-pulse"
+                      style={{
+                        height: `${((i * 13) % 60) + 20}%`,
+                        animationDelay: `${(i * 100) % 1000}ms`,
+                        animationDuration: `${((i * 50) % 1000) + 1000}ms`,
+                      }}
+                    />
+                  ))}
+                </div>
+
+                {/* Main Content */}
+                <div className="relative z-10 flex flex-col items-center gap-2">
+                  <div className="relative">
+                    <HeadphonesIcon
+                      weight="duotone"
+                      className="w-20 h-20 text-green-400 drop-shadow-[0_0_15px_rgba(74,222,128,0.5)]"
+                    />
+                    {/* Sound waves emitted from headphones */}
+                    <div className="absolute -right-4 top-1/2 -translate-y-1/2 flex gap-1">
+                      <div
+                        className="w-1 h-3 bg-green-400/80 rounded-full animate-pulse"
+                        style={{ animationDelay: "0ms" }}
+                      />
+                      <div
+                        className="w-1 h-5 bg-green-400/60 rounded-full animate-pulse"
+                        style={{ animationDelay: "100ms" }}
+                      />
+                      <div
+                        className="w-1 h-2 bg-green-400/40 rounded-full animate-pulse"
+                        style={{ animationDelay: "200ms" }}
+                      />
+                    </div>
+                    <div className="absolute -left-4 top-1/2 -translate-y-1/2 flex gap-1 flex-row-reverse">
+                      <div
+                        className="w-1 h-3 bg-green-400/80 rounded-full animate-pulse"
+                        style={{ animationDelay: "0ms" }}
+                      />
+                      <div
+                        className="w-1 h-5 bg-green-400/60 rounded-full animate-pulse"
+                        style={{ animationDelay: "100ms" }}
+                      />
+                      <div
+                        className="w-1 h-2 bg-green-400/40 rounded-full animate-pulse"
+                        style={{ animationDelay: "200ms" }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="text-center mt-2">
+                    <span className="text-xl font-mono font-bold tracking-wider text-green-500">
+                      RX TRAINER
+                    </span>
+                    <div className="text-xs text-green-500/80 font-mono mt-1">
+                      LISTEN & DECODE
+                    </div>
+                  </div>
                 </div>
               </div>
             ),
