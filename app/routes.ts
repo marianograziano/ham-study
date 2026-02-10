@@ -86,6 +86,9 @@ const getDemoRoutes = (idPrefix: string) => [
   route("tools/cw/game", "routes/tools/cw.game.tsx", {
     id: `${idPrefix}-cw-game`,
   }),
+  route("tools/cw/rx-game", "routes/tools/cw.rx-game.tsx", {
+    id: `${idPrefix}-cw-rx-game`,
+  }),
 ];
 
 export default [

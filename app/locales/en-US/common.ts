@@ -377,7 +377,7 @@ export default {
         subtitle: "Tap morse code to defend the wall",
         ready: "Ready to Play?",
         instructions:
-          "Press SPACE for · (dit) and ENTER for − (dah). Type the morse code to eliminate falling characters before they reach the wall!",
+          "Press J for · (dit) and K for − (dah). Type the morse code to eliminate falling characters before they reach the wall!",
         start: "Start Game",
         resume: "Resume",
         paused: "Paused",
@@ -390,7 +390,8 @@ export default {
         clear: "Clear",
         dit: "Dit",
         dah: "Dah",
-        controls: "SPACE = · (dit) | ENTER = − (dah) | BACKSPACE = Delete | ESC = Pause",
+        controls:
+          "J = · (dit) | K = − (dah) | BACKSPACE = Delete | ESC = Pause",
         gameOver: "Game Over",
         wallBreached: "The wall has been breached!",
         finalScore: "Final Score",
@@ -402,8 +403,44 @@ export default {
     },
     cwGame: {
       title: "CW Defense",
-      description: "Defend the wall with Morse Code! A falling typing game to train your CW reaction speed.",
+      description:
+        "Defend the wall with Morse Code! A falling typing game to train your CW reaction speed.",
       keywords: "CW, Morse Code, game, typing game, ham radio",
+    },
+    cwRxGame: {
+      title: "CW RX Trainer",
+      description:
+        "Morse Code reception trainer with realistic HF background noise.",
+      keywords: "CW, RX, reception, Morse Code, ham radio",
+      ui: {
+        title: "RX TRAINER",
+        subtitle: "Morse Code Reception Sim",
+        instructions:
+          "Listen to the sequence. Type what you hear. Press ENTER to submit.",
+        start: "START LISTENING",
+        score: "Score",
+        highScore: "High Score",
+        speed: "Speed (WPM)",
+        spacing: "Spacing",
+        noise: "Noise",
+        qsb: "QSB (Fading)",
+        chineseCallsigns: "CN Calls Only",
+        qsoMode: "Simulate QSO",
+        status: {
+          transmitting: "TRANSMITTING...",
+          waiting: "WAITING FOR INPUT",
+          correct: "CORRECT!",
+          miss: "MISS!",
+          was: "WAS:",
+        },
+        input: {
+          placeholder: {
+            playing: "...",
+            waiting: "TYPE HERE",
+          },
+          hint: "PRESS [SPACE] TO REPEAT • [ENTER] TO SUBMIT",
+        },
+      },
     },
   },
 
