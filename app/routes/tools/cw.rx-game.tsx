@@ -1,7 +1,7 @@
 import { GameController, Play, SpeakerHigh } from "@phosphor-icons/react";
 import i18next from "i18next";
 import { useEffect, useRef } from "react";
-import { initReactI18next } from "react-i18next";
+import { initReactI18next, useTranslation } from "react-i18next";
 import type { MetaFunction } from "react-router";
 import { useCwRxGameLogic } from "~/components/tools/cw/rx-game/useCwRxGameLogic";
 import { Button } from "~/components/ui/button";
@@ -17,12 +17,12 @@ export const loader = async ({ request }: Route.LoaderArgs) => {
     resources,
   });
   return {
-    title: `${t("tools.cw.rx_game.title", "CW Receive Trainer")} | Ham Study`,
+    title: `${t("tools.cwRxGame.title", "CW Receive Trainer")} | Ham Study`,
     description: t(
-      "tools.cw.rx_game.description",
+      "tools.cwRxGame.description",
       "Practice receiving Morse code.",
     ),
-    keywords: t("tools.cw.rx_game.keywords", "cw, morse, rx, receive, trainer"),
+    keywords: t("tools.cwRxGame.keywords", "cw, morse, rx, receive, trainer"),
   };
 };
 
@@ -39,6 +39,7 @@ export const meta: MetaFunction<typeof loader> = ({ data }) => {
 };
 
 export default function CwRxGame() {
+  const { t } = useTranslation("common");
   const {
     gameState,
     setGameState,
@@ -82,7 +83,7 @@ export default function CwRxGame() {
           <div className="bg-black/80 border border-green-900 p-4 flex flex-col gap-2">
             <div>
               <div className="text-xs text-green-700 uppercase tracking-widest mb-1">
-                Score
+                {t("tools.cwRxGame.ui.score")}
               </div>
               <div className="text-3xl font-black text-green-500 text-shadow-glow">
                 {gameState.score.toString().padStart(6, "0")}
@@ -90,7 +91,7 @@ export default function CwRxGame() {
             </div>
             <div>
               <div className="text-[10px] text-green-800 uppercase tracking-widest mb-0.5">
-                High Score
+                {t("tools.cwRxGame.ui.highScore")}
               </div>
               <div className="text-xl font-bold text-green-700">
                 {gameState.highScore.toString().padStart(6, "0")}
@@ -105,7 +106,7 @@ export default function CwRxGame() {
                 htmlFor="wpm-slider"
                 className="text-xs text-green-700 uppercase tracking-widest block mb-2"
               >
-                Speed (WPM): {gameState.wpm}
+                {t("tools.cwRxGame.ui.speed")}: {gameState.wpm}
               </label>
               <input
                 id="wpm-slider"
@@ -129,7 +130,7 @@ export default function CwRxGame() {
                 htmlFor="farnsworth-slider"
                 className="text-xs text-green-700 uppercase tracking-widest block mb-2"
               >
-                Spacing: {gameState.farnsworth}
+                {t("tools.cwRxGame.ui.spacing")}: {gameState.farnsworth}
               </label>
               <input
                 id="farnsworth-slider"
@@ -153,7 +154,7 @@ export default function CwRxGame() {
                 htmlFor="noise-slider"
                 className="text-xs text-green-700 uppercase tracking-widest block mb-2"
               >
-                Noise: {gameState.noiseLevel}%
+                {t("tools.cwRxGame.ui.noise")}: {gameState.noiseLevel}%
               </label>
               <input
                 id="noise-slider"
@@ -183,16 +184,14 @@ export default function CwRxGame() {
                 weight="fill"
               />
               <h2 className="text-5xl font-black text-phosphor tracking-widest mb-2 uppercase font-mono text-shadow-glow">
-                RX TRAINER
+                {t("tools.cwRxGame.ui.title")}
               </h2>
               <p className="text-green-800 tracking-[0.5em] text-xs mb-8 uppercase">
-                Morse Code Reception Sim
+                {t("tools.cwRxGame.ui.subtitle")}
               </p>
 
               <div className="mb-8 mt-8 text-green-400/60 text-sm">
-                <p>Listen to the sequence.</p>
-                <p>Type what you hear.</p>
-                <p>Press ENTER to submit.</p>
+                <p>{t("tools.cwRxGame.ui.instructions")}</p>
               </div>
 
               <Button
@@ -201,7 +200,7 @@ export default function CwRxGame() {
                 className="bg-green-700 hover:bg-green-600 text-black font-black tracking-widest px-12 py-6 text-xl rounded-none border border-green-400 shadow-[0_0_20px_rgba(34,197,94,0.4)]"
               >
                 <Play className="w-6 h-6 mr-3" weight="fill" />
-                START LISTENING
+                {t("tools.cwRxGame.ui.start")}
               </Button>
             </div>
           </div>
@@ -216,27 +215,28 @@ export default function CwRxGame() {
                 <div className="flex items-center gap-3 text-green-500 animate-pulse">
                   <SpeakerHigh weight="fill" className="w-8 h-8" />
                   <span className="text-xl tracking-widest">
-                    TRANSMITTING...
+                    {t("tools.cwRxGame.ui.status.transmitting")}
                   </span>
                 </div>
               )}
               {gameState.status === "waiting_input" && (
                 <div className="text-green-500/50 tracking-widest">
-                  WAITING FOR INPUT
+                  {t("tools.cwRxGame.ui.status.waiting")}
                 </div>
               )}
               {gameState.status === "success" && (
                 <div className="text-green-400 text-2xl font-bold tracking-widest">
-                  CORRECT!
+                  {t("tools.cwRxGame.ui.status.correct")}
                 </div>
               )}
               {gameState.status === "failure" && (
                 <div className="flex flex-col items-center">
                   <div className="text-red-500 text-2xl font-bold tracking-widest mb-2">
-                    MISS!
+                    {t("tools.cwRxGame.ui.status.miss")}
                   </div>
                   <div className="text-green-800 text-sm">
-                    WAS: {gameState.currentTarget}
+                    {t("tools.cwRxGame.ui.status.was")}{" "}
+                    {gameState.currentTarget}
                   </div>
                 </div>
               )}
@@ -262,7 +262,9 @@ export default function CwRxGame() {
                   gameState.status === "failure"
                 }
                 placeholder={
-                  gameState.status === "playing_audio" ? "..." : "TYPE HERE"
+                  gameState.status === "playing_audio"
+                    ? t("tools.cwRxGame.ui.input.placeholder.playing")
+                    : t("tools.cwRxGame.ui.input.placeholder.waiting")
                 }
                 className="w-full bg-black/50 border-b-4 border-green-700 text-green-400 text-center text-5xl p-4 font-mono uppercase focus:outline-none focus:border-green-400 focus:bg-green-900/10 transition-all placeholder:text-green-900/30"
                 autoComplete="off"
@@ -272,7 +274,7 @@ export default function CwRxGame() {
               {/* Helper hint */}
               <div className="text-center mt-4 text-green-800 text-xs tracking-widest">
                 {gameState.status === "waiting_input"
-                  ? "PRESS [SPACE] TO REPEAT • [ENTER] TO SUBMIT"
+                  ? t("tools.cwRxGame.ui.input.hint")
                   : " "}
               </div>
             </div>

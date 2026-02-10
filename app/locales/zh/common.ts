@@ -394,6 +394,31 @@ export default {
       title: "CW 听力训练 (RX Trainer)",
       description: "摩尔斯电码接收练习工具，模拟真实短波底噪。",
       keywords: "CW, 听力练习, 抄收, 摩尔斯电码, 业余无线电",
+      ui: {
+        title: "听力训练",
+        subtitle: "摩尔斯电码接收模拟",
+        instructions: "聆听摩尔斯电码序列。输入你听到的内容。按回车键提交。",
+        start: "开始监听",
+        score: "得分",
+        highScore: "最高分",
+        speed: "速度 (WPM)",
+        spacing: "间距 (Spacing)",
+        noise: "底噪 (Noise)",
+        status: {
+          transmitting: "正在发送...",
+          waiting: "等待输入",
+          correct: "正确!",
+          miss: "错误!",
+          was: "正确答案:",
+        },
+        input: {
+          placeholder: {
+            playing: "...",
+            waiting: "在此输入",
+          },
+          hint: "按 [空格] 重听 • [回车] 提交",
+        },
+      },
     },
   },
 

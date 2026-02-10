@@ -412,6 +412,32 @@ export default {
       description:
         "Morse Code reception trainer with realistic HF background noise.",
       keywords: "CW, RX, reception, Morse Code, ham radio",
+      ui: {
+        title: "RX TRAINER",
+        subtitle: "Morse Code Reception Sim",
+        instructions:
+          "Listen to the sequence. Type what you hear. Press ENTER to submit.",
+        start: "START LISTENING",
+        score: "Score",
+        highScore: "High Score",
+        speed: "Speed (WPM)",
+        spacing: "Spacing",
+        noise: "Noise",
+        status: {
+          transmitting: "TRANSMITTING...",
+          waiting: "WAITING FOR INPUT",
+          correct: "CORRECT!",
+          miss: "MISS!",
+          was: "WAS:",
+        },
+        input: {
+          placeholder: {
+            playing: "...",
+            waiting: "TYPE HERE",
+          },
+          hint: "PRESS [SPACE] TO REPEAT • [ENTER] TO SUBMIT",
+        },
+      },
     },
   },
 
