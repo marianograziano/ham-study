@@ -3,15 +3,15 @@ import i18next from "i18next";
 import { useEffect, useRef, useState } from "react";
 import { initReactI18next, useTranslation } from "react-i18next";
 import type { MetaFunction } from "react-router";
-import { Button } from "~/components/ui/button";
 import {
   CwGameBoard,
   CwGameControls,
   CwGameHUD,
   CwGameOver,
-  useCwGameLogic,
   type DifficultyLevel,
+  useCwGameLogic,
 } from "~/components/tools/cw/game";
+import { Button } from "~/components/ui/button";
 import resources from "~/locales";
 import { getLocale } from "~/middleware/i18next";
 import type { Route } from "./+types/cw.game";

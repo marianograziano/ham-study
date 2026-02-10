@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MORSE_CODE_MAP } from "~/components/tools/cw/constants";
 import {
-  GAME_WIDTH,
-  MAX_HEALTH,
-  WALL_Y,
-  type FallingChar,
-  type GameState,
-  type Particle,
-  getRandomChar,
-  type DifficultyLevel,
   DIFFICULTY_SETTINGS,
+  type DifficultyLevel,
+  type FallingChar,
+  GAME_WIDTH,
+  type GameState,
+  getRandomChar,
+  MAX_HEALTH,
+  type Particle,
+  WALL_Y,
 } from "./constants";
 import { soundManager } from "./SoundManager";
 

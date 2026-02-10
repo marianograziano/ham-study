@@ -1,6 +1,6 @@
 import { GameController } from "@phosphor-icons/react";
-import { MAX_HEALTH } from "./constants";
 import type { GameState } from "./constants";
+import { MAX_HEALTH } from "./constants";
 
 interface CwGameHUDProps {
   gameState: GameState;

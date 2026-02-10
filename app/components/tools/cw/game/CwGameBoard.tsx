@@ -1,9 +1,9 @@
-import { useRef, useEffect, useState, useLayoutEffect } from "react";
 import { Pause, Play } from "@phosphor-icons/react";
-import { Button } from "~/components/ui/button";
-import { WALL_Y } from "./constants";
-import type { FallingChar, Particle, GameState } from "./constants";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { MORSE_CODE_MAP } from "~/components/tools/cw/constants";
+import { Button } from "~/components/ui/button";
+import type { FallingChar, GameState, Particle } from "./constants";
+import { WALL_Y } from "./constants";
 
 interface CwGameBoardProps {
   gameState: GameState;
