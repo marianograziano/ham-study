@@ -1,7 +1,7 @@
 import { useFrame, useThree } from "@react-three/fiber";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { type InstancedMesh, SphereGeometry } from "three";
-import init, { calculate_electric_field } from "wasm/antenna/pkg/antenna";
+import initWasm, { calculate_electric_field } from "wasm/antenna/pkg/antenna?init";
 
 interface ElectricFieldWasmProps {
   antennaType: string;
@@ -32,14 +32,30 @@ export function ElectricFieldWasm(props: ElectricFieldWasmProps) {
 
   const { invalidate } = useThree();
 
+  // WASM initialization state
+  const [wasmReady, setWasmReady] = useState(false);
+  const wasmInitRef = useRef<Promise<void> | null>(null);
+
+  // Initialize WASM once
+  useEffect(() => {
+    if (!wasmInitRef.current) {
+      wasmInitRef.current = initWasm().then(() => {
+        setWasmReady(true);
+      }).catch((err) => {
+        console.error("Failed to initialize WASM:", err);
+      });
+    }
+    return () => {
+      // Cleanup not needed for WASM
+    };
+  }, []);
+
   // Dense Grid for "Field Fabric"
   const gridSize = 100; // 100x100 = 10,000 particles
   const spacing = 40 / gridSize; // Cover 40 units
   const count = gridSize * gridSize;
 
   const meshRef = useRef<InstancedMesh>(null);
-  const isInitialized = useRef(false);
-  const initError = useRef<Error | null>(null);
 
   // Time tracking
   const timeRef = useRef(0);
@@ -57,29 +73,15 @@ export function ElectricFieldWasm(props: ElectricFieldWasmProps) {
     [],
   );
 
-  // Initialize WASM
-  useEffect(() => {
-    const initWasm = async () => {
-      try {
-        // Initialize the WASM module
-        await init();
-        isInitialized.current = true;
-        invalidate();
-      } catch (err) {
-        console.error("Failed to initialize WASM:", err);
-        initError.current = err instanceof Error ? err : new Error(String(err));
-      }
-    };
 
-    initWasm();
-  }, [invalidate]);
 
   useFrame((_state, delta) => {
-    if (!isInitialized.current || !meshRef.current) return;
+    if (!meshRef.current) return;
 
     // Optimization for demand mode:
     // If speed is 0 (static thumbnail), we can skip calculations
     if (speed === 0) return;
+    if (!wasmReady) return;
 
     timeRef.current += delta * 1.0 * speed;
 
@@ -117,8 +119,8 @@ export function ElectricFieldWasm(props: ElectricFieldWasmProps) {
     }
   });
 
-  // Manual cleanup for useMemo resources
-  useMemo(() => {
+  // Cleanup geometry on unmount
+  useEffect(() => {
     return () => {
       geometry.dispose();
     };
