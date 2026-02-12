@@ -1,8 +1,16 @@
 import { Camera } from "@phosphor-icons/react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import * as THREE from "three";
 import { Button } from "~/components/ui/button";
+import {
+  initPropagationWasm,
+  calculateSignalPath,
+  getPropagationStats,
+  generateSphericalSurface,
+  type PathPoint,
+  type PropagationStats,
+} from "~/utils/propagation-wasm";
 
 // --- 核心配置常量 ---
 const EARTH_RADIUS = 50;
@@ -164,69 +172,35 @@ function createImpactWaveTexture() {
   return tex;
 }
 
-// --- 数学工具 ---
+// --- WASM 几何体生成 ---
 
-function intersectSphere(
-  rayOrigin: THREE.Vector3,
-  rayDir: THREE.Vector3,
-  sphereCenter: THREE.Vector3,
-  sphereRadius: number,
-): THREE.Vector3 | null {
-  const L = new THREE.Vector3().subVectors(sphereCenter, rayOrigin);
-  const tca = L.dot(rayDir);
-  const d2 = L.dot(L) - tca * tca;
-  const r2 = sphereRadius * sphereRadius;
-  if (d2 > r2) return null;
-  const thc = Math.sqrt(r2 - d2);
-  const t1 = L.dot(rayDir) - thc;
-  const t2 = L.dot(rayDir) + thc;
-  if (t1 > 0.001)
-    return rayOrigin.clone().add(rayDir.clone().multiplyScalar(t1));
-  if (t2 > 0.001)
-    return rayOrigin.clone().add(rayDir.clone().multiplyScalar(t2));
-  return null;
-}
-
-function createSphericalSurfaceGeometry(
+function createSphericalSurfaceGeometryWASM(
   radius: number,
   maxAngle: number,
   spreadAngle: number,
 ) {
-  const segmentsR = 64;
-  const segmentsW = 64;
-  const geometry = new THREE.BufferGeometry();
-  const vertices = [];
-  const uvs = [];
-  const indices = [];
-
-  for (let i = 0; i <= segmentsR; i++) {
-    const phi = (i / segmentsR) * maxAngle;
-    for (let j = 0; j <= segmentsW; j++) {
-      const theta = (j / segmentsW - 0.5) * spreadAngle;
-      const x = radius * Math.sin(phi) * Math.sin(theta);
-      const y = radius * Math.cos(phi);
-      const z = radius * Math.sin(phi) * Math.cos(theta);
-      vertices.push(x, y, z);
-      uvs.push(j / segmentsW, i / segmentsR);
-    }
+  try {
+    const { vertices, uvs, indices } = generateSphericalSurface(
+      radius,
+      maxAngle,
+      spreadAngle,
+      64,
+      64,
+    );
+    
+    const geometry = new THREE.BufferGeometry();
+    geometry.setIndex(Array.from(indices));
+    geometry.setAttribute(
+      "position",
+      new THREE.Float32BufferAttribute(vertices, 3),
+    );
+    geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+    return geometry;
+  } catch (e) {
+    // Fallback to simple geometry if WASM fails
+    console.warn("WASM geometry generation failed, using fallback", e);
+    return new THREE.SphereGeometry(radius, 64, 64);
   }
-  for (let i = 0; i < segmentsR; i++) {
-    for (let j = 0; j < segmentsW; j++) {
-      const a = i * (segmentsW + 1) + j;
-      const b = (i + 1) * (segmentsW + 1) + j;
-      const c = (i + 1) * (segmentsW + 1) + (j + 1);
-      const d = i * (segmentsW + 1) + (j + 1);
-      indices.push(a, b, d);
-      indices.push(b, c, d);
-    }
-  }
-  geometry.setIndex(indices);
-  geometry.setAttribute(
-    "position",
-    new THREE.Float32BufferAttribute(vertices, 3),
-  );
-  geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
-  return geometry;
 }
 
 interface ElectromagneticPropagationSceneProps {
@@ -242,7 +216,7 @@ export default function ElectromagneticPropagationScene({
   mode = "HF",
   frequency = 14.1,
   angle = 15,
-  ionoHeight = 300,
+  ionoHeight = 20,  // Scale factor, not km
   isThumbnail = false,
   isHovered = false,
 }: ElectromagneticPropagationSceneProps) {
@@ -256,6 +230,8 @@ export default function ElectromagneticPropagationScene({
   });
   const { t } = useTranslation("scene");
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [wasmReady, setWasmReady] = useState(false);
+  const wasmInitRef = useRef<Promise<void> | null>(null);
 
   const handleDownload = () => {
     if (canvasRef.current) {
@@ -266,12 +242,25 @@ export default function ElectromagneticPropagationScene({
     }
   };
 
+  // Initialize WASM
+  useEffect(() => {
+    if (!wasmInitRef.current) {
+      wasmInitRef.current = initPropagationWasm()
+        .then(() => {
+          setWasmReady(true);
+        })
+        .catch((err) => {
+          console.error("Failed to initialize propagation WASM:", err);
+        });
+    }
+  }, []);
+
   useEffect(() => {
     paramsRef.current = { mode, angle, frequency, ionoHeight, isHovered };
   }, [mode, angle, frequency, ionoHeight, isHovered]);
 
   useEffect(() => {
-    if (!mountRef.current) return;
+    if (!mountRef.current || !wasmReady) return;
 
     // --- 初始化 ---
     const width = mountRef.current.clientWidth;
@@ -484,7 +473,7 @@ export default function ElectromagneticPropagationScene({
       intensity: number,
     ) => {
       const maxRippleAngle = 0.08;
-      const geo = createSphericalSurfaceGeometry(
+      const geo = createSphericalSurfaceGeometryWASM(
         EARTH_RADIUS + 0.3,
         maxRippleAngle,
         Math.PI * 2,
@@ -521,11 +510,9 @@ export default function ElectromagneticPropagationScene({
       ionoHeight: -1,
     };
 
-    // --- 真正的 3D 路径逻辑 ---
+    // --- WASM 优化的 3D 路径逻辑 ---
     const updateSignalPath = () => {
       const { mode, angle, frequency, ionoHeight } = paramsRef.current;
-      // Note: We might want slightly looser check or force update if anything changes.
-      // But props change triggers this fn in animation loop anyway.
       if (
         mode === lastUpdateParams.mode &&
         angle === lastUpdateParams.angle &&
@@ -541,114 +528,88 @@ export default function ElectromagneticPropagationScene({
         if (c.geometry) c.geometry.dispose();
         signalGroup.remove(c);
       }
-      // Keep GroundBounce? Maybe clear them too on major param change?
-      // Original code cleared bounces only on logic update I guess.
-      // Let's clear ground bounces to interact immediately.
       while (groundBounceGroup.children.length > 0)
         groundBounceGroup.remove(groundBounceGroup.children[0]);
 
       const ionoR = EARTH_RADIUS + ionoHeight;
       ionosphere.scale.setScalar(ionoR / (EARTH_RADIUS + 15));
 
-      const pts: THREE.Vector3[] = [];
-      let currentPos = new THREE.Vector3(0, EARTH_RADIUS, 0);
-      pts.push(currentPos);
+      // Use WASM for signal path calculation
+      let pathPoints: PathPoint[] = [];
+      let stats: PropagationStats | null = null;
+      
+      try {
+        pathPoints = calculateSignalPath(
+          mode,
+          frequency,
+          angle,
+          ionoHeight,
+          EARTH_RADIUS,
+          MAX_HOPS,
+          CRITICAL_FREQUENCY_FOF2,
+        );
+        
+        stats = getPropagationStats(
+          mode,
+          frequency,
+          angle,
+          ionoHeight,
+          EARTH_RADIUS,
+          CRITICAL_FREQUENCY_FOF2,
+        );
+      } catch (e) {
+        console.error("WASM path calculation failed:", e);
+        return;
+      }
 
-      const rad = (angle * Math.PI) / 180;
-      let direction = new THREE.Vector3(
-        Math.cos(rad),
-        Math.sin(rad),
-        0,
-      ).normalize();
+      if (pathPoints.length < 2) return;
 
-      const incidenceAngle = Math.asin((EARTH_RADIUS / ionoR) * Math.cos(rad));
-      const currentMUF = CRITICAL_FREQUENCY_FOF2 / Math.cos(incidenceAngle);
-      const isPenetrating = mode === "UV" ? true : frequency > currentMUF;
-
+      const pts: THREE.Vector3[] = pathPoints.map(p => new THREE.Vector3(p.x, p.y, p.z));
+      const impactPoints: THREE.Vector3[] = pathPoints
+        .filter(p => p.isImpact)
+        .map(p => new THREE.Vector3(p.x, p.y, p.z));
+      
+      const isPenetrating = stats?.isPenetrating ?? (mode === "UV");
       const baseColor =
         mode === "HF" ? (isPenetrating ? 0xf43f5e : 0x06b6d4) : 0xfacc15;
 
       // 1. 主地波
-      if (mode === "HF") {
-        const gwStrength = Math.max(0, 15 - frequency * 0.4);
-        if (gwStrength > 0) {
-          const maxAngle = gwStrength * 0.06;
-          const spreadAngle = Math.PI / 3;
-          const gwGeo = createSphericalSurfaceGeometry(
-            EARTH_RADIUS + 0.3,
-            maxAngle,
-            spreadAngle,
-          );
-          const gwMat = new THREE.MeshBasicMaterial({
-            map: wifiTexture,
-            color: 0x22c55e,
-            transparent: true,
-            opacity: 0.8,
-            side: THREE.DoubleSide,
-            depthWrite: false,
-            blending: THREE.AdditiveBlending,
-          });
-          gwMat.map?.repeat.set(1, 4);
-          const gwMesh = new THREE.Mesh(gwGeo, gwMat);
-          gwMesh.rotateY(Math.PI / 2);
-          gwMesh.userData = { isGroundWave: true };
-          signalGroup.add(gwMesh);
-        }
+      if (mode === "HF" && stats && stats.groundWaveStrength > 0) {
+        const maxAngle = (stats.groundWaveStrength * 0.06 * Math.PI) / 180;
+        const spreadAngle = Math.PI / 3;
+        const gwGeo = createSphericalSurfaceGeometryWASM(
+          EARTH_RADIUS + 0.3,
+          maxAngle,
+          spreadAngle,
+        );
+        const gwMat = new THREE.MeshBasicMaterial({
+          map: wifiTexture,
+          color: 0x22c55e,
+          transparent: true,
+          opacity: 0.8,
+          side: THREE.DoubleSide,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending,
+        });
+        gwMat.map?.repeat.set(1, 4);
+        const gwMesh = new THREE.Mesh(gwGeo, gwMat);
+        gwMesh.rotateY(Math.PI / 2);
+        gwMesh.userData = { isGroundWave: true };
+        signalGroup.add(gwMesh);
       }
 
-      // 2. 天波
-      const impactPoints: THREE.Vector3[] = [];
+      // 2. 天波撞击效果
       const bounceEvents: { pos: THREE.Vector3; intensity: number }[] = [];
-
-      if (isPenetrating) {
-        const hitIono = intersectSphere(
-          currentPos,
-          direction,
-          new THREE.Vector3(0, 0, 0),
-          ionoR,
-        );
-        if (hitIono) {
-          pts.push(hitIono);
-          impactPoints.push(hitIono);
-          pts.push(hitIono.clone().add(direction.clone().multiplyScalar(80)));
-        } else {
-          pts.push(currentPos.clone().add(direction.multiplyScalar(80)));
-        }
-      } else {
-        let bounces = 0;
-        while (bounces < MAX_HOPS) {
-          const hitIono = intersectSphere(
-            currentPos,
-            direction,
-            new THREE.Vector3(0, 0, 0),
-            ionoR,
-          );
-          if (!hitIono) break;
-          pts.push(hitIono);
-          impactPoints.push(hitIono);
-
-          direction = direction
-            .clone()
-            .reflect(hitIono.clone().normalize().negate());
-          const hitEarth = intersectSphere(
-            hitIono,
-            direction,
-            new THREE.Vector3(0, 0, 0),
-            EARTH_RADIUS,
-          );
-          if (hitEarth) {
-            pts.push(hitEarth);
-            impactPoints.push(hitEarth);
-            currentPos = hitEarth;
-
-            const intensity = 0.5 ** (bounces + 1);
-            bounceEvents.push({ pos: hitEarth, intensity });
-
-            direction = direction.clone().reflect(hitEarth.clone().normalize());
-            bounces++;
-          } else {
-            pts.push(hitIono.clone().add(direction.multiplyScalar(60)));
-            break;
+      for (let i = 1; i < pathPoints.length - 1; i++) {
+        if (pathPoints[i].isImpact) {
+          // 地面撞击 (y 坐标接近地球半径)
+          if (Math.abs(pathPoints[i].y - EARTH_RADIUS) < 1.0) {
+            const bounceIndex = Math.floor(i / 2);
+            const intensity = 0.5 ** (bounceIndex + 1);
+            bounceEvents.push({ 
+              pos: new THREE.Vector3(pathPoints[i].x, pathPoints[i].y, pathPoints[i].z), 
+              intensity 
+            });
           }
         }
       }
@@ -985,7 +946,7 @@ export default function ElectromagneticPropagationScene({
 
       renderer.forceContextLoss();
     };
-  }, [isThumbnail]); // Only re-init if isThumbnail changes radically
+  }, [isThumbnail, wasmReady]); // Re-init if isThumbnail or wasmReady changes
 
   return (
     <div ref={mountRef} className="w-full h-full cursor-move relative z-0">

@@ -1,8 +1,13 @@
 use wasm_bindgen::prelude::*;
 
-// Re-export the electric field module
+// Re-export all modules
 mod electric_field;
+mod geometry;
+mod propagation;
+
 pub use electric_field::*;
+pub use geometry::*;
+pub use propagation::*;
 
 /// Wave type for antenna field calculation
 #[derive(Clone, Copy, Debug, PartialEq)]
