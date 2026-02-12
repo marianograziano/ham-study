@@ -1,5 +1,10 @@
 use wasm_bindgen::prelude::*;
 
+// Re-export the electric field module
+mod electric_field;
+pub use electric_field::*;
+
+/// Calculate antenna field pattern (legacy function, kept for compatibility)
 #[wasm_bindgen]
 pub fn calculate_field(theta: f64, length: f64, traveling: bool) -> f64 {
     const PI: f64 = std::f64::consts::PI;
@@ -17,7 +22,7 @@ pub fn calculate_field(theta: f64, length: f64, traveling: bool) -> f64 {
             let kz = K * z;
             (kz.cos(), -kz.sin())
         } else {
-            ( (K * (length - z)).sin(), 0.0 )
+            ((K * (length - z)).sin(), 0.0)
         };
         let phase = K * z * cos_theta;
         let kr = phase.cos();

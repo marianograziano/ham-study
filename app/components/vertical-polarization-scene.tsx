@@ -4,12 +4,11 @@ import { Canvas } from "@react-three/fiber";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { SphereGeometry, Vector3 } from "three";
-import { calculate_field } from "wasm/antenna/pkg/antenna";
 import { Button } from "~/components/ui/button";
 import { Label } from "~/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
 import { Switch } from "~/components/ui/switch";
-import { ElectricFieldInstanced } from "./electric-field-instanced";
+import { ElectricFieldWasm } from "./electric-field-wasm";
 
 function Antenna() {
   return (
@@ -86,11 +85,6 @@ export default function VerticalPolarizationScene({
   );
 
   const uniqueId = useId();
-
-  useEffect(() => {
-    const field = calculate_field(0, 1, true);
-    console.log("Sample field:", field);
-  }, []);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const handleDownload = () => {
@@ -281,7 +275,7 @@ export default function VerticalPolarizationScene({
           {showPattern && <RadiationPattern />}
           {/* Surface/Field Mode */}
           {showWaves && (
-            <ElectricFieldInstanced
+            <ElectricFieldWasm
               antennaType="vertical"
               polarizationType="vertical"
               speed={effectiveSpeed}
