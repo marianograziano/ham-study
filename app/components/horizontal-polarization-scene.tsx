@@ -8,7 +8,7 @@ import { Button } from "~/components/ui/button";
 import { Label } from "~/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
 import { Switch } from "~/components/ui/switch";
-import { ElectricFieldInstanced } from "./electric-field-instanced";
+import { ElectricFieldWasm } from "./electric-field-wasm";
 
 function Antenna() {
   return (
@@ -284,7 +284,7 @@ export default function HorizontalPolarizationScene({
           {/* Surface/Field Mode */}
           {/* Surface/Field Mode */}
           {showWaves && (
-            <ElectricFieldInstanced
+            <ElectricFieldWasm
               antennaType="horizontal"
               polarizationType="horizontal"
               speed={effectiveSpeed}

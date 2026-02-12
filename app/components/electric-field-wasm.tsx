@@ -1,7 +1,9 @@
 import { useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { type InstancedMesh, SphereGeometry } from "three";
-import initWasm, { calculate_electric_field } from "wasm/antenna/pkg/antenna?init";
+import initWasm, {
+  calculate_electric_field,
+} from "wasm/antenna/pkg/antenna?init";
 
 interface ElectricFieldWasmProps {
   antennaType: string;
@@ -30,8 +32,6 @@ export function ElectricFieldWasm(props: ElectricFieldWasmProps) {
     rotation = [0, 0, 0],
   } = props;
 
-  const { invalidate } = useThree();
-
   // WASM initialization state
   const [wasmReady, setWasmReady] = useState(false);
   const wasmInitRef = useRef<Promise<void> | null>(null);
@@ -39,11 +39,13 @@ export function ElectricFieldWasm(props: ElectricFieldWasmProps) {
   // Initialize WASM once
   useEffect(() => {
     if (!wasmInitRef.current) {
-      wasmInitRef.current = initWasm().then(() => {
-        setWasmReady(true);
-      }).catch((err) => {
-        console.error("Failed to initialize WASM:", err);
-      });
+      wasmInitRef.current = initWasm()
+        .then(() => {
+          setWasmReady(true);
+        })
+        .catch((err) => {
+          console.error("Failed to initialize WASM:", err);
+        });
     }
     return () => {
       // Cleanup not needed for WASM
@@ -72,8 +74,6 @@ export function ElectricFieldWasm(props: ElectricFieldWasmProps) {
     () => new SphereGeometry(0.05, 6, 6), // Low poly spheres
     [],
   );
-
-
 
   useFrame((_state, delta) => {
     if (!meshRef.current) return;
