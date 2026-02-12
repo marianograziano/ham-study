@@ -80,7 +80,7 @@ export default async function handleRequest(
   responseHeaders.set("Content-Type", "text/html");
   responseHeaders.set(
     "Content-Security-Policy",
-    `default-src 'self'; script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https:; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' https: data:; connect-src 'self' https:; upgrade-insecure-requests`,
+    `default-src 'self'; script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https: 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' https: data:; connect-src 'self' https:; upgrade-insecure-requests`,
   );
 
   return new Response(body, {

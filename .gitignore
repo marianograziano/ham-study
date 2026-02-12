@@ -29,3 +29,5 @@ yarn-error.log*
 pnpm-debug.log*
 
 
+# rust
+wasm/antenna/target/
