@@ -1,14 +1,15 @@
-import { Camera } from "@phosphor-icons/react";
+import { CameraIcon } from "@phosphor-icons/react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import * as THREE from "three";
 import { Button } from "~/components/ui/button";
 import {
-  initPropagationWasm,
   calculateSignalPath,
+  createSphericalSurfaceGeometry,
   getPropagationStats,
-  generateSphericalSurface,
+  initPropagationWasm,
   type PathPoint,
+  type PropagationConfig,
   type PropagationStats,
 } from "~/utils/propagation-wasm";
 
@@ -16,6 +17,15 @@ import {
 const EARTH_RADIUS = 50;
 const MAX_HOPS = 3;
 const CRITICAL_FREQUENCY_FOF2 = 7;
+
+// Default propagation config
+const defaultPropagationConfig: PropagationConfig = {
+  useWorker: true,
+  useCache: true,
+  earthRadius: EARTH_RADIUS,
+  maxHops: MAX_HOPS,
+  criticalFrequency: CRITICAL_FREQUENCY_FOF2,
+};
 
 // --- 纹理生成器 ---
 
@@ -172,30 +182,22 @@ function createImpactWaveTexture() {
   return tex;
 }
 
-// --- WASM 几何体生成 ---
+// --- WASM 几何体生成 (with caching) ---
 
-function createSphericalSurfaceGeometryWASM(
+async function createSphericalSurfaceGeometryWASM(
   radius: number,
   maxAngle: number,
   spreadAngle: number,
-) {
+): Promise<THREE.BufferGeometry> {
   try {
-    const { vertices, uvs, indices } = generateSphericalSurface(
+    return await createSphericalSurfaceGeometry(
       radius,
       maxAngle,
       spreadAngle,
       64,
       64,
+      defaultPropagationConfig,
     );
-    
-    const geometry = new THREE.BufferGeometry();
-    geometry.setIndex(Array.from(indices));
-    geometry.setAttribute(
-      "position",
-      new THREE.Float32BufferAttribute(vertices, 3),
-    );
-    geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
-    return geometry;
   } catch (e) {
     // Fallback to simple geometry if WASM fails
     console.warn("WASM geometry generation failed, using fallback", e);
@@ -216,7 +218,7 @@ export default function ElectromagneticPropagationScene({
   mode = "HF",
   frequency = 14.1,
   angle = 15,
-  ionoHeight = 20,  // Scale factor, not km
+  ionoHeight = 20, // Scale factor, not km
   isThumbnail = false,
   isHovered = false,
 }: ElectromagneticPropagationSceneProps) {
@@ -232,6 +234,17 @@ export default function ElectromagneticPropagationScene({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [wasmReady, setWasmReady] = useState(false);
   const wasmInitRef = useRef<Promise<void> | null>(null);
+
+  // Refs for cleanup
+  const sceneRef = useRef<{
+    signalGroup?: THREE.Group;
+    scatterGroup?: THREE.Group;
+    groundBounceGroup?: THREE.Group;
+    pulseGroup?: THREE.Group;
+    ionosphere?: THREE.Mesh;
+    updateSignalPath?: () => Promise<void>;
+    dispose?: () => void;
+  }>({});
 
   const handleDownload = () => {
     if (canvasRef.current) {
@@ -349,6 +362,7 @@ export default function ElectromagneticPropagationScene({
     );
     ionosphere.renderOrder = 1;
     earthGroup.add(ionosphere);
+    sceneRef.current.ionosphere = ionosphere;
 
     // 发射塔
     const tower = new THREE.Mesh(
@@ -407,12 +421,19 @@ export default function ElectromagneticPropagationScene({
 
     const signalGroup = new THREE.Group();
     earthGroup.add(signalGroup);
+    sceneRef.current.signalGroup = signalGroup;
+
     const scatterGroup = new THREE.Group();
     earthGroup.add(scatterGroup);
+    sceneRef.current.scatterGroup = scatterGroup;
+
     const groundBounceGroup = new THREE.Group();
     earthGroup.add(groundBounceGroup);
+    sceneRef.current.groundBounceGroup = groundBounceGroup;
+
     const pulseGroup = new THREE.Group();
     earthGroup.add(pulseGroup);
+    sceneRef.current.pulseGroup = pulseGroup;
 
     // --- 粒子系统 ---
     const spawnScatter = (pos: THREE.Vector3, color: number) => {
@@ -467,13 +488,13 @@ export default function ElectromagneticPropagationScene({
       scatterGroup.add(ring);
     };
 
-    const spawnSecondaryGroundWave = (
+    const spawnSecondaryGroundWave = async (
       pos: THREE.Vector3,
       color: number,
       intensity: number,
     ) => {
       const maxRippleAngle = 0.08;
-      const geo = createSphericalSurfaceGeometryWASM(
+      const geo = await createSphericalSurfaceGeometryWASM(
         EARTH_RADIUS + 0.3,
         maxRippleAngle,
         Math.PI * 2,
@@ -511,7 +532,7 @@ export default function ElectromagneticPropagationScene({
     };
 
     // --- WASM 优化的 3D 路径逻辑 ---
-    const updateSignalPath = () => {
+    const updateSignalPath = async () => {
       const { mode, angle, frequency, ionoHeight } = paramsRef.current;
       if (
         mode === lastUpdateParams.mode &&
@@ -537,25 +558,22 @@ export default function ElectromagneticPropagationScene({
       // Use WASM for signal path calculation
       let pathPoints: PathPoint[] = [];
       let stats: PropagationStats | null = null;
-      
+
       try {
-        pathPoints = calculateSignalPath(
+        pathPoints = await calculateSignalPath(
           mode,
           frequency,
           angle,
           ionoHeight,
-          EARTH_RADIUS,
-          MAX_HOPS,
-          CRITICAL_FREQUENCY_FOF2,
+          defaultPropagationConfig,
         );
-        
-        stats = getPropagationStats(
+
+        stats = await getPropagationStats(
           mode,
           frequency,
           angle,
           ionoHeight,
-          EARTH_RADIUS,
-          CRITICAL_FREQUENCY_FOF2,
+          defaultPropagationConfig,
         );
       } catch (e) {
         console.error("WASM path calculation failed:", e);
@@ -564,12 +582,14 @@ export default function ElectromagneticPropagationScene({
 
       if (pathPoints.length < 2) return;
 
-      const pts: THREE.Vector3[] = pathPoints.map(p => new THREE.Vector3(p.x, p.y, p.z));
+      const pts: THREE.Vector3[] = pathPoints.map(
+        (p) => new THREE.Vector3(p.x, p.y, p.z),
+      );
       const impactPoints: THREE.Vector3[] = pathPoints
-        .filter(p => p.isImpact)
-        .map(p => new THREE.Vector3(p.x, p.y, p.z));
-      
-      const isPenetrating = stats?.isPenetrating ?? (mode === "UV");
+        .filter((p) => p.isImpact)
+        .map((p) => new THREE.Vector3(p.x, p.y, p.z));
+
+      const isPenetrating = stats?.isPenetrating ?? mode === "UV";
       const baseColor =
         mode === "HF" ? (isPenetrating ? 0xf43f5e : 0x06b6d4) : 0xfacc15;
 
@@ -577,25 +597,29 @@ export default function ElectromagneticPropagationScene({
       if (mode === "HF" && stats && stats.groundWaveStrength > 0) {
         const maxAngle = (stats.groundWaveStrength * 0.06 * Math.PI) / 180;
         const spreadAngle = Math.PI / 3;
-        const gwGeo = createSphericalSurfaceGeometryWASM(
-          EARTH_RADIUS + 0.3,
-          maxAngle,
-          spreadAngle,
-        );
-        const gwMat = new THREE.MeshBasicMaterial({
-          map: wifiTexture,
-          color: 0x22c55e,
-          transparent: true,
-          opacity: 0.8,
-          side: THREE.DoubleSide,
-          depthWrite: false,
-          blending: THREE.AdditiveBlending,
-        });
-        gwMat.map?.repeat.set(1, 4);
-        const gwMesh = new THREE.Mesh(gwGeo, gwMat);
-        gwMesh.rotateY(Math.PI / 2);
-        gwMesh.userData = { isGroundWave: true };
-        signalGroup.add(gwMesh);
+        try {
+          const gwGeo = await createSphericalSurfaceGeometryWASM(
+            EARTH_RADIUS + 0.3,
+            maxAngle,
+            spreadAngle,
+          );
+          const gwMat = new THREE.MeshBasicMaterial({
+            map: wifiTexture,
+            color: 0x22c55e,
+            transparent: true,
+            opacity: 0.8,
+            side: THREE.DoubleSide,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending,
+          });
+          gwMat.map?.repeat.set(1, 4);
+          const gwMesh = new THREE.Mesh(gwGeo, gwMat);
+          gwMesh.rotateY(Math.PI / 2);
+          gwMesh.userData = { isGroundWave: true };
+          signalGroup.add(gwMesh);
+        } catch (e) {
+          console.warn("Failed to create ground wave geometry:", e);
+        }
       }
 
       // 2. 天波撞击效果
@@ -606,9 +630,13 @@ export default function ElectromagneticPropagationScene({
           if (Math.abs(pathPoints[i].y - EARTH_RADIUS) < 1.0) {
             const bounceIndex = Math.floor(i / 2);
             const intensity = 0.5 ** (bounceIndex + 1);
-            bounceEvents.push({ 
-              pos: new THREE.Vector3(pathPoints[i].x, pathPoints[i].y, pathPoints[i].z), 
-              intensity 
+            bounceEvents.push({
+              pos: new THREE.Vector3(
+                pathPoints[i].x,
+                pathPoints[i].y,
+                pathPoints[i].z,
+              ),
+              intensity,
             });
           }
         }
@@ -644,7 +672,7 @@ export default function ElectromagneticPropagationScene({
         const energyMat = new THREE.MeshBasicMaterial({
           color: baseColor,
           transparent: true,
-          opacity: 0.15, // 降低不透明度，使其看起来更像“外壳”而非实体
+          opacity: 0.15, // 降低不透明度，使其看起来更像"外壳"而非实体
           blending: THREE.AdditiveBlending,
           depthWrite: false,
         });
@@ -663,11 +691,16 @@ export default function ElectromagneticPropagationScene({
         impactPoints.forEach((p) => {
           spawnScatter(p, baseColor);
         });
-        bounceEvents.forEach((evt) => {
-          spawnSecondaryGroundWave(evt.pos, baseColor, evt.intensity);
-        });
+
+        // Spawn secondary ground waves asynchronously
+        for (const evt of bounceEvents) {
+          await spawnSecondaryGroundWave(evt.pos, baseColor, evt.intensity);
+        }
       }
     };
+
+    // Store update function for animation loop
+    sceneRef.current.updateSignalPath = updateSignalPath;
 
     // --- Loop ---
     const clock = new THREE.Clock();
@@ -746,7 +779,8 @@ export default function ElectromagneticPropagationScene({
         ionosphere.rotation.y -= delta * 0.01;
       }
 
-      updateSignalPath();
+      // Update signal path (async, but we don't await here)
+      sceneRef.current.updateSignalPath?.();
 
       signalGroup.children.forEach((child) => {
         const mesh = child as THREE.Mesh;
@@ -945,6 +979,9 @@ export default function ElectromagneticPropagationScene({
       impactWaveTexture.dispose();
 
       renderer.forceContextLoss();
+
+      // Clear geometry cache periodically (not on every unmount)
+      // This is handled by the cache's TTL mechanism
     };
   }, [isThumbnail, wasmReady]); // Re-init if isThumbnail or wasmReady changes
 
@@ -953,7 +990,7 @@ export default function ElectromagneticPropagationScene({
       {!isThumbnail && (
         <div className="absolute bottom-4 right-4 z-50">
           <Button variant="secondary" size="sm" onClick={handleDownload}>
-            <Camera className="mr-2 size-4" />
+            <CameraIcon className="mr-2 size-4" />
             {t("common.controls.download")}
           </Button>
         </div>

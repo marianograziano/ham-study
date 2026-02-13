@@ -1,7 +1,7 @@
 import { CameraIcon } from "@phosphor-icons/react";
 import { ArcballControls } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useId, useMemo, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { SphereGeometry, Vector3 } from "three";
 import { Button } from "~/components/ui/button";

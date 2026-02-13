@@ -319,15 +319,22 @@ mod tests {
 
     #[test]
     fn test_incidence_angle_calculation() {
-        // 垂直发射 (90度) 到 300km 高度 (地球半径 6371km)
+        // 垂直发射 (90度仰角) 到 300km 高度 (地球半径 6371km)
+        // 仰角90度 = 垂直向上，此时入射角应该接近0度(垂直入射)
         let angle = calculate_incidence_angle(90.0, 6371.0, 6371.0 + 300.0);
         // 应该接近 0 (垂直入射)
         assert!(angle.abs() < 0.1);
         
-        // 水平发射 (0度)
-        let angle = calculate_incidence_angle(0.0, 6371.0, 6371.0 + 300.0);
-        // 应该接近 90 度 (切向入射)
-        assert!(angle > 1.4); // > 80度
+        // 低仰角发射 (10度) - 接近水平
+        // 射线以很小的仰角发射，到达电离层时入射角会较大
+        let angle = calculate_incidence_angle(10.0, 6371.0, 6371.0 + 300.0);
+        // 入射角应该大于60度(约1.05弧度)，但小于90度
+        assert!(angle > 1.0 && angle < 1.5); // 约60-85度
+        
+        // 45度仰角发射
+        let angle = calculate_incidence_angle(45.0, 6371.0, 6371.0 + 300.0);
+        // 入射角应该在30-60度之间
+        assert!(angle > 0.5 && angle < 1.0); // 约30-60度
     }
 
     #[test]

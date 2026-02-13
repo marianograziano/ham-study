@@ -20,10 +20,7 @@ import { Button } from "~/components/ui/button";
 import { Label } from "~/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
 import { Switch } from "~/components/ui/switch";
-import {
-  calculateField,
-  initAntennaWasm,
-} from "~/utils/antenna-physics-wasm";
+import { calculateField, initAntennaWasm } from "~/utils/antenna-physics-wasm";
 import { ElectricFieldInstanced } from "./electric-field-instanced";
 
 const WIRE_START = new Vector3(-5, -1, 0);

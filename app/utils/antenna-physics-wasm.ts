@@ -1,6 +1,6 @@
 /**
  * Antenna Physics Calculations using WebAssembly
- * 
+ *
  * This module provides high-performance antenna field calculations
  * using Rust-compiled WebAssembly for CPU-intensive numerical integration.
  */
@@ -26,7 +26,7 @@ export async function initAntennaWasm(): Promise<void> {
 
 /**
  * Calculate electric field intensity for a single angle
- * 
+ *
  * @param theta - Angle off the axis (radians)
  * @param length - Antenna length (in wavelengths lambda)
  * @param type - "traveling" | "standing"
@@ -45,10 +45,10 @@ export function calculateField(
 
 /**
  * Calculate electric field intensity for multiple angles in batch
- * 
+ *
  * This is significantly more efficient than calling calculateField multiple times
  * as it reduces JavaScript <-> WebAssembly call overhead.
- * 
+ *
  * @param angles - Array of angles in radians
  * @param length - Antenna length (in wavelengths lambda)
  * @param type - "traveling" | "standing"
@@ -65,15 +65,15 @@ export function calculateFieldBatch(
 
   const anglesArray = new Float64Array(angles);
   const outputArray = new Float64Array(angles.length);
-  
+
   calculate_field_batch(anglesArray, length, type, outputArray);
-  
+
   return Array.from(outputArray);
 }
 
 /**
  * Calculate complete antenna radiation pattern (360 degrees)
- * 
+ *
  * @param length - Antenna length (in wavelengths lambda)
  * @param type - "traveling" | "standing"
  * @param numPoints - Number of points to calculate (default: 360)
@@ -89,17 +89,17 @@ export function calculateRadiationPattern(
   }
 
   const outputArray = new Float64Array(numPoints);
-  
+
   calculate_radiation_pattern(length, type, numPoints, outputArray);
-  
+
   return Array.from(outputArray);
 }
 
 /**
  * Generate radiation pattern data for polar plot
- * 
+ *
  * Returns data points suitable for Chart.js or similar plotting libraries.
- * 
+ *
  * @param length - Antenna length (in wavelengths lambda)
  * @param type - "traveling" | "standing"
  * @param numPoints - Number of points (default: 360)
@@ -111,7 +111,7 @@ export function generateRadiationPatternData(
   numPoints: number = 360,
 ): Array<{ angle: number; field: number; angleRad: number }> {
   const fields = calculateRadiationPattern(length, type, numPoints);
-  
+
   return fields.map((field, index) => ({
     angle: (360 * index) / numPoints,
     angleRad: (2 * Math.PI * index) / numPoints,
