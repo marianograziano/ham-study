@@ -1,15 +1,18 @@
 import { Camera } from "@phosphor-icons/react";
 import { ArcballControls } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
-import { useId, useMemo, useRef, useState, useEffect } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { SphereGeometry, Vector3 } from "three";
 import { Button } from "~/components/ui/button";
 import { Label } from "~/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
 import { Switch } from "~/components/ui/switch";
-import { ElectricFieldInstanced } from "./electric-field-instanced";
-import { calculateAntennaGain, initAntennaWasm } from "~/utils/antenna-physics-wasm";
+import {
+  calculateAntennaGain,
+  initAntennaWasm,
+} from "~/utils/antenna-physics-wasm";
+import { ElectricFieldWasm } from "./electric-field-wasm";
 
 function YagiAntenna() {
   return (
@@ -77,7 +80,15 @@ function RadiationPattern() {
       // Calculate gain using WASM
       let gain = 0.1; // Base/noise floor
       try {
-        const wasmGain = calculateAntennaGain("yagi", theta, phi, 0.5, 1, false, "60");
+        const wasmGain = calculateAntennaGain(
+          "yagi",
+          theta,
+          phi,
+          0.5,
+          1,
+          false,
+          "60",
+        );
         gain += wasmGain * 1.5;
       } catch (error) {
         console.warn("WASM calculation failed, using fallback", error);
@@ -329,7 +340,7 @@ export default function YagiAntennaScene({
           {showPattern && <RadiationPattern />}
           {/* Surface/Field Mode */}
           {showWaves && (
-            <ElectricFieldInstanced
+            <ElectricFieldWasm
               antennaType="yagi"
               polarizationType="horizontal"
               speed={effectiveSpeed}

@@ -21,7 +21,7 @@ import { Label } from "~/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
 import { Switch } from "~/components/ui/switch";
 import { calculateField, initAntennaWasm } from "~/utils/antenna-physics-wasm";
-import { ElectricFieldInstanced } from "./electric-field-instanced";
+import { ElectricFieldWasm } from "./electric-field-wasm";
 
 const WIRE_START = new Vector3(-5, -1, 0);
 const WIRE_END = new Vector3(5, 3, 0);
@@ -598,7 +598,7 @@ export default function LongWireAntennaScene({
           {showPattern && <RadiationPattern length={length} />}
           {showWaves && (
             <group position={midPoint} rotation={[0, 0, rotationAngle]}>
-              <ElectricFieldInstanced
+              <ElectricFieldWasm
                 key={length}
                 antennaType="long-wire"
                 polarizationType="horizontal"

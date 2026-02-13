@@ -17,7 +17,7 @@ import { Button } from "~/components/ui/button";
 import { Label } from "~/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
 import { Switch } from "~/components/ui/switch";
-import { ElectricFieldInstanced } from "./electric-field-instanced";
+import { ElectricFieldWasm } from "./electric-field-wasm";
 
 const wireLength = 8;
 const wireHeight = 2;
@@ -442,7 +442,7 @@ export default function EndFedAntennaScene({
           )}
           {showWaves && (
             <group position={[-2, 1, 0]} rotation={[0, 0, Math.atan2(2, -8)]}>
-              <ElectricFieldInstanced
+              <ElectricFieldWasm
                 antennaType="end-fed"
                 polarizationType="horizontal"
                 speed={effectiveSpeed}

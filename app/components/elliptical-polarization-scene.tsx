@@ -9,7 +9,7 @@ import { Label } from "~/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
 import { Slider } from "~/components/ui/slider";
 import { Switch } from "~/components/ui/switch";
-import { ElectricFieldInstanced } from "./electric-field-instanced";
+import { ElectricFieldWasm } from "./electric-field-wasm";
 
 function GenericAntenna() {
   return (
@@ -340,7 +340,7 @@ export default function EllipticalPolarizationScene({
           <GenericAntenna />
           {showPattern && <RadiationPattern ampY={ampY} ampZ={ampZ} />}
           {showWaves && (
-            <ElectricFieldInstanced
+            <ElectricFieldWasm
               antennaType="helical" // Reusing helical type for now as elliptical is similar in implementation
               polarizationType="elliptical"
               speed={effectiveSpeed}

@@ -5,15 +5,15 @@
  * using Rust-compiled WebAssembly for CPU-intensive numerical integration.
  */
 
-import initWasm from "wasm/antenna/pkg/antenna?init";
 import {
-  calculate_field,
-  calculate_field_batch,
-  calculate_radiation_pattern,
   calculate_antenna_gain,
   calculate_antenna_gain_batch,
   calculate_antenna_radiation_pattern,
+  calculate_field,
+  calculate_field_batch,
+  calculate_radiation_pattern,
 } from "wasm/antenna/pkg/antenna";
+import initWasm from "wasm/antenna/pkg/antenna?init";
 
 // WASM initialization state
 let wasmInitialized = false;

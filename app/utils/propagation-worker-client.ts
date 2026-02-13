@@ -5,10 +5,9 @@
  * Handles message passing, request/response correlation, and error handling.
  */
 
-import type { PathPoint, PropagationStats } from "./propagation-wasm";
-
 // Import the worker using Vite's ?worker syntax
 import PropagationWorker from "../workers/propagation.worker?worker";
+import type { PathPoint, PropagationStats } from "./propagation-wasm";
 
 // Generate unique request IDs
 let requestIdCounter = 0;

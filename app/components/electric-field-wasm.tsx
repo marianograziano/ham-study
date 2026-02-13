@@ -16,6 +16,7 @@ interface ElectricFieldWasmProps {
   activeHarmonic?: number;
   isInvertedV?: boolean;
   rotation?: [number, number, number];
+  axialRatio?: number; // For elliptical polarization (currently unused by WASM)
 }
 
 export function ElectricFieldWasm(props: ElectricFieldWasmProps) {
@@ -30,6 +31,9 @@ export function ElectricFieldWasm(props: ElectricFieldWasmProps) {
     activeHarmonic,
     isInvertedV = false,
     rotation = [0, 0, 0],
+    // axialRatio is accepted but currently not used by WASM - reserved for future enhancement
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    axialRatio,
   } = props;
 
   // WASM initialization state

@@ -61,9 +61,23 @@ declare module "wasm/antenna/pkg/antenna?init" {
     [Symbol.dispose](): void;
   }
 
-  export function calculate_field(theta: number, length: number, wave_type: string): number;
-  export function calculate_field_batch(angles: Float64Array, length: number, wave_type: string, output: Float64Array): void;
-  export function calculate_radiation_pattern(length: number, wave_type: string, num_points: number, output: Float64Array): void;
+  export function calculate_field(
+    theta: number,
+    length: number,
+    wave_type: string,
+  ): number;
+  export function calculate_field_batch(
+    angles: Float64Array,
+    length: number,
+    wave_type: string,
+    output: Float64Array,
+  ): void;
+  export function calculate_radiation_pattern(
+    length: number,
+    wave_type: string,
+    num_points: number,
+    output: Float64Array,
+  ): void;
   export function calculate_electric_field(
     antenna_type: string,
     polarization_type: string,
@@ -80,11 +94,31 @@ declare module "wasm/antenna/pkg/antenna?init" {
     matrix_buffer: Float32Array,
     color_buffer: Float32Array,
   ): void;
-  export function generate_spherical_surface(params: SphericalSurfaceParams, vertices: Float32Array, uvs: Float32Array, indices: Uint32Array): number;
-  export function get_spherical_surface_buffer_sizes(segments_r: number, segments_w: number): bigint;
-  export function intersect_sphere_batch(ray_origins: Float32Array, ray_dirs: Float32Array, sphere_center: Float32Array, sphere_radius: number, results: Float32Array): void;
-  export function calculate_signal_path(params: PropagationParams, path_buffer: Float32Array, impact_buffer: Uint8Array): number;
-  export function calculate_propagation_stats(params: PropagationParams): PropagationStats;
+  export function generate_spherical_surface(
+    params: SphericalSurfaceParams,
+    vertices: Float32Array,
+    uvs: Float32Array,
+    indices: Uint32Array,
+  ): number;
+  export function get_spherical_surface_buffer_sizes(
+    segments_r: number,
+    segments_w: number,
+  ): bigint;
+  export function intersect_sphere_batch(
+    ray_origins: Float32Array,
+    ray_dirs: Float32Array,
+    sphere_center: Float32Array,
+    sphere_radius: number,
+    results: Float32Array,
+  ): void;
+  export function calculate_signal_path(
+    params: PropagationParams,
+    path_buffer: Float32Array,
+    impact_buffer: Uint8Array,
+  ): number;
+  export function calculate_propagation_stats(
+    params: PropagationParams,
+  ): PropagationStats;
   export function calculate_ground_wave_strength(frequency: number): number;
   export function calculate_ground_wave_angle(strength: number): number;
   export function get_propagation_buffer_size(max_hops: number): number;
