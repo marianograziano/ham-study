@@ -5,7 +5,16 @@
  * using Rust-compiled WebAssembly for CPU-intensive numerical integration.
  */
 
-import {
+// Import init separately for manual control
+/**
+ * Antenna Physics Calculations using WebAssembly
+ *
+ * This module provides high-performance antenna field calculations
+ * using Rust-compiled WebAssembly for CPU-intensive numerical integration.
+ */
+
+// Import WASM functions - note: we don't use ?init here to have manual control
+import initWasm, {
   calculate_antenna_gain,
   calculate_antenna_gain_batch,
   calculate_antenna_radiation_pattern,
@@ -13,19 +22,35 @@ import {
   calculate_field_batch,
   calculate_radiation_pattern,
 } from "wasm/antenna/pkg/antenna";
-import initWasm from "wasm/antenna/pkg/antenna?init";
 
 // WASM initialization state
 let wasmInitialized = false;
+let initPromise: Promise<void> | null = null;
 
 /**
- * Initialize the WASM module
+ * Ensure WASM is initialized before use
+ */
+async function ensureInitialized(): Promise<void> {
+  if (wasmInitialized) {
+    return;
+  }
+
+  if (initPromise) {
+    return initPromise;
+  }
+
+  initPromise = initWasm().then(() => {
+    wasmInitialized = true;
+  });
+
+  return initPromise;
+}
+
+/**
+ * Initialize the WASM module (public API)
  */
 export async function initAntennaWasm(): Promise<void> {
-  if (!wasmInitialized) {
-    await initWasm();
-    wasmInitialized = true;
-  }
+  return ensureInitialized();
 }
 
 /**
@@ -36,14 +61,12 @@ export async function initAntennaWasm(): Promise<void> {
  * @param type - "traveling" | "standing"
  * @returns Normalized electric field magnitude
  */
-export function calculateField(
+export async function calculateField(
   theta: number,
   length: number,
   type: "traveling" | "standing",
-): number {
-  if (!wasmInitialized) {
-    throw new Error("WASM not initialized. Call initAntennaWasm() first.");
-  }
+): Promise<number> {
+  await ensureInitialized();
   return calculate_field(theta, length, type);
 }
 
@@ -58,14 +81,12 @@ export function calculateField(
  * @param type - "traveling" | "standing"
  * @returns Array of normalized electric field magnitudes
  */
-export function calculateFieldBatch(
+export async function calculateFieldBatch(
   angles: number[],
   length: number,
   type: "traveling" | "standing",
-): number[] {
-  if (!wasmInitialized) {
-    throw new Error("WASM not initialized. Call initAntennaWasm() first.");
-  }
+): Promise<number[]> {
+  await ensureInitialized();
 
   const anglesArray = new Float64Array(angles);
   const outputArray = new Float64Array(angles.length);
@@ -83,14 +104,12 @@ export function calculateFieldBatch(
  * @param numPoints - Number of points to calculate (default: 360)
  * @returns Array of normalized field magnitudes for angles 0 to 2π
  */
-export function calculateRadiationPattern(
+export async function calculateRadiationPattern(
   length: number,
   type: "traveling" | "standing",
   numPoints: number = 360,
-): number[] {
-  if (!wasmInitialized) {
-    throw new Error("WASM not initialized. Call initAntennaWasm() first.");
-  }
+): Promise<number[]> {
+  await ensureInitialized();
 
   const outputArray = new Float64Array(numPoints);
 
@@ -109,12 +128,12 @@ export function calculateRadiationPattern(
  * @param numPoints - Number of points (default: 360)
  * @returns Array of {angle, field} objects where angle is in degrees
  */
-export function generateRadiationPatternData(
+export async function generateRadiationPatternData(
   length: number,
   type: "traveling" | "standing",
   numPoints: number = 360,
-): Array<{ angle: number; field: number; angleRad: number }> {
-  const fields = calculateRadiationPattern(length, type, numPoints);
+): Promise<Array<{ angle: number; field: number; angleRad: number }>> {
+  const fields = await calculateRadiationPattern(length, type, numPoints);
 
   return fields.map((field, index) => ({
     angle: (360 * index) / numPoints,
@@ -135,7 +154,7 @@ export function generateRadiationPatternData(
  * @param radialAngle - Radial angle string ("60", "135") for GP antennas
  * @returns Normalized gain value (0.0 to 1.0+)
  */
-export function calculateAntennaGain(
+export async function calculateAntennaGain(
   antennaType: string,
   theta: number,
   phi: number,
@@ -143,10 +162,8 @@ export function calculateAntennaGain(
   activeHarmonic: number = 1,
   isInvertedV: boolean = false,
   radialAngle: string = "60",
-): number {
-  if (!wasmInitialized) {
-    throw new Error("WASM not initialized. Call initAntennaWasm() first.");
-  }
+): Promise<number> {
+  await ensureInitialized();
   return calculate_antenna_gain(
     antennaType,
     theta,
@@ -170,7 +187,7 @@ export function calculateAntennaGain(
  * @param radialAngle - Radial angle string
  * @returns Array of gain values
  */
-export function calculateAntennaGainBatch(
+export async function calculateAntennaGainBatch(
   antennaType: string,
   anglesTheta: number[],
   anglesPhi: number[],
@@ -178,10 +195,8 @@ export function calculateAntennaGainBatch(
   activeHarmonic: number = 1,
   isInvertedV: boolean = false,
   radialAngle: string = "60",
-): number[] {
-  if (!wasmInitialized) {
-    throw new Error("WASM not initialized. Call initAntennaWasm() first.");
-  }
+): Promise<number[]> {
+  await ensureInitialized();
 
   if (anglesTheta.length !== anglesPhi.length) {
     throw new Error("anglesTheta and anglesPhi must have the same length");
@@ -217,7 +232,7 @@ export function calculateAntennaGainBatch(
  * @param numPoints - Number of azimuth points to calculate (default: 360)
  * @returns Array of gain values for azimuth angles 0 to 2π
  */
-export function calculateAntennaRadiationPattern(
+export async function calculateAntennaRadiationPattern(
   antennaType: string,
   theta: number,
   antennaLength: number,
@@ -225,10 +240,8 @@ export function calculateAntennaRadiationPattern(
   isInvertedV: boolean = false,
   radialAngle: string = "60",
   numPoints: number = 360,
-): number[] {
-  if (!wasmInitialized) {
-    throw new Error("WASM not initialized. Call initAntennaWasm() first.");
-  }
+): Promise<number[]> {
+  await ensureInitialized();
 
   const outputArray = new Float64Array(numPoints);
 

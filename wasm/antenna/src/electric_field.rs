@@ -85,25 +85,11 @@ pub(crate) fn calculate_windom_factor(angle: f64, n: i32, is_inverted_v: bool) -
         let (px, py, pz, tx, ty, tz) = if dist_from_feed < 0.0 {
             // Left arm
             let d = -dist_from_feed;
-            (
-                0.0,
-                d * -sin_d,
-                d * -cos_d,
-                0.0,
-                sin_d,
-                cos_d,
-            )
+            (0.0, d * -sin_d, d * -cos_d, 0.0, sin_d, cos_d)
         } else {
             // Right arm
             let d = dist_from_feed;
-            (
-                0.0,
-                d * -sin_d,
-                d * cos_d,
-                0.0,
-                -sin_d,
-                cos_d,
-            )
+            (0.0, d * -sin_d, d * cos_d, 0.0, -sin_d, cos_d)
         };
 
         let phase = k * (px * dx + py * dy + pz * dz);
@@ -203,7 +189,7 @@ fn calculate_field_internal(
 ) {
     let center_offset = (grid_size as f64 * spacing) / 2.0;
     let count = (grid_size * grid_size) as usize;
-    
+
     // Ensure buffers are large enough
     if matrix_buffer.len() < count * 16 || color_buffer.len() < count * 3 {
         return;
@@ -215,36 +201,36 @@ fn calculate_field_internal(
     for x in 0..grid_size {
         for z in 0..grid_size {
             let index = (x * grid_size + z) as usize;
-            
+
             let pos_x = x as f64 * spacing - center_offset;
             let pos_z = z as f64 * spacing - center_offset;
-            
+
             let dist = (pos_x * pos_x + pos_z * pos_z).sqrt();
-            
+
             if dist < 1.0 {
                 // Zero scale - set identity matrix with zero scale
                 set_matrix_at(matrix_buffer, index, 0.0, 0.0, 0.0, 0.0);
                 continue;
             }
-            
+
             // Conical slope logic for GP 60
             let mut y_offset = 0.0;
             if antenna_type == AntennaType::GP && radial_angle == "60" {
                 y_offset = dist * 1.2;
             }
-            
+
             // Phase calculation
             let phase = k * dist - time * speed_factor;
-            
+
             // Direction & handedness
             let angle = pos_z.atan2(pos_x);
             let cos_dir = angle.cos();
-            
+
             // Polarization logic
             let mut y_scale = 1.0;
             let mut h_scale = 1.0;
             let mut dir_gain = 1.0;
-            
+
             match polarization_type {
                 PolarizationType::Circular | PolarizationType::Elliptical => {
                     let rot_dir = if is_rhcp { 1.0 } else { -1.0 };
@@ -252,7 +238,7 @@ fn calculate_field_internal(
                     if polarization_type == PolarizationType::Elliptical {
                         h_scale *= 0.6;
                     }
-                    
+
                     let front = cos_dir.max(0.0);
                     let back = (-cos_dir).max(0.0);
                     dir_gain = front.powf(1.5) + 0.3 * back + 0.1;
@@ -263,15 +249,36 @@ fn calculate_field_internal(
                         AntennaType::MagneticLoop => {
                             let cos_a = angle.cos();
                             dir_gain = cos_a.abs() + 0.05;
+                            if polarization_type == PolarizationType::Vertical {
+                                y_scale = 1.0;
+                                h_scale = 0.0;
+                            } else {
+                                y_scale = 0.0;
+                                h_scale = 1.0;
+                            }
                         }
                         AntennaType::Yagi | AntennaType::Quad => {
                             let front = cos_dir.max(0.0);
                             dir_gain = front.powi(2) + 0.1;
+                            if polarization_type == PolarizationType::Vertical {
+                                y_scale = 1.0;
+                                h_scale = 0.0;
+                            } else {
+                                y_scale = 0.0;
+                                h_scale = 1.0;
+                            }
                         }
                         AntennaType::Moxon => {
                             let sin_dir = angle.sin();
                             let front = sin_dir.max(0.0);
                             dir_gain = front.powi(2) + 0.1;
+                            if polarization_type == PolarizationType::Vertical {
+                                y_scale = 1.0;
+                                h_scale = 0.0;
+                            } else {
+                                y_scale = 0.0;
+                                h_scale = 1.0;
+                            }
                         }
                         AntennaType::HB9CV => {
                             let kd = std::f64::consts::PI / 4.0;
@@ -279,6 +286,13 @@ fn calculate_field_internal(
                             let psi = kd * cos_dir + delta;
                             let mag = (2.0 + 2.0 * psi.cos()).sqrt();
                             dir_gain = (mag / std::f64::consts::SQRT_2).powi(2);
+                            if polarization_type == PolarizationType::Vertical {
+                                y_scale = 1.0;
+                                h_scale = 0.0;
+                            } else {
+                                y_scale = 0.0;
+                                h_scale = 1.0;
+                            }
                         }
                         AntennaType::LongWire => {
                             let l = antenna_length;
@@ -288,9 +302,20 @@ fn calculate_field_internal(
                             let den = angle.sin().abs();
                             let val = if den > 0.1 { num / den } else { num * 10.0 };
                             dir_gain = val * 0.5 + 0.05;
+                            if polarization_type == PolarizationType::Vertical {
+                                y_scale = 1.0;
+                                h_scale = 0.0;
+                            } else {
+                                y_scale = 0.0;
+                                h_scale = 1.0;
+                            }
                         }
                         AntennaType::Windom => {
-                            let n = if active_harmonic > 0 { active_harmonic } else { 1 };
+                            let n = if active_harmonic > 0 {
+                                active_harmonic
+                            } else {
+                                1
+                            };
                             let val = calculate_windom_factor(angle, n, is_inverted_v);
                             dir_gain = val.powf(1.5) * 0.5 + 0.05;
                             if polarization_type == PolarizationType::Vertical {
@@ -302,16 +327,22 @@ fn calculate_field_internal(
                             }
                         }
                         AntennaType::EndFed => {
-                            let n = if active_harmonic > 0 { active_harmonic } else { 1 };
+                            let n = if active_harmonic > 0 {
+                                active_harmonic
+                            } else {
+                                1
+                            };
                             let cos_theta = angle.cos();
                             let sin_theta = angle.sin().abs();
                             let safe_sin_theta = sin_theta.max(0.001);
-                            
+
                             let val = if n % 2 == 1 {
-                                let num = ((n as f64 * std::f64::consts::PI) / 2.0 * cos_theta).cos();
+                                let num =
+                                    ((n as f64 * std::f64::consts::PI) / 2.0 * cos_theta).cos();
                                 (num / safe_sin_theta).abs()
                             } else {
-                                let num = ((n as f64 * std::f64::consts::PI) / 2.0 * cos_theta).sin();
+                                let num =
+                                    ((n as f64 * std::f64::consts::PI) / 2.0 * cos_theta).sin();
                                 (num / safe_sin_theta).abs()
                             };
                             dir_gain = val.powf(1.5) * 0.5 + 0.05;
@@ -340,53 +371,63 @@ fn calculate_field_internal(
                                 AntennaType::Vertical | AntennaType::GP => {
                                     h_scale = 0.0;
                                     dir_gain = 1.0;
+
+                                    // Horizontal polarization fallback only for simple antennas
+                                    if polarization_type == PolarizationType::Horizontal {
+                                        y_scale = 0.0;
+                                        h_scale = angle.sin();
+                                        dir_gain = angle.sin().abs() + 0.1;
+                                    }
                                 }
                                 _ => {}
                             }
                         }
                     }
-                    
-                    // Horizontal polarization fallback
-                    if polarization_type == PolarizationType::Horizontal {
-                        y_scale = 0.0;
-                        h_scale = angle.sin();
-                        dir_gain = angle.sin().abs() + 0.1;
-                    }
                 }
             }
-            
+
             let amp = amplitude_scale * dir_gain;
             let decay = (1.0 - dist / 22.0).max(0.0);
             let effective_amp = amp * decay;
-            
+
             let val_y = phase.sin();
             let val_h = phase.cos();
-            
+
             let disp_y = val_y * y_scale * effective_amp;
             let disp_h = val_h * h_scale * effective_amp;
-            
+
             let tan_x = -angle.sin();
             let tan_z = angle.cos();
-            
+
             let final_x = pos_x + tan_x * disp_h;
             let final_y = disp_y + y_offset;
             let final_z = pos_z + tan_z * disp_h;
-            
+
             let s = if decay > 0.01 { 1.0 } else { 0.0 };
-            
+
             // Update matrix
-            set_matrix_at(matrix_buffer, index, final_x as f32, final_y as f32, final_z as f32, s as f32);
-            
+            set_matrix_at(
+                matrix_buffer,
+                index,
+                final_x as f32,
+                final_y as f32,
+                final_z as f32,
+                s as f32,
+            );
+
             // Color logic
             let mut normalized_gain = 0.0;
             let mut use_heat_map = false;
-            
+
             let is_variable_gain = matches!(
                 antenna_type,
-                AntennaType::Yagi | AntennaType::Quad | AntennaType::Moxon 
-                    | AntennaType::HB9CV | AntennaType::MagneticLoop
+                AntennaType::Yagi
+                    | AntennaType::Quad
+                    | AntennaType::Moxon
+                    | AntennaType::HB9CV
+                    | AntennaType::MagneticLoop
             ) || polarization_type == PolarizationType::Horizontal;
-            
+
             match polarization_type {
                 PolarizationType::Circular | PolarizationType::Elliptical => {
                     use_heat_map = true;
@@ -399,23 +440,23 @@ fn calculate_field_internal(
                     }
                 }
             }
-            
+
             let (mut r, mut g, mut b) = if use_heat_map {
                 let hue = (1.0 - normalized_gain) * 0.66;
                 hsl_to_rgb(hue, 1.0, 0.5)
             } else {
                 hsl_to_rgb(0.55, 0.9, 0.5)
             };
-            
+
             let wave_pulse = (phase.sin() + 1.0) * 0.5;
             let sharpness = wave_pulse.powi(2);
             let effective_gain = dir_gain.max(0.3);
             let brightness = sharpness * decay * 2.0 * effective_gain + 0.2;
-            
+
             r *= brightness;
             g *= brightness;
             b *= brightness;
-            
+
             // Update color
             color_buffer[index * 3] = r as f32;
             color_buffer[index * 3 + 1] = g as f32;
@@ -425,7 +466,7 @@ fn calculate_field_internal(
 }
 
 /// WASM-exposed function to calculate electric field
-/// 
+///
 /// # Arguments
 /// * `antenna_type` - Type of antenna ("vertical", "gp", "dp", "yagi", etc.)
 /// * `polarization_type` - Polarization type ("vertical", "horizontal", "circular", "elliptical")
@@ -460,7 +501,7 @@ pub fn calculate_electric_field(
 ) {
     let antenna_type_enum = AntennaType::from(antenna_type);
     let polarization_type_enum = PolarizationType::from(polarization_type);
-    
+
     calculate_field_internal(
         antenna_type_enum,
         polarization_type_enum,
@@ -485,34 +526,27 @@ pub fn calculate_electric_field(
 /// [ 0,  sy, 0,  0 ]
 /// [ 0,  0,  sz, 0 ]
 /// [ ox, oy, oz, 1 ]
-fn set_matrix_at(
-    buffer: &mut [f32],
-    index: usize,
-    x: f32,
-    y: f32,
-    z: f32,
-    scale: f32,
-) {
+fn set_matrix_at(buffer: &mut [f32], index: usize, x: f32, y: f32, z: f32, scale: f32) {
     let offset = index * 16;
-    
+
     // Column 0
     buffer[offset] = scale;
     buffer[offset + 1] = 0.0;
     buffer[offset + 2] = 0.0;
     buffer[offset + 3] = 0.0;
-    
+
     // Column 1
     buffer[offset + 4] = 0.0;
     buffer[offset + 5] = scale;
     buffer[offset + 6] = 0.0;
     buffer[offset + 7] = 0.0;
-    
+
     // Column 2
     buffer[offset + 8] = 0.0;
     buffer[offset + 9] = 0.0;
     buffer[offset + 10] = scale;
     buffer[offset + 11] = 0.0;
-    
+
     // Column 3 (translation)
     buffer[offset + 12] = x;
     buffer[offset + 13] = y;
@@ -551,9 +585,15 @@ mod tests {
         // Check that buffers were filled (not all zeros)
         let matrix_sum: f32 = matrix_buffer.iter().sum();
         let color_sum: f32 = color_buffer.iter().sum();
-        
-        assert!(matrix_sum != 0.0, "Matrix buffer should contain non-zero values");
-        assert!(color_sum != 0.0, "Color buffer should contain non-zero values");
+
+        assert!(
+            matrix_sum != 0.0,
+            "Matrix buffer should contain non-zero values"
+        );
+        assert!(
+            color_sum != 0.0,
+            "Color buffer should contain non-zero values"
+        );
     }
 
     #[test]
@@ -588,15 +628,26 @@ mod tests {
         let offset = center_index * 16;
 
         // Center should have zero scale (dist < 1.0)
-        assert_eq!(matrix_buffer[offset], 0.0, "Center point should have zero scale");
+        assert_eq!(
+            matrix_buffer[offset], 0.0,
+            "Center point should have zero scale"
+        );
     }
 
     #[test]
     fn test_calculate_electric_field_different_antenna_types() {
         let antenna_types = vec![
-            "vertical", "gp", "dp", "yagi", "quad", 
-            "moxon", "hb9cv", "magnetic-loop", "long-wire",
-            "windom", "end-fed"
+            "vertical",
+            "gp",
+            "dp",
+            "yagi",
+            "quad",
+            "moxon",
+            "hb9cv",
+            "magnetic-loop",
+            "long-wire",
+            "windom",
+            "end-fed",
         ];
 
         for ant_type in antenna_types {
@@ -672,11 +723,11 @@ mod tests {
     fn test_calculate_electric_field_time_evolution() {
         let grid_size = 10;
         let count = (grid_size * grid_size) as usize;
-        
+
         // Calculate at two different times
         let mut matrix_buffer_1 = vec![0.0f32; count * 16];
         let mut color_buffer_1 = vec![0.0f32; count * 3];
-        
+
         let mut matrix_buffer_2 = vec![0.0f32; count * 16];
         let mut color_buffer_2 = vec![0.0f32; count * 3];
 
@@ -717,11 +768,8 @@ mod tests {
         // Results should be different at different times
         let sum_1: f32 = matrix_buffer_1.iter().sum();
         let sum_2: f32 = matrix_buffer_2.iter().sum();
-        
-        assert_ne!(
-            sum_1, sum_2,
-            "Field should evolve over time"
-        );
+
+        assert_ne!(sum_1, sum_2, "Field should evolve over time");
     }
 
     #[test]
@@ -747,7 +795,13 @@ mod tests {
         assert!(factor.is_finite(), "Windom factor should be finite");
 
         let factor_inv = calculate_windom_factor(0.0, 1, true);
-        assert!(factor_inv >= 0.0, "Inverted V Windom factor should be non-negative");
-        assert!(factor_inv.is_finite(), "Inverted V Windom factor should be finite");
+        assert!(
+            factor_inv >= 0.0,
+            "Inverted V Windom factor should be non-negative"
+        );
+        assert!(
+            factor_inv.is_finite(),
+            "Inverted V Windom factor should be finite"
+        );
     }
 }

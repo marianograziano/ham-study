@@ -264,7 +264,7 @@ function RadiationPattern({ length }: { length: number }) {
         const theta = vertex.angleTo(new Vector3(1, 0, 0));
 
         // Use the physics engine (WASM)!
-        const gain = calculateField(theta, length, "standing");
+        const gain = await calculateField(theta, length, "standing");
 
         // Apply gain to vertex position
         // Add a small epsilon to avoid z-fighting or zero-size

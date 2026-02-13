@@ -3,7 +3,7 @@ import { ArcballControls } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
-import { SphereGeometry, Vector3 } from "three";
+import { type BufferGeometry, SphereGeometry, Vector3 } from "three";
 import { Button } from "~/components/ui/button";
 import { Label } from "~/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
@@ -56,64 +56,77 @@ function YagiAntenna() {
 }
 
 function RadiationPattern() {
-  // Initialize WASM module
+  const [geometry, setGeometry] = useState<BufferGeometry | null>(null);
+
   useEffect(() => {
-    initAntennaWasm().catch(console.error);
-  }, []);
+    let isMounted = true;
 
-  const geometry = useMemo(() => {
-    const geo = new SphereGeometry(1, 60, 40);
-    const posAttribute = geo.attributes.position;
-    const vertex = new Vector3();
-    const scale = 10;
+    const generateGeometry = async () => {
+      // Initialize WASM first
+      await initAntennaWasm();
 
-    for (let i = 0; i < posAttribute.count; i++) {
-      vertex.fromBufferAttribute(posAttribute, i);
-      vertex.normalize();
+      if (!isMounted) return;
 
-      // Convert vertex direction to spherical coordinates
-      // phi: azimuth angle (0 = forward direction +X)
-      // theta: elevation angle (0 = horizontal plane, π/2 = vertical)
-      const phi = Math.atan2(vertex.z, vertex.x); // azimuth around Y axis
-      const theta = Math.PI / 2; // assume horizontal pattern (elevation = 90 deg)
+      const geo = new SphereGeometry(1, 60, 40);
+      const posAttribute = geo.attributes.position;
+      const vertex = new Vector3();
+      const scale = 10;
 
-      // Calculate gain using WASM
-      let gain = 0.1; // Base/noise floor
-      try {
-        const wasmGain = calculateAntennaGain(
-          "yagi",
-          theta,
-          phi,
-          0.5,
-          1,
-          false,
-          "60",
-        );
-        gain += wasmGain * 1.5;
-      } catch (error) {
-        console.warn("WASM calculation failed, using fallback", error);
-        // Fallback to simplified model
-        const cosAngle = vertex.x;
-        if (cosAngle > 0) {
-          gain += cosAngle ** 3 * 1.5;
+      for (let i = 0; i < posAttribute.count; i++) {
+        vertex.fromBufferAttribute(posAttribute, i);
+        vertex.normalize();
+
+        // Convert vertex direction to spherical coordinates
+        // phi: azimuth angle (0 = forward direction +X)
+        // theta: elevation angle (0 = horizontal plane, π/2 = vertical)
+        const phi = Math.atan2(vertex.z, vertex.x); // azimuth around Y axis
+        const theta = Math.PI / 2; // assume horizontal pattern (elevation = 90 deg)
+
+        // Calculate gain using WASM
+        let gain = 0.1; // Base/noise floor
+        try {
+          const wasmGain = await calculateAntennaGain(
+            "yagi",
+            theta,
+            phi,
+            0.5,
+            1,
+            false,
+            "60",
+          );
+          gain += wasmGain * 1.5;
+        } catch (error) {
+          console.warn("WASM calculation failed, using fallback", error);
+          // Fallback to simplified model
+          const cosAngle = vertex.x;
+          if (cosAngle > 0) {
+            gain += cosAngle ** 3 * 1.5;
+          }
+          if (cosAngle < -0.5) {
+            gain += 0.2 * Math.abs(Math.cos(cosAngle * 5));
+          }
         }
-        if (cosAngle < -0.5) {
-          gain += 0.2 * Math.abs(Math.cos(cosAngle * 5));
-        }
+
+        vertex.multiplyScalar(gain * scale);
+        posAttribute.setXYZ(i, vertex.x, vertex.y, vertex.z);
       }
+      geo.computeVertexNormals();
 
-      vertex.multiplyScalar(gain * scale);
-      posAttribute.setXYZ(i, vertex.x, vertex.y, vertex.z);
-    }
-    geo.computeVertexNormals();
-    return geo;
+      if (isMounted) {
+        setGeometry(geo);
+      }
+    };
+
+    generateGeometry();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  useMemo(() => {
-    return () => {
-      geometry.dispose();
-    };
-  }, [geometry]);
+  if (!geometry) {
+    return null;
+  }
 
   return (
     <group>
