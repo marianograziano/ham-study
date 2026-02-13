@@ -57,7 +57,7 @@ impl From<&str> for PolarizationType {
 }
 
 /// Calculate Windom antenna factor using numerical integration
-fn calculate_windom_factor(angle: f64, n: i32, is_inverted_v: bool) -> f64 {
+pub(crate) fn calculate_windom_factor(angle: f64, n: i32, is_inverted_v: bool) -> f64 {
     const PI: f64 = std::f64::consts::PI;
     let k = n as f64 * PI;
     let segments = 40;

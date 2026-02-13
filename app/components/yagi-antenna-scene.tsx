@@ -1,7 +1,7 @@
 import { Camera } from "@phosphor-icons/react";
 import { ArcballControls } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
-import { useId, useMemo, useRef, useState } from "react";
+import { useId, useMemo, useRef, useState, useEffect } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { SphereGeometry, Vector3 } from "three";
 import { Button } from "~/components/ui/button";
@@ -9,6 +9,7 @@ import { Label } from "~/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
 import { Switch } from "~/components/ui/switch";
 import { ElectricFieldInstanced } from "./electric-field-instanced";
+import { calculateAntennaGain, initAntennaWasm } from "~/utils/antenna-physics-wasm";
 
 function YagiAntenna() {
   return (
@@ -52,6 +53,11 @@ function YagiAntenna() {
 }
 
 function RadiationPattern() {
+  // Initialize WASM module
+  useEffect(() => {
+    initAntennaWasm().catch(console.error);
+  }, []);
+
   const geometry = useMemo(() => {
     const geo = new SphereGeometry(1, 60, 40);
     const posAttribute = geo.attributes.position;
@@ -62,20 +68,27 @@ function RadiationPattern() {
       vertex.fromBufferAttribute(posAttribute, i);
       vertex.normalize();
 
-      // Yagi pattern: highly directional beam along +X axis
-      // Strong forward lobe, weak back lobe
-      const cosAngle = vertex.x; // cos(theta) where theta is angle from X axis (beam direction)
+      // Convert vertex direction to spherical coordinates
+      // phi: azimuth angle (0 = forward direction +X)
+      // theta: elevation angle (0 = horizontal plane, π/2 = vertical)
+      const phi = Math.atan2(vertex.z, vertex.x); // azimuth around Y axis
+      const theta = Math.PI / 2; // assume horizontal pattern (elevation = 90 deg)
 
+      // Calculate gain using WASM
       let gain = 0.1; // Base/noise floor
-
-      // Forward lobe (+X direction)
-      if (cosAngle > 0) {
-        gain += cosAngle ** 3 * 1.5;
-      }
-
-      // Back lobe (-X direction) - small ripple
-      if (cosAngle < -0.5) {
-        gain += 0.2 * Math.abs(Math.cos(cosAngle * 5));
+      try {
+        const wasmGain = calculateAntennaGain("yagi", theta, phi, 0.5, 1, false, "60");
+        gain += wasmGain * 1.5;
+      } catch (error) {
+        console.warn("WASM calculation failed, using fallback", error);
+        // Fallback to simplified model
+        const cosAngle = vertex.x;
+        if (cosAngle > 0) {
+          gain += cosAngle ** 3 * 1.5;
+        }
+        if (cosAngle < -0.5) {
+          gain += 0.2 * Math.abs(Math.cos(cosAngle * 5));
+        }
       }
 
       vertex.multiplyScalar(gain * scale);

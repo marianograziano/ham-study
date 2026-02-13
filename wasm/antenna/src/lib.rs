@@ -4,10 +4,12 @@ use wasm_bindgen::prelude::*;
 mod electric_field;
 mod geometry;
 mod propagation;
+mod radiation;
 
 pub use electric_field::*;
 pub use geometry::*;
 pub use propagation::*;
+pub use radiation::*;
 
 /// Wave type for antenna field calculation
 #[derive(Clone, Copy, Debug, PartialEq)]
