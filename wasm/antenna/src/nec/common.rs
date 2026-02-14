@@ -94,12 +94,21 @@ pub struct SegjData {
     pub cx: Vec<f64>,
 }
 
+// common /vsorc/
+#[derive(Debug, Default, Clone)]
+pub struct VSorcData {
+    pub nsant: usize,
+    pub isant: Vec<usize>,     // 0-based segment indices
+    pub vsant: Vec<Complex64>, // Voltage values
+}
+
 // The main Context struct to hold everything
 #[derive(Debug, Default)]
 pub struct Context {
     pub geometry: GeometryData,
     pub current: CurrentData,
     pub segj: SegjData,
+    pub vsorc: VSorcData,
     // Add other structs as we port them
     // pub gnd: GroundData,
     // pub netcx: NetcxData,

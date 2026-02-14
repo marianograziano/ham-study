@@ -1,5 +1,6 @@
 use crate::nec::common::{Context, PCHCON, PI};
 use num_complex::Complex64;
+
 use std::f64::consts::PI as PI_CONST;
 
 // Struct to hold TMI global data from nec2c (Transfer impedance/Integration data?)
@@ -703,16 +704,28 @@ fn ekscx(
         * (gzp2 - gzp1 + xk * xk * (1.0 - bk2) * Complex64::new(cint, -sint) - bk2 * (gzz2 - gzz1));
 }
 
+/// Helper struct for 3D Complex vector
+#[derive(Clone, Copy, Debug)]
+pub struct CVec3 {
+    pub x: Complex64,
+    pub y: Complex64,
+    pub z: Complex64,
+}
+
+impl CVec3 {
+    pub fn new() -> Self {
+        Self {
+            x: Complex64::new(0.0, 0.0),
+            y: Complex64::new(0.0, 0.0),
+            z: Complex64::new(0.0, 0.0),
+        }
+    }
+}
+
 /// Electric field evaluation.
 /// Corresponds to `efld` in fields.c
-pub fn efld(
-    xi: f64,
-    yi: f64,
-    zi: f64,
-    ai: f64,
-    ij: usize,
-    ctx: &Context,
-) -> (Complex64, Complex64, Complex64) {
+/// Returns full vector components: (E_Sine, E_Cosine, E_Constant)
+pub fn efld(xi: f64, yi: f64, zi: f64, ai: f64, ij: usize, ctx: &Context) -> (CVec3, CVec3, CVec3) {
     // Basic implementation of efld
     // Calculates field at (xi, yi, zi)
 
@@ -721,11 +734,7 @@ pub fn efld(
     // Let's retrieve source segment.
     let s_idx = ij;
     if s_idx >= ctx.geometry.n {
-        return (
-            Complex64::new(0.0, 0.0),
-            Complex64::new(0.0, 0.0),
-            Complex64::new(0.0, 0.0),
-        );
+        return (CVec3::new(), CVec3::new(), CVec3::new());
     }
 
     // Load source segment geometry
@@ -743,10 +752,20 @@ pub fn efld(
     let zij = zi - zc;
 
     let zp = xij * cabj + yij * sabj + zij * salpj;
-    let rhox = xij - cabj * zp;
-    let rhoy = yij - sabj * zp;
-    let rhoz = zij - salpj * zp;
+    let mut rhox = xij - cabj * zp;
+    let mut rhoy = yij - sabj * zp;
+    let mut rhoz = zij - salpj * zp;
     let rh = (rhox * rhox + rhoy * rhoy + rhoz * rhoz + ai * ai).sqrt();
+
+    if rh > 1.0e-10 {
+        rhox = rhox / rh;
+        rhoy = rhoy / rh;
+        rhoz = rhoz / rh;
+    } else {
+        rhox = 0.0;
+        rhoy = 0.0;
+        rhoz = 0.0;
+    }
 
     // Call eksc or ekscx
     let k = 2.0 * PI_CONST;
@@ -758,26 +777,10 @@ pub fn efld(
     let mut tezk = Complex64::new(0.0, 0.0);
     let mut terk = Complex64::new(0.0, 0.0);
 
-    // Dispatch logic approximated from nec2c
-    // nec2c uses detailed overlap checks (ind1, ind2).
-    // For now we use simpler proximity check
-
     let radius_s = ctx.geometry.bi[s_idx];
-    // If distance is large compared to radius, use eksc
-    // If close, use ekscx?
-    // In ne2c:
-    // ind1=0 -> eksc.
-    // ind1!=0 -> ekscx.
-    // ind1 is set if overlapping condition met.
 
-    // For now always use eksc unless extremely close?
-    // Let's implement full check logic later.
-    // NEC2C logic:
-    // If rh < radius_s (or close), then extended kernel logic needed?
-    // Actually extended kernel is for "extended thin wire", i.e. radius not negligible.
-    // Let's use eksc for now as default, keeping ekscx available.
-
-    let use_extended = false; // logic would go here
+    // For now always use eksc unless extremely close
+    let use_extended = false; // logic checks ind1/ind2 etc.
 
     if !use_extended {
         eksc(
@@ -793,7 +796,22 @@ pub fn efld(
         );
     }
 
-    // Return result directly from eksc components for now (placeholder for transform)
-    // Actually we need to transform back to be useful.
-    (tezs, ters, tezk)
+    // Transform to cartesian components (Free Space)
+    // txs = tezs * cabj + ters * rhox
+    let mut es = CVec3::new();
+    es.x = tezs * cabj + ters * rhox;
+    es.y = tezs * sabj + ters * rhoy;
+    es.z = tezs * salpj + ters * rhoz;
+
+    let mut ek = CVec3::new();
+    ek.x = tezk * cabj + terk * rhox;
+    ek.y = tezk * sabj + terk * rhoy;
+    ek.z = tezk * salpj + terk * rhoz;
+
+    let mut ec = CVec3::new();
+    ec.x = tezc * cabj + terc * rhox;
+    ec.y = tezc * sabj + terc * rhoy;
+    ec.z = tezc * salpj + terc * rhoz;
+
+    (es, ec, ek)
 }
