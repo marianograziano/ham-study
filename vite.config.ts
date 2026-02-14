@@ -3,6 +3,7 @@ import { reactRouter } from "@react-router/dev/vite";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "vite";
 import { imagetools } from "vite-imagetools";
+import wasm from "vite-plugin-wasm";
 import tsconfigPaths from "vite-tsconfig-paths";
 
 export default defineConfig({
@@ -14,10 +15,12 @@ export default defineConfig({
     tailwindcss(),
     reactRouter(),
     tsconfigPaths(),
+    wasm(),
   ],
   resolve: {
     alias: {
       "node:worker_threads": "/app/mocks/worker_threads.ts",
+      wasm: "/wasm",
     },
   },
   ssr: {

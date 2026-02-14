@@ -8,7 +8,7 @@ import { Button } from "~/components/ui/button";
 import { Label } from "~/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
 import { Switch } from "~/components/ui/switch";
-import { ElectricFieldInstanced } from "./electric-field-instanced";
+import { ElectricFieldWasm } from "./electric-field-wasm";
 
 // Helper to get wire geometry points and currents
 function getWireSegments(
@@ -595,7 +595,7 @@ export default function WindomAntennaScene({
           )}
 
           {showWaves && (
-            <ElectricFieldInstanced
+            <ElectricFieldWasm
               antennaType="windom" // Uses End-Fed/Windom harmonic logic
               polarizationType="horizontal"
               speed={effectiveSpeed}

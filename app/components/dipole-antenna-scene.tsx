@@ -8,7 +8,7 @@ import { Button } from "~/components/ui/button";
 import { Label } from "~/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
 import { Switch } from "~/components/ui/switch";
-import { ElectricFieldInstanced } from "./electric-field-instanced";
+import { ElectricFieldWasm } from "./electric-field-wasm";
 
 // Dipole Geometry Component
 function DipoleStructure({
@@ -476,7 +476,7 @@ export default function DipoleAntennaScene({
           )}
 
           {showWaves && (
-            <ElectricFieldInstanced
+            <ElectricFieldWasm
               antennaType="dp"
               polarizationType="horizontal"
               speed={effectiveSpeed}

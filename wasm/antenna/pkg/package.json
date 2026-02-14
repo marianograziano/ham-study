@@ -1,0 +1,15 @@
+{
+  "name": "antenna",
+  "type": "module",
+  "version": "0.1.0",
+  "files": [
+    "antenna_bg.wasm",
+    "antenna.js",
+    "antenna.d.ts"
+  ],
+  "main": "antenna.js",
+  "types": "antenna.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}

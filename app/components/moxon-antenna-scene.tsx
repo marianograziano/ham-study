@@ -14,7 +14,7 @@ import { Button } from "~/components/ui/button";
 import { Label } from "~/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
 import { Switch } from "~/components/ui/switch";
-import { ElectricFieldInstanced } from "./electric-field-instanced";
+import { ElectricFieldWasm } from "./electric-field-wasm";
 
 const width = 2;
 const depth = 0.7;
@@ -396,7 +396,7 @@ export default function MoxonAntennaScene({
           {/* Surface/Field Mode - Lifted to match antenna height */}
           {showWaves && (
             <group position={[0, 2, 0]}>
-              <ElectricFieldInstanced
+              <ElectricFieldWasm
                 antennaType="moxon"
                 polarizationType="horizontal"
                 speed={effectiveSpeed}

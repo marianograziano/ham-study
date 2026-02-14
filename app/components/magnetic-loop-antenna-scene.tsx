@@ -10,7 +10,7 @@ import { Label } from "~/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
 import { Switch } from "~/components/ui/switch";
 // import { Slider } from "~/components/ui/slider"; // Removed
-import { ElectricFieldInstanced } from "./electric-field-instanced";
+import { ElectricFieldWasm } from "./electric-field-wasm";
 
 function MagneticLoopAntenna() {
   return (
@@ -336,7 +336,7 @@ export default function MagneticLoopAntennaScene({
             <MagneticLoopAntenna />
             {showPattern && <RadiationPattern />}
             {showWaves && (
-              <ElectricFieldInstanced
+              <ElectricFieldWasm
                 antennaType="magnetic-loop"
                 polarizationType="horizontal"
                 speed={effectiveSpeed}

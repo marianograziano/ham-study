@@ -14,7 +14,7 @@ import { Button } from "~/components/ui/button";
 import { Label } from "~/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
 import { Switch } from "~/components/ui/switch";
-import { ElectricFieldInstanced } from "./electric-field-instanced";
+import { ElectricFieldWasm } from "./electric-field-wasm";
 
 interface QuadElementProps {
   position: [number, number, number];
@@ -427,7 +427,7 @@ export default function QuadAntennaScene({
           {showWaves && (
             <group position={[1, 2, 0]}>
               {/* Surface/Field Mode - Always On */}
-              <ElectricFieldInstanced
+              <ElectricFieldWasm
                 antennaType="quad"
                 polarizationType="horizontal"
                 speed={effectiveSpeed}
