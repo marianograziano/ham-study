@@ -5,6 +5,7 @@ mod antenna_pattern;
 mod electric_field;
 mod geometry;
 mod moxon_calc;
+pub mod nec;
 mod propagation;
 mod radiation;
 mod yagi_calc;
