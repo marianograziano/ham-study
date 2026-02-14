@@ -58,15 +58,31 @@ pub fn calculate_antenna_gain(
 
             let cos_phi = phi.cos();
 
+            // Elevation factor (theta is elevation from horizontal, 0 = horizon, pi/2 = zenith)
+            // We want max gain at theta = 0, so we use cos(theta)
+            let cos_theta = theta.cos();
+            // Protect against negative cos_theta (should be positive for -pi/2 to pi/2, but safety first)
+            let elevation_factor = cos_theta.abs();
+
             // Forward main lobe
+            // Power factor depends on antenna length (gain)
+            // Longer antenna -> sharper beam -> higher exponent
+            // Base exponent 2.0, plus length contribution
+            let exponent = 2.0 + 4.0 * antenna_length.max(0.0);
+
+            // Combine azimuth and elevation for 3D pencil beam
+            // We apply the same exponent to elevation to get a circular beam cross-section
             let main_lobe = if cos_phi > 0.0 {
-                cos_phi.powf(2.5)
+                cos_phi.powf(exponent) * elevation_factor.powf(exponent)
             } else {
                 0.0
             };
 
             // Side/Back lobes approximation
-            let side_lobes = (3.0 * phi).cos().abs() * 0.15;
+            // Also attenuate side lobes with elevation, but maybe less aggressively or same?
+            // Realistically side lobes are also 3D structures.
+            // Let's attenuate them normally with elevation to avoid vertical fans
+            let side_lobes = (3.0 * phi).cos().abs() * 0.15 * elevation_factor;
 
             // Front-to-back ratio floor (non-zero back radiation)
             let fbr_floor = if cos_phi < 0.0 { 0.05 } else { 0.0 };

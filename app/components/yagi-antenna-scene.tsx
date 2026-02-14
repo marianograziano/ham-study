@@ -80,7 +80,9 @@ function RadiationPattern({ material }: { material?: string }) {
         // phi: azimuth angle (0 = forward direction +X)
         // theta: elevation angle (0 = horizontal plane, π/2 = vertical)
         const phi = Math.atan2(vertex.z, vertex.x); // azimuth around Y axis
-        const theta = Math.PI / 2; // assume horizontal pattern (elevation = 90 deg)
+        // Calculate elevation from horizontal plane (XZ)
+        // sin(theta) = y / radius. Radius is 1 (normalized vertex).
+        const theta = Math.asin(vertex.y);
 
         // Calculate gain using WASM
         let gain = 0.1; // Base/noise floor

@@ -70,3 +70,34 @@ fn test_calculate_antenna_gain_material_loss() {
     );
     assert!(gain_fiber < 0.1, "Fiberglass should have very low gain");
 }
+#[test]
+fn test_yagi_gain_increases_with_length() {
+    // Short Yagi (e.g. 0.5 lambda) -> should have broader beam
+    // Long Yagi (e.g. 3.0 lambda) -> should have sharper beam
+
+    let angle_off_axis = std::f64::consts::PI / 6.0; // 30 degrees
+
+    let gain_short = calculate_antenna_gain("yagi", 0.0, angle_off_axis, 0.5, 1, false, "60", None);
+    let gain_long = calculate_antenna_gain("yagi", 0.0, angle_off_axis, 3.0, 1, false, "60", None);
+
+    assert!(
+        gain_long < gain_short,
+        "Longer Yagi should have sharper beam (lower gain at 30 deg off-axis). Short: {}, Long: {}",
+        gain_short,
+        gain_long
+    );
+
+    // Test Elevation Attenuation (3D Pencil Beam Check)
+    // At theta = 0 (horizontal), gain should be high.
+    // At theta = 30 deg (up), gain should be significantly lower for a Yagi.
+    let gain_horizon = calculate_antenna_gain("yagi", 0.0, 0.0, 3.0, 1, false, "60", None);
+    let gain_elevated =
+        calculate_antenna_gain("yagi", angle_off_axis, 0.0, 3.0, 1, false, "60", None);
+
+    assert!(
+        gain_elevated < gain_horizon * 0.8,
+        "Yagi should have elevation attenuation (pencil beam). Horizon: {}, Elevated 30deg: {}",
+        gain_horizon,
+        gain_elevated
+    );
+}
