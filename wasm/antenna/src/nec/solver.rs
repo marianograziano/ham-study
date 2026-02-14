@@ -168,70 +168,53 @@ impl Solver {
     }
 
     /// Fills the interaction matrix for wire-wire interactions.
-    /// Corresponds to `cmset` calling `cmww` in matrix.c
+    /// This corresponds to `cmss`, `cmsw`, `cmws`, `cmww` logic combined for wire-only.
     pub fn fill_matrix_wire_wire(&mut self, ctx: &mut Context) {
-        let n = ctx.geometry.n;
-        // Ensure matrix is cleared? Or we assume new solver.
-        // Assuming geometry.n matches solver size.
+        let n = self.nrow;
 
-        // Loop over source segments
+        // Loop over source basis functions (Columns j)
         for j in 0..n {
-            // 1. Compute basis function coefficients for source segment j
-            // In nec2c: trio(j) calls tbf.
-            // j is 0-based here.
+            // Calculate basis function coefficients for column j
+            // Output stored in ctx.segj
+            crate::nec::physics::tbf(j, 1, ctx);
 
-            // Check connection capability (icap) - hardcoded to 1 (std) or passed?
-            // tbf(i, icap, ctx).
-            // Let's assume icap=0 for free ends, 1 for connection?
-            // In nec2c, `subph` sets this.
-            // For now, let's pass 1 as default or check connectivity.
-            // Actually, `tbf` uses connection data in geometry.
-
-            tbf(j, 1, ctx); // 1 = assume regular?
-
-            // The result is in ctx.segj (ax, bx, cx, jco, jsno)
-
-            // 2. Loop over observation segments (rows)
+            // Loop over observation segments (Rows i)
             for i in 0..n {
-                // Observer i
+                let mut sum_term = Complex64::new(0.0, 0.0);
+
                 let xi = ctx.geometry.x[i];
                 let yi = ctx.geometry.y[i];
                 let zi = ctx.geometry.z[i];
                 let ai = ctx.geometry.bi[i];
-
                 let cabi = ctx.geometry.cab[i];
                 let sabi = ctx.geometry.sab[i];
                 let salpi = ctx.geometry.salp[i];
 
-                // Calculate E-field at i due to j
-                // efld(xi, yi, zi, ai, ij, ctx)
-                // ij in efld is the source index corresponding to `j`.
-
-                let (es, ec, ek) = efld(xi, yi, zi, ai, j, ctx);
-
-                // Project field onto segment i orientation
-                // etk = E_constant . s_i = ek . s_i
-                // ets = E_sine . s_i = es . s_i
-                // etc = E_cosine . s_i = ec . s_i
-
-                let etk = ek.x * cabi + ek.y * sabi + ek.z * salpi;
-                let ets = es.x * cabi + es.y * sabi + es.z * salpi;
-                let etc = ec.x * cabi + ec.y * sabi + ec.z * salpi;
-
-                // Fill matrix
-                // Normal fill (itrp == 0 case in C)
+                // Sum contributions from segments supporting basis function j
                 for k in 0..ctx.segj.jsno {
-                    let jx = (ctx.segj.jco[k] - 1) as usize; // 0-based index
-                                                             // cm[ipr + jx * nr] += ...
-                                                             // ipr is i. nr is n.
-                                                             // matrix is column major?
-                                                             // In C: cm[i + jx * n].
-                                                             // In Rust Solver: matrix[row + col * nrow].
-                                                             // So matrix[i + jx * n].
+                    // Segment index from jco (1-based, signed)
+                    let jx_raw = ctx.segj.jco[k];
+                    let jx = (jx_raw.abs() - 1) as usize;
 
+                    // Calculate field at i due to segment jx
+                    // Pass is_self = (i == jx)
+                    use crate::nec::physics::efld;
+                    let (es, ec, ek) = efld(xi, yi, zi, ai, jx, i == jx, ctx);
+
+                    // Project field onto segment i orientation
+                    let etk = ek.x * cabi + ek.y * sabi + ek.z * salpi;
+                    let ets = es.x * cabi + es.y * sabi + es.z * salpi;
+                    let etc = ec.x * cabi + ec.y * sabi + ec.z * salpi;
+
+                    // Accumulate weighted by basis function coeff
                     let term = etk * ctx.segj.ax[k] + ets * ctx.segj.bx[k] + etc * ctx.segj.cx[k];
-                    self.matrix[i + jx * n] = self.matrix[i + jx * n] + term;
+
+                    sum_term = sum_term + term;
                 }
+
+                // Store in column-major matrix
+                // matrix[row + col * nrow]
+                self.matrix[i + j * n] = sum_term;
             }
         }
     }

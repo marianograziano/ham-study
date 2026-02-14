@@ -152,3 +152,56 @@ pub fn calculate_radiation_pattern(
         output[i] = calculate_field_internal_single(theta, length, wave_type_enum);
     }
 }
+use crate::nec::simulation::NecSimulation;
+
+/// WASM wrapper for NEC simulation
+#[wasm_bindgen]
+pub struct NecContext {
+    sim: NecSimulation,
+}
+
+#[wasm_bindgen]
+impl NecContext {
+    #[wasm_bindgen(constructor)]
+    pub fn new() -> Self {
+        Self {
+            sim: NecSimulation::new(),
+        }
+    }
+
+    pub fn initialize(&mut self, num_wires: usize) {
+        self.sim.initialize(num_wires);
+    }
+
+    pub fn add_wire(
+        &mut self,
+        x1: f64,
+        y1: f64,
+        z1: f64,
+        x2: f64,
+        y2: f64,
+        z2: f64,
+        radius: f64,
+        segments: usize,
+        tag: i32,
+    ) {
+        self.sim
+            .add_wire(x1, y1, z1, x2, y2, z2, radius, segments, tag);
+    }
+
+    pub fn set_frequency(&mut self, mhz: f64) {
+        self.sim.set_frequency(mhz);
+    }
+
+    pub fn add_voltage_source(&mut self, tag: i32, seg_on_wire: usize, real: f64, imag: f64) {
+        self.sim.add_voltage_source(tag, seg_on_wire, real, imag);
+    }
+
+    pub fn calculate(&mut self) -> Result<(), String> {
+        self.sim.calculate()
+    }
+
+    pub fn calculate_far_field(&self, theta: f64, phi: f64, r_dist: f64) -> f64 {
+        self.sim.calculate_far_field(theta, phi, r_dist)
+    }
+}

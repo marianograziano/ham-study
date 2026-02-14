@@ -14,8 +14,9 @@ struct TmiData {
 /// Calculates the basis function for segment i.
 /// This corresponds to `tbf` in nec2c.
 pub fn tbf(i: usize, icap: usize, ctx: &mut Context) {
-    // Porting tbf from calculations.c
-    // Note: nec2c uses 1-based indexing for i, we use 0-based.
+    // Porting tbf from calculations.c with explicit loops for clarity.
+    // NEC2 uses Sine/Cosine expansion.
+    // Basis function J (centered at i) extends to connected segments.
 
     // Reset jsno
     ctx.segj.jsno = 0;
@@ -25,17 +26,6 @@ pub fn tbf(i: usize, icap: usize, ctx: &mut Context) {
 
     let ix = i;
 
-    // jcox= data.icon1[ix];
-    let mut jcox = ctx.geometry.icon1[ix];
-
-    if jcox > PCHCON as i32 {
-        jcox = (ix + 1) as i32;
-    }
-
-    let mut jend = -1;
-    let mut iend = -1;
-    let mut sig = -1.0;
-
     // Ensure capacity
     if ctx.segj.ax.len() < 30 {
         ctx.segj.ax.resize(30, 0.0);
@@ -44,97 +34,186 @@ pub fn tbf(i: usize, icap: usize, ctx: &mut Context) {
         ctx.segj.jco.resize(30, 0);
     }
 
+    // ---------------------------------------------------------
+    // Phase 1: Trace End 1 (Left Arm)
+    // ---------------------------------------------------------
+
+    // Start from End 1 of ix
+    let mut current_idx = ix;
+    let mut leaving_end = 1; // 1=End1, 2=End2.
+                             // To trace "Left", we leave End 1 of current segment.
+
+    let mut jcox = ctx.geometry.icon1[ix];
+    let mut sig = -1.0;
+    let _jend = -1; // Legacy sign tracking if needed? No, explicit 'sig' is enough.
+
     let mut njun1 = 0;
+    let mut loop_idx = 0;
 
-    // First loop: connection at end 1
     loop {
-        if jcox != 0 {
-            if jcox < 0 {
-                jcox = -jcox;
-            } else {
-                sig = -sig;
-                jend = -jend;
-            }
-
-            let jcoxx = (jcox - 1) as usize; // 0-based index of current segment in loop
-            ctx.segj.jsno += 1;
-            let jsnox = ctx.segj.jsno - 1;
-
-            // Ensure capacity
-            if jsnox >= ctx.segj.jco.len() {
-                let new_len = jsnox + 10;
-                ctx.segj.ax.resize(new_len, 0.0);
-                ctx.segj.bx.resize(new_len, 0.0);
-                ctx.segj.cx.resize(new_len, 0.0);
-                ctx.segj.jco.resize(new_len, 0);
-            }
-
-            ctx.segj.jco[jsnox] = jcox; // Store 1-based index
-
-            let d = PI * ctx.geometry.si[jcoxx];
-            let sdh = d.sin();
-            let cdh = d.cos();
-            let sd = 2.0 * sdh * cdh; // sin(2d)
-
-            let omc: f64;
-            if d <= 0.015 {
-                let omc_sq = 4.0 * d * d;
-                omc = ((1.3888889e-3 * omc_sq - 4.1666666667e-2) * omc_sq + 0.5) * omc_sq;
-            } else {
-                omc = 1.0 - cdh * cdh + sdh * sdh;
-            }
-
-            let aj = 1.0 / ((1.0 / (PI * ctx.geometry.bi[jcoxx])).ln() - 0.577215664);
-            pp = pp - omc / sd * aj;
-
-            ctx.segj.ax[jsnox] = aj / sd * sig;
-            ctx.segj.bx[jsnox] = aj / (2.0 * cdh);
-            ctx.segj.cx[jsnox] = -aj / (2.0 * sdh) * sig;
-
-            if jcox != (ix + 1) as i32 {
-                if jend == 1 {
-                    jcox = ctx.geometry.icon2[jcoxx];
-                } else {
-                    jcox = ctx.geometry.icon1[jcoxx];
-                }
-
-                if jcox.abs() != (ix + 1) as i32 {
-                    if jcox != 0 {
-                        continue;
-                    }
-                    // Error would go here
-                }
-            } else {
-                ctx.segj.bx[jsnox] = -ctx.segj.bx[jsnox];
-            }
-
-            if iend == 1 {
-                break;
-            }
-        }
-
-        pm = -pp;
-        pp = 0.0;
-        njun1 = ctx.segj.jsno;
-
-        jcox = ctx.geometry.icon2[ix];
-        if jcox > PCHCON as i32 {
-            jcox = (ix + 1) as i32;
-        }
-
-        jend = 1;
-        iend = 1;
-        sig = -1.0;
-
         if jcox == 0 {
             break;
         }
+        if loop_idx > 100 {
+            break;
+        } // Safety
+        loop_idx += 1;
+
+        let next_seg_idx = (jcox.abs() - 1) as usize;
+        let entered_end = if jcox < 0 { 1 } else { 2 };
+
+        // Update orientation sign
+        // NEC logic: flipper sig if entered end 2 (against coord).
+        if entered_end == 2 {
+            sig = -sig;
+        }
+
+        // Add to basis
+        ctx.segj.jsno += 1;
+        let jsnox = ctx.segj.jsno - 1;
+
+        if jsnox >= ctx.segj.jco.len() {
+            let new_len = jsnox + 10;
+            ctx.segj.ax.resize(new_len, 0.0);
+            ctx.segj.bx.resize(new_len, 0.0);
+            ctx.segj.cx.resize(new_len, 0.0);
+            ctx.segj.jco.resize(new_len, 0);
+        }
+
+        // Store jcox (connection info)
+        ctx.segj.jco[jsnox] = jcox;
+
+        // Compute coeffs
+        let d = PI_CONST * ctx.geometry.si[next_seg_idx];
+        let sdh = d.sin();
+        let cdh = d.cos();
+        let sd = 2.0 * sdh * cdh;
+
+        let omc: f64;
+        if d <= 0.015 {
+            let omc_sq = 4.0 * d * d;
+            omc = ((1.3888889e-3 * omc_sq - 4.1666666667e-2) * omc_sq + 0.5) * omc_sq;
+        } else {
+            omc = 1.0 - cdh * cdh + sdh * sdh;
+        }
+
+        let aj = 1.0 / ((1.0 / (PI_CONST * ctx.geometry.bi[next_seg_idx])).ln() - 0.577215664);
+        pp = pp - omc / sd * aj;
+
+        ctx.segj.ax[jsnox] = aj / sd * sig;
+        ctx.segj.bx[jsnox] = aj / (2.0 * cdh);
+        ctx.segj.cx[jsnox] = -aj / (2.0 * sdh) * sig;
+
+        // Check loop-back to source
+        if next_seg_idx == ix {
+            ctx.segj.bx[jsnox] = -ctx.segj.bx[jsnox];
+            break;
+        }
+
+        // Prepare next step
+        // We entered 'entered_end'. Must leave 'opposite'.
+        leaving_end = if entered_end == 1 { 2 } else { 1 };
+
+        if leaving_end == 1 {
+            jcox = ctx.geometry.icon1[next_seg_idx];
+        } else {
+            jcox = ctx.geometry.icon2[next_seg_idx];
+        }
     }
+
+    njun1 = ctx.segj.jsno;
+    pm = -pp; // Swap pp/pm for End 2 logic?
+              // In original: "pm = -pp; pp = 0.0;"
+              // Then calculate End 2.
+              // NEC accumulates 'pp' for first branch.
+              // Then moves it to 'pm' (minus?).
+              // Then accumulates 'pp' for second branch (End 2).
+    pp = 0.0;
+
+    // ---------------------------------------------------------
+    // Phase 2: Trace End 2 (Right Arm)
+    // ---------------------------------------------------------
+
+    current_idx = ix;
+    leaving_end = 2; // Leaving End 2 of source
+    jcox = ctx.geometry.icon2[ix];
+    sig = 1.0; // Corrected to 1.0 to ensure Positive Ax (Symmetric Basis).
+               // Original -1.0 led to Negative Ax for Right Arm (Asymmetry).
+
+    loop_idx = 0;
+
+    loop {
+        if jcox == 0 {
+            break;
+        }
+        if loop_idx > 100 {
+            break;
+        }
+        loop_idx += 1;
+
+        let next_seg_idx = (jcox.abs() - 1) as usize;
+        let entered_end = if jcox < 0 { 1 } else { 2 };
+
+        if entered_end == 2 {
+            sig = -sig;
+        }
+
+        ctx.segj.jsno += 1;
+        let jsnox = ctx.segj.jsno - 1;
+
+        if jsnox >= ctx.segj.jco.len() {
+            let new_len = jsnox + 10;
+            ctx.segj.ax.resize(new_len, 0.0);
+            ctx.segj.bx.resize(new_len, 0.0);
+            ctx.segj.cx.resize(new_len, 0.0);
+            ctx.segj.jco.resize(new_len, 0);
+        }
+
+        ctx.segj.jco[jsnox] = jcox;
+
+        // Check for loop back immediately? No, after calc.
+
+        let d = PI_CONST * ctx.geometry.si[next_seg_idx];
+        let sdh = d.sin();
+        let cdh = d.cos();
+        let sd = 2.0 * sdh * cdh;
+
+        let omc: f64;
+        if d <= 0.015 {
+            let omc_sq = 4.0 * d * d;
+            omc = ((1.3888889e-3 * omc_sq - 4.1666666667e-2) * omc_sq + 0.5) * omc_sq;
+        } else {
+            omc = 1.0 - cdh * cdh + sdh * sdh;
+        }
+
+        let aj = 1.0 / ((1.0 / (PI_CONST * ctx.geometry.bi[next_seg_idx])).ln() - 0.577215664);
+        pp = pp - omc / sd * aj;
+
+        ctx.segj.ax[jsnox] = aj / sd * sig;
+        ctx.segj.bx[jsnox] = aj / (2.0 * cdh);
+        ctx.segj.cx[jsnox] = -aj / (2.0 * sdh) * sig;
+
+        if next_seg_idx == ix {
+            ctx.segj.bx[jsnox] = -ctx.segj.bx[jsnox];
+            break;
+        }
+
+        leaving_end = if entered_end == 1 { 2 } else { 1 };
+
+        if leaving_end == 1 {
+            jcox = ctx.geometry.icon1[next_seg_idx];
+        } else {
+            jcox = ctx.geometry.icon2[next_seg_idx];
+        }
+    }
+
+    // ---------------------------------------------------------
+    // Phase 3: Center Segment and Junction Normalization
+    // ---------------------------------------------------------
 
     let njun2 = ctx.segj.jsno - njun1;
     let jsnop = ctx.segj.jsno;
 
-    // Ensure capacity for center segment
     if jsnop >= ctx.segj.jco.len() {
         ctx.segj.jco.resize(jsnop + 10, 0);
         ctx.segj.ax.resize(jsnop + 10, 0.0);
@@ -142,9 +221,11 @@ pub fn tbf(i: usize, icap: usize, ctx: &mut Context) {
         ctx.segj.cx.resize(jsnop + 10, 0.0);
     }
 
+    // Add center segment
+    // Note: Store as 1-based index
     ctx.segj.jco[jsnop] = (ix + 1) as i32;
 
-    let d = PI * ctx.geometry.si[ix];
+    let d = PI_CONST * ctx.geometry.si[ix];
     let sdh = d.sin();
     let cdh = d.cos();
     let sd = 2.0 * sdh * cdh;
@@ -157,8 +238,10 @@ pub fn tbf(i: usize, icap: usize, ctx: &mut Context) {
         1.0 - cd
     };
 
-    let ap = 1.0 / ((1.0 / (PI * ctx.geometry.bi[ix])).ln() - 0.577215664);
+    let ap = 1.0 / ((1.0 / (PI_CONST * ctx.geometry.bi[ix])).ln() - 0.577215664);
     let aj = ap;
+
+    // Calculate qm, qp and normalize coeffs
 
     // Case 1: Open at start (njun1 == 0)
     if njun1 == 0 {
@@ -168,7 +251,7 @@ pub fn tbf(i: usize, icap: usize, ctx: &mut Context) {
             let xxi = if icap == 0 {
                 0.0
             } else {
-                let qp_val = PI * ctx.geometry.bi[ix];
+                let qp_val = PI_CONST * ctx.geometry.bi[ix];
                 let xxi_val = qp_val * qp_val;
                 qp_val * (1.0 - 0.5 * xxi_val) / (1.0 - xxi_val)
             };
@@ -182,7 +265,7 @@ pub fn tbf(i: usize, icap: usize, ctx: &mut Context) {
         let xxi = if icap == 0 {
             0.0
         } else {
-            let qp_val = PI * ctx.geometry.bi[ix];
+            let qp_val = PI_CONST * ctx.geometry.bi[ix];
             let xxi_val = qp_val * qp_val;
             qp_val * (1.0 - 0.5 * xxi_val) / (1.0 - xxi_val)
         };
@@ -195,10 +278,10 @@ pub fn tbf(i: usize, icap: usize, ctx: &mut Context) {
         ctx.segj.cx[jsnop] = (cdh + ap * qp * (sdh + xxi * cdh)) / d_val;
 
         for i_end in 0..njun2 {
-            // njun2 segments start at index equal to njun1 (which is 0)
-            ctx.segj.ax[i_end] = -ctx.segj.ax[i_end] * qp;
-            ctx.segj.bx[i_end] = ctx.segj.bx[i_end] * qp;
-            ctx.segj.cx[i_end] = -ctx.segj.cx[i_end] * qp;
+            let idx = njun1 + i_end;
+            ctx.segj.ax[idx] = -ctx.segj.ax[idx] * qp;
+            ctx.segj.bx[idx] = ctx.segj.bx[idx] * qp;
+            ctx.segj.cx[idx] = -ctx.segj.cx[idx] * qp;
         }
 
         ctx.segj.jsno = jsnop + 1;
@@ -208,7 +291,7 @@ pub fn tbf(i: usize, icap: usize, ctx: &mut Context) {
 
     // Case 2: Open at end (njun2 == 0)
     if njun2 == 0 {
-        let qm_val = PI * ctx.geometry.bi[ix];
+        let qm_val = PI_CONST * ctx.geometry.bi[ix];
         let xxi = qm_val * qm_val;
         let xxi_val = qm_val * (1.0 - 0.5 * xxi) / (1.0 - xxi);
 
@@ -244,12 +327,12 @@ pub fn tbf(i: usize, icap: usize, ctx: &mut Context) {
         let idx = njun1 + i_end;
         ctx.segj.ax[idx] = -ctx.segj.ax[idx] * qp;
         ctx.segj.bx[idx] = ctx.segj.bx[idx] * qp;
-        ctx.segj.cx[idx] = -ctx.segj.cx[idx] * qp;
+        ctx.segj.cx[idx] = -ctx.segj.cx[idx] * qp; // Note: -qp for end 2
     }
 
     ctx.segj.ax[jsnop] = -1.0;
-    ctx.segj.bx[jsnop] += (aj * qm + ap * qp) * sdh / sd;
-    ctx.segj.cx[jsnop] += (aj * qm - ap * qp) * cdh / sd;
+    ctx.segj.bx[jsnop] = (aj * qm + ap * qp) * sdh / sd;
+    ctx.segj.cx[jsnop] = (aj * qm - ap * qp) * cdh / sd;
 
     ctx.segj.jsno = jsnop + 1;
 }
@@ -519,79 +602,91 @@ fn gxx(
     (g1, g1p, g2, g2p, g3, gzp)
 }
 
-/// Compute e field of sine, cosine, and constant current filaments
-/// Corresponds to `eksc`
-fn eksc(
+// Constants from nec2c.h
+const CONST1: Complex64 = Complex64::new(0.0, 4.771341189);
+const CONST4: Complex64 = Complex64::new(0.0, 188.365);
+
+/// Compute E-field of sine, cosine, and constant current filaments by thin wire approximation.
+/// Returns (Ez_sine, Er_sine, Ez_cos, Er_cos, Ez_const, Er_const)
+pub fn eksc(
     s: f64,
     z: f64,
     rh: f64,
-    xk: f64,
+    k: f64,
     ij: usize,
-    ezs: &mut Complex64,
-    ers: &mut Complex64,
-    ezc: &mut Complex64,
-    erc: &mut Complex64,
-    ezk: &mut Complex64,
-    erk: &mut Complex64,
+) -> (
+    Complex64,
+    Complex64,
+    Complex64,
+    Complex64,
+    Complex64,
+    Complex64,
 ) {
-    let rhk = xk * rh;
-    let tmi = TmiData {
-        ij,
-        zpk: xk * z,
-        rkb2: rhk * rhk,
-    };
-
     let sh = 0.5 * s;
-    let shk = xk * sh;
+    let shk = k * sh;
     let ss = shk.sin();
     let cs = shk.cos();
     let z2a = sh - z;
     let z1a = -(sh + z);
 
-    let (gz1, gp1) = gx(z1a, rh, xk);
-    let (gz2, gp2) = gx(z2a, rh, xk);
+    let (gz1, gp1) = gx(z1a, rh, k);
+    let (gz2, gp2) = gx(z2a, rh, k);
 
     let mut gzp1 = gp1 * z1a;
     let mut gzp2 = gp2 * z2a;
 
-    let c1 = 1.0;
+    let ezs = CONST1 * ((gz2 - gz1) * cs * k - (gzp2 + gzp1) * ss);
+    let ezc = -CONST1 * ((gz2 + gz1) * ss * k + (gzp2 - gzp1) * cs);
+    let erk = CONST1 * (gp2 - gp1) * rh;
 
-    *ezs = c1 * ((gz2 - gz1) * cs * xk - (gzp2 + gzp1) * ss);
-    *ezc = -c1 * ((gz2 + gz1) * ss * xk + (gzp2 - gzp1) * cs);
-    *erk = c1 * (gp2 - gp1) * rh;
+    // intx call
+    let tmi = TmiData {
+        ij,
+        zpk: k * z,
+        rkb2: (k * rh) * (k * rh),
+    };
+    let (cint, sint) = intx(-shk, shk, k * rh, &tmi);
 
-    let (cint, sint) = intx(-shk, shk, rhk, &tmi);
-    *ezk = -c1 * (gzp2 - gzp1 + xk * xk * Complex64::new(cint, -sint));
+    let ezk = -CONST1 * (gzp2 - gzp1 + k * k * Complex64::new(cint, -sint));
 
-    gzp1 = gzp1 * z1a;
-    gzp2 = gzp2 * z2a;
+    // Recalculate gzp for ers/erc (based on C logic reassignment)
+    let gzp1_val = gzp1 * z1a;
+    let gzp2_val = gzp2 * z2a;
+
+    let ers: Complex64;
+    let erc: Complex64;
 
     if rh >= 1.0e-10 {
-        *ers = -c1 * ((gzp2 + gzp1 + gz2 + gz1) * ss - (z2a * gz2 - z1a * gz1) * cs * xk) / rh;
-        *erc = -c1 * ((gzp2 - gzp1 + gz2 - gz1) * cs + (z2a * gz2 + z1a * gz1) * ss * xk) / rh;
+        ers = -CONST1 * ((gzp2_val + gzp1_val + gz2 + gz1) * ss - (z2a * gz2 - z1a * gz1) * cs * k)
+            / rh;
+        erc = -CONST1 * ((gzp2_val - gzp1_val + gz2 - gz1) * cs + (z2a * gz2 + z1a * gz1) * ss * k)
+            / rh;
     } else {
-        *ers = Complex64::new(0.0, 0.0);
-        *erc = Complex64::new(0.0, 0.0);
+        ers = Complex64::new(0.0, 0.0);
+        erc = Complex64::new(0.0, 0.0);
     }
+
+    (ezs, ers, ezc, erc, ezk, erk)
 }
 
-/// Compute e field by extended thin wire approximation
-/// Corresponds to `ekscx`
+/// Compute e field by extended thin wire approximation.
+/// Returns (Ez_sine, Er_sine, Ez_cos, Er_cos, Ez_const, Er_const)
 fn ekscx(
     bx: f64,
     s: f64,
     z: f64,
     rhx: f64,
-    xk: f64,
+    k: f64,
     ij: usize,
     inx1: i32,
     inx2: i32,
-    ezs: &mut Complex64,
-    ers: &mut Complex64,
-    ezc: &mut Complex64,
-    erc: &mut Complex64,
-    ezk: &mut Complex64,
-    erk: &mut Complex64,
+) -> (
+    Complex64,
+    Complex64,
+    Complex64,
+    Complex64,
+    Complex64,
+    Complex64,
 ) {
     let rh;
     let b;
@@ -608,14 +703,7 @@ fn ekscx(
     }
 
     let sh = 0.5 * s;
-    let rhk = xk * rh;
-    let tmi = TmiData {
-        ij,
-        zpk: xk * z,
-        rkb2: rhk * rhk,
-    };
-
-    let shk = xk * sh;
+    let shk = k * sh;
     let ss = shk.sin();
     let cs = shk.cos();
     let z2a = sh - z;
@@ -636,32 +724,17 @@ fn ekscx(
     let gzz2;
 
     if inx1 != 2 {
-        let res = gxx(z1a, rh, b, a2, xk, ira);
+        let res = gxx(z1a, rh, b, a2, k, ira);
         gz1 = res.0;
-        // gzp1 in C is g1p in gxx return? No.
-        // gxx returns: g1, g1p, g2, g2p, g3, gzp
-        // In ekscx: gcheck names:
-        // C gxx args: &gz1, &gzp1, &gr1, &grp1, &grk1, &gzz1
-        // Rust gxx returns: (g1, g1p, g2, g2p, g3, gzp)
-        // Corresponds to: (gz1, gzp1, gr1, grp1, grk1, gzz1)
         gzp1 = res.1;
         gr1 = res.2;
         grp1 = res.3;
         grk1 = res.4;
         gzz1 = res.5;
     } else {
-        let (gz, gzp) = gx(z1a, rhx, xk); // gx returns (gz, gzp)
+        let (gz, gzp) = gx(z1a, rhx, k);
         gz1 = gz;
-        grk1 = gzp; // gx returns gzp in C is different from gxx gzp
-                    // gx in C returns: &gz, &gzp
-                    // gx implemented in Rust returns (gz, gzp)
-
-        // In ekscx C code:
-        // gx( z1a, rhx, xk, &gz1, &grk1);
-        // gzp1= grk1* z1a;
-        // gr1= gz1/ rhx;
-        // ...
-
+        grk1 = gzp;
         gzp1 = grk1 * z1a;
         gr1 = gz1 / rhx;
         grp1 = gzp1 / rhx;
@@ -670,7 +743,7 @@ fn ekscx(
     }
 
     if inx2 != 2 {
-        let res = gxx(z2a, rh, b, a2, xk, ira);
+        let res = gxx(z2a, rh, b, a2, k, ira);
         gz2 = res.0;
         gzp2 = res.1;
         gr2 = res.2;
@@ -678,10 +751,9 @@ fn ekscx(
         grk2 = res.4;
         gzz2 = res.5;
     } else {
-        let (gz, gzp) = gx(z2a, rhx, xk);
+        let (gz, gzp) = gx(z2a, rhx, k);
         gz2 = gz;
         grk2 = gzp;
-
         gzp2 = grk2 * z2a;
         gr2 = gz2 / rhx;
         grp2 = gzp2 / rhx;
@@ -689,19 +761,27 @@ fn ekscx(
         gzz2 = Complex64::new(0.0, 0.0);
     }
 
-    let c1 = 1.0;
+    let ezs = CONST1 * ((gz2 - gz1) * cs * k - (gzp2 + gzp1) * ss);
+    let ezc = -CONST1 * ((gz2 + gz1) * ss * k + (gzp2 - gzp1) * cs);
+    let ers =
+        -CONST1 * ((z2a * grp2 + z1a * grp1 + gr2 + gr1) * ss - (z2a * gr2 - z1a * gr1) * cs * k);
+    let erc =
+        -CONST1 * ((z2a * grp2 - z1a * grp1 + gr2 - gr1) * cs + (z2a * gr2 + z1a * gr1) * ss * k);
+    let erk = CONST1 * (grk2 - grk1);
 
-    *ezs = c1 * ((gz2 - gz1) * cs * xk - (gzp2 + gzp1) * ss);
-    *ezc = -c1 * ((gz2 + gz1) * ss * xk + (gzp2 - gzp1) * cs);
-    *ers = -c1 * ((z2a * grp2 + z1a * grp1 + gr2 + gr1) * ss - (z2a * gr2 - z1a * gr1) * cs * xk);
-    *erc = -c1 * ((z2a * grp2 - z1a * grp1 + gr2 - gr1) * cs + (z2a * gr2 + z1a * gr1) * ss * xk);
-    *erk = c1 * (grk2 - grk1);
+    let tmi = TmiData {
+        ij,
+        zpk: k * z,
+        rkb2: (k * rh) * (k * rh),
+    };
+    let (cint, sint) = intx(-shk, shk, k * rh, &tmi);
 
-    let (cint, sint) = intx(-shk, shk, rhk, &tmi);
-    let bk = b * xk;
+    let bk = b * k;
     let bk2 = bk * bk * 0.25;
-    *ezk = -c1
-        * (gzp2 - gzp1 + xk * xk * (1.0 - bk2) * Complex64::new(cint, -sint) - bk2 * (gzz2 - gzz1));
+    let ezk = -CONST1
+        * (gzp2 - gzp1 + k * k * (1.0 - bk2) * Complex64::new(cint, -sint) - bk2 * (gzz2 - gzz1));
+
+    (ezs, ers, ezc, erc, ezk, erk)
 }
 
 /// Helper struct for 3D Complex vector
@@ -725,14 +805,20 @@ impl CVec3 {
 /// Electric field evaluation.
 /// Corresponds to `efld` in fields.c
 /// Returns full vector components: (E_Sine, E_Cosine, E_Constant)
-pub fn efld(xi: f64, yi: f64, zi: f64, ai: f64, ij: usize, ctx: &Context) -> (CVec3, CVec3, CVec3) {
+pub fn efld(
+    xi: f64,
+    yi: f64,
+    zi: f64,
+    ai: f64,
+    s_idx: usize,
+    is_self: bool,
+    ctx: &Context,
+) -> (CVec3, CVec3, CVec3) {
     // Basic implementation of efld
     // Calculates field at (xi, yi, zi)
 
     // For now, support only free space (no ground)
 
-    // Let's retrieve source segment.
-    let s_idx = ij;
     if s_idx >= ctx.geometry.n {
         return (CVec3::new(), CVec3::new(), CVec3::new());
     }
@@ -769,32 +855,21 @@ pub fn efld(xi: f64, yi: f64, zi: f64, ai: f64, ij: usize, ctx: &Context) -> (CV
 
     // Call eksc or ekscx
     let k = 2.0 * PI_CONST;
-
-    let mut tezs = Complex64::new(0.0, 0.0);
-    let mut ters = Complex64::new(0.0, 0.0);
-    let mut tezc = Complex64::new(0.0, 0.0);
-    let mut terc = Complex64::new(0.0, 0.0);
-    let mut tezk = Complex64::new(0.0, 0.0);
-    let mut terk = Complex64::new(0.0, 0.0);
-
     let radius_s = ctx.geometry.bi[s_idx];
+
+    // Determine flag for eksc/intx (0 means singular/self)
+    let ij_flag = if is_self { 0 } else { 1 };
 
     // For now always use eksc unless extremely close
     let use_extended = false; // logic checks ind1/ind2 etc.
 
-    if !use_extended {
-        eksc(
-            len_s, zp, rh, k, s_idx, &mut tezs, &mut ters, &mut tezc, &mut terc, &mut tezk,
-            &mut terk,
-        );
+    let (tezs, ters, tezc, terc, tezk, terk) = if !use_extended {
+        eksc(len_s, zp, rh, k, ij_flag)
     } else {
-        let inx1 = 0; // determine overlap case
+        let inx1 = 0;
         let inx2 = 0;
-        ekscx(
-            radius_s, len_s, zp, rh, k, s_idx, inx1, inx2, &mut tezs, &mut ters, &mut tezc,
-            &mut terc, &mut tezk, &mut terk,
-        );
-    }
+        ekscx(radius_s, len_s, zp, rh, k, ij_flag, inx1, inx2)
+    };
 
     // Transform to cartesian components (Free Space)
     // txs = tezs * cabj + ters * rhox

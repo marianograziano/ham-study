@@ -249,6 +249,16 @@ impl GeometryData {
                 self.bi.push(rad); // Uniform radius for now
                 self.itag.push(itg);
 
+                // Derived data
+                let seg_len = (dx * dx + dy * dy + dz * dz).sqrt();
+                self.si.push(seg_len);
+                self.x.push(xs1 + 0.5 * dx);
+                self.y.push(ys1 + 0.5 * dy);
+                self.z.push(zs1 + 0.5 * dz);
+                self.cab.push(dx / seg_len);
+                self.sab.push(dy / seg_len);
+                self.salp.push(dz / seg_len);
+
                 xs1 = xs2;
                 ys1 = ys2;
                 zs1 = zs2;
@@ -277,6 +287,16 @@ impl GeometryData {
 
                 self.bi.push(rad);
                 self.itag.push(itg);
+
+                // Derived data
+                let seg_len = (dx * dx + dy * dy + dz * dz).sqrt();
+                self.si.push(seg_len);
+                self.x.push(xs1 + 0.5 * dx);
+                self.y.push(ys1 + 0.5 * dy);
+                self.z.push(zs1 + 0.5 * dz);
+                self.cab.push(dx / seg_len);
+                self.sab.push(dy / seg_len);
+                self.salp.push(dz / seg_len);
 
                 xs1 = xs2;
                 ys1 = ys2;
