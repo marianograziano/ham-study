@@ -1,4 +1,4 @@
-import { Camera } from "@phosphor-icons/react";
+import { CameraIcon } from "@phosphor-icons/react";
 import { ArcballControls } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
 import { useId, useMemo, useRef, useState } from "react";
@@ -8,7 +8,7 @@ import { Button } from "~/components/ui/button";
 import { Label } from "~/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
 import { Switch } from "~/components/ui/switch";
-import { ElectricFieldInstanced } from "./electric-field-instanced";
+import { ElectricFieldWasm } from "./electric-field-wasm";
 
 function Antenna() {
   return (
@@ -234,7 +234,7 @@ export default function VerticalPolarizationScene({
             className="w-full"
             onClick={handleDownload}
           >
-            <Camera className="mr-2 size-4" />
+            <CameraIcon className="mr-2 size-4" />
             {t("common.controls.download")}
           </Button>
         </div>
@@ -275,7 +275,7 @@ export default function VerticalPolarizationScene({
           {showPattern && <RadiationPattern />}
           {/* Surface/Field Mode */}
           {showWaves && (
-            <ElectricFieldInstanced
+            <ElectricFieldWasm
               antennaType="vertical"
               polarizationType="vertical"
               speed={effectiveSpeed}

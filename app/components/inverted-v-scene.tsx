@@ -8,7 +8,7 @@ import { Button } from "~/components/ui/button";
 import { Label } from "~/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
 import { Switch } from "~/components/ui/switch";
-import { ElectricFieldInstanced } from "./electric-field-instanced";
+import { ElectricFieldWasm } from "./electric-field-wasm";
 
 // Height adjusted to allow legs to hang down without clipping ground
 const height = 3;
@@ -322,7 +322,7 @@ export default function InvertedVAntennaScene({
           {/* Surface/Field Mode - Lifted to match antenna height */}
           {showWaves && (
             <group position={[0, height, 0]}>
-              <ElectricFieldInstanced
+              <ElectricFieldWasm
                 antennaType="inverted-v"
                 polarizationType="horizontal"
                 speed={effectiveSpeed}

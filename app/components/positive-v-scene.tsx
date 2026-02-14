@@ -8,7 +8,7 @@ import { Button } from "~/components/ui/button";
 import { Label } from "~/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
 import { Switch } from "~/components/ui/switch";
-import { ElectricFieldInstanced } from "./electric-field-instanced";
+import { ElectricFieldWasm } from "./electric-field-wasm";
 
 // Height definition
 const height = 3;
@@ -317,7 +317,7 @@ export default function PositiveVAntennaScene({
           {/* Surface/Field Mode - Lifted to match antenna height */}
           {showWaves && (
             <group position={[0, height, 0]}>
-              <ElectricFieldInstanced
+              <ElectricFieldWasm
                 antennaType="positive-v"
                 polarizationType="horizontal"
                 speed={effectiveSpeed}

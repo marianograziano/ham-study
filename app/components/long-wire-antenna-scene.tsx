@@ -1,7 +1,7 @@
 import { Camera } from "@phosphor-icons/react";
 import { ArcballControls } from "@react-three/drei";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { useId, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import {
   BufferGeometry,
@@ -20,8 +20,8 @@ import { Button } from "~/components/ui/button";
 import { Label } from "~/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
 import { Switch } from "~/components/ui/switch";
-import { calculateField } from "~/utils/antenna-physics";
-import { ElectricFieldInstanced } from "./electric-field-instanced";
+import { calculateField, initAntennaWasm } from "~/utils/antenna-physics-wasm";
+import { ElectricFieldWasm } from "./electric-field-wasm";
 
 const WIRE_START = new Vector3(-5, -1, 0);
 const WIRE_END = new Vector3(5, 3, 0);
@@ -239,39 +239,52 @@ function LongWireAntenna({
 }
 
 function RadiationPattern({ length }: { length: number }) {
-  const geometry = useMemo(() => {
-    const geo = new SphereGeometry(1, 120, 60); // Higher resolution for sharp nulls
-    const posAttribute = geo.attributes.position;
-    const vertex = new Vector3();
-    const scale = 5; // Scale up to be visible
+  const [geometry, setGeometry] = useState<BufferGeometry | null>(null);
 
-    for (let i = 0; i < posAttribute.count; i++) {
-      vertex.fromBufferAttribute(posAttribute, i);
+  useEffect(() => {
+    let isMounted = true;
 
-      // Angle to X axis (wire axis in simplified local calc)
-      // Note: calculateField expects angle from axis (0 to PI).
-      // Our sphere vertex angleTo(1,0,0) does exactly that (0 to PI).
-      const theta = vertex.angleTo(new Vector3(1, 0, 0));
+    const generateGeometry = async () => {
+      // Ensure WASM is initialized
+      await initAntennaWasm();
 
-      // Use the physics engine!
-      const gain = calculateField(theta, length, "standing");
+      if (!isMounted) return;
 
-      // Apply gain to vertex position
-      // Add a small epsilon to avoid z-fighting or zero-size
-      vertex.normalize().multiplyScalar(Math.max(0.01, gain) * scale);
+      const geo = new SphereGeometry(1, 120, 60); // Higher resolution for sharp nulls
+      const posAttribute = geo.attributes.position;
+      const vertex = new Vector3();
+      const scale = 5; // Scale up to be visible
 
-      posAttribute.setXYZ(i, vertex.x, vertex.y, vertex.z);
-    }
-    geo.computeVertexNormals();
-    geo.computeVertexNormals();
-    return geo;
-  }, [length]);
+      for (let i = 0; i < posAttribute.count; i++) {
+        vertex.fromBufferAttribute(posAttribute, i);
 
-  useMemo(() => {
-    return () => {
-      geometry.dispose();
+        // Angle to X axis (wire axis in simplified local calc)
+        // Note: calculateField expects angle from axis (0 to PI).
+        // Our sphere vertex angleTo(1,0,0) does exactly that (0 to PI).
+        const theta = vertex.angleTo(new Vector3(1, 0, 0));
+
+        // Use the physics engine (WASM)!
+        const gain = await calculateField(theta, length, "standing");
+
+        // Apply gain to vertex position
+        // Add a small epsilon to avoid z-fighting or zero-size
+        vertex.normalize().multiplyScalar(Math.max(0.01, gain) * scale);
+
+        posAttribute.setXYZ(i, vertex.x, vertex.y, vertex.z);
+      }
+      geo.computeVertexNormals();
+
+      if (isMounted) {
+        setGeometry(geo);
+      }
     };
-  }, [geometry]);
+
+    generateGeometry();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [length]);
 
   // Align pattern with the wire
   // Wire goes from (-5, -1, 0) to (5, 3, 0).
@@ -291,6 +304,20 @@ function RadiationPattern({ length }: { length: number }) {
   const midPoint = new Vector3()
     .addVectors(WIRE_START, WIRE_END)
     .multiplyScalar(0.5);
+
+  // Cleanup geometry on unmount or when geometry changes
+  useEffect(() => {
+    return () => {
+      if (geometry) {
+        geometry.dispose();
+      }
+    };
+  }, [geometry]);
+
+  // Don't render until geometry is ready
+  if (!geometry) {
+    return null;
+  }
 
   return (
     <group position={midPoint}>
@@ -571,7 +598,7 @@ export default function LongWireAntennaScene({
           {showPattern && <RadiationPattern length={length} />}
           {showWaves && (
             <group position={midPoint} rotation={[0, 0, rotationAngle]}>
-              <ElectricFieldInstanced
+              <ElectricFieldWasm
                 key={length}
                 antennaType="long-wire"
                 polarizationType="horizontal"

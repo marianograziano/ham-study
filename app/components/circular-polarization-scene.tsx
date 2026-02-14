@@ -15,7 +15,7 @@ import { Label } from "~/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
 import { Switch } from "~/components/ui/switch";
 
-import { ElectricFieldInstanced } from "./electric-field-instanced";
+import { ElectricFieldWasm } from "./electric-field-wasm";
 
 function HelicalAntenna() {
   const points = useMemo(() => {
@@ -346,7 +346,7 @@ export default function CircularPolarizationScene({
           <HelicalAntenna />
           {showPattern && <RadiationPattern />}
           {showWaves && (
-            <ElectricFieldInstanced
+            <ElectricFieldWasm
               antennaType="helical"
               polarizationType="circular"
               speed={effectiveSpeed}

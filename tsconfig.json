@@ -15,7 +15,8 @@
     "rootDirs": [".", "./.react-router/types"],
     "baseUrl": ".",
     "paths": {
-      "~/*": ["./app/*"]
+      "~/*": ["./app/*"],
+      "wasm/*": ["./wasm/*"]
     },
     "esModuleInterop": true,
     "verbatimModuleSyntax": true,
