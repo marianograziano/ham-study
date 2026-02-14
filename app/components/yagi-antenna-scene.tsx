@@ -55,7 +55,7 @@ function YagiAntenna() {
   );
 }
 
-function RadiationPattern() {
+function RadiationPattern({ material }: { material?: string }) {
   const [geometry, setGeometry] = useState<BufferGeometry | null>(null);
 
   useEffect(() => {
@@ -93,7 +93,14 @@ function RadiationPattern() {
             1,
             false,
             "60",
+            material,
           );
+          // Scale visualization based on gain
+          // Max gain ~12dBi -> ~15 linear.
+          // We want visual scale. WASM returns normalized 0-1 (approx).
+          // Actually WASM returns linear gain?
+          // calculate_antenna_gain returns normalized pattern (max ~1.0 for main lobe).
+          // We scale it for visual punch.
           gain += wasmGain * 1.5;
         } catch (error) {
           console.warn("WASM calculation failed, using fallback", error);
@@ -122,7 +129,7 @@ function RadiationPattern() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [material]); // Re-run when material changes
 
   if (!geometry) {
     return null;
@@ -150,6 +157,8 @@ export default function YagiAntennaScene({
   isHovered?: boolean;
 }) {
   const { t } = useTranslation("scene");
+  /* ... inside separate component or prop ... */
+  const [material, setMaterial] = useState<string>("aluminum");
   const [showWaves, setShowWaves] = useState(true);
   const [showPattern, setShowPattern] = useState(true);
   const [speedMode, setSpeedMode] = useState<"slow" | "medium" | "fast">(
@@ -219,7 +228,48 @@ export default function YagiAntennaScene({
 
   const ControlsContent = () => (
     <div className="flex flex-col space-y-3">
+      {/* ... previous controls ... */}
+
+      <div className="pt-3 border-t border-white/10">
+        <div className="mb-2 text-xs md:text-sm font-medium text-zinc-200">
+          {t("common.material", "Material")}
+        </div>
+        <RadioGroup
+          value={material}
+          onValueChange={setMaterial}
+          className="flex flex-col gap-2"
+        >
+          <div className="flex items-center space-x-2">
+            <RadioGroupItem
+              value="aluminum"
+              id={`${uniqueId}m-al`}
+              className="border-zinc-400 text-primary-foreground data-[state=checked]:bg-transparent data-[state=checked]:border-primary-foreground data-[state=checked]:text-input"
+            />
+            <Label
+              htmlFor={`${uniqueId}m-al`}
+              className="text-xs cursor-pointer text-zinc-300"
+            >
+              Aluminum (Standard)
+            </Label>
+          </div>
+          <div className="flex items-center space-x-2">
+            <RadioGroupItem
+              value="stainless_steel"
+              id={`${uniqueId}m-ss`}
+              className="border-zinc-400 text-primary-foreground data-[state=checked]:bg-transparent data-[state=checked]:border-primary-foreground data-[state=checked]:text-input"
+            />
+            <Label
+              htmlFor={`${uniqueId}m-ss`}
+              className="text-xs cursor-pointer text-zinc-300"
+            >
+              Stainless Steel (Lossy)
+            </Label>
+          </div>
+        </RadioGroup>
+      </div>
+
       <div className="pt-3 border-t border-white/10 md:border-none md:pt-0">
+        {/* ... existing visualization toggles ... */}
         <div className="mb-2 text-xs md:text-sm font-medium text-zinc-200">
           {t("common.controls.visualization")}
         </div>
@@ -350,7 +400,7 @@ export default function YagiAntennaScene({
           />
 
           <YagiAntenna />
-          {showPattern && <RadiationPattern />}
+          {showPattern && <RadiationPattern material={material} />}
           {/* Surface/Field Mode */}
           {showWaves && (
             <ElectricFieldWasm
@@ -368,7 +418,7 @@ export default function YagiAntennaScene({
               <LegendContent />
             </div>
 
-            <div className="hidden md:block absolute bottom-4 right-4 p-4 bg-black/70 text-white rounded-lg pointer-events-auto">
+            <div className="hidden md:block absolute bottom-4 right-4 p-4 bg-black/70 text-white rounded-lg pointer-events-auto overflow-y-auto max-h-[80%]">
               <ControlsContent />
             </div>
 

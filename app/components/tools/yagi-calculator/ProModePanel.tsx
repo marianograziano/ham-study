@@ -23,6 +23,7 @@ import {
   TooltipTrigger,
 } from "~/components/ui/tooltip";
 import type {
+  AntennaMaterial,
   BoomShape,
   DrivenElementType,
   MountMethod,
@@ -48,6 +49,8 @@ interface ProModePanelProps {
   setProSpacingType: (v: SpacingType) => void;
   proManualSpacing: number;
   setProManualSpacing: (v: number) => void;
+  proMaterial: AntennaMaterial;
+  setProMaterial: (v: AntennaMaterial) => void;
 }
 
 export function ProModePanel({
@@ -69,6 +72,8 @@ export function ProModePanel({
   setProSpacingType,
   proManualSpacing,
   setProManualSpacing,
+  proMaterial,
+  setProMaterial,
 }: ProModePanelProps) {
   const { t } = useTranslation("common");
 
@@ -227,6 +232,49 @@ export function ProModePanel({
                 </SelectItem>
                 <SelectItem value="none">
                   {t("tools.yagiCalculator.pro.mountMethods.none")}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <Label className="text-xs uppercase text-slate-500">
+                {t("tools.yagiCalculator.pro.material")}
+              </Label>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <QuestionIcon className="h-4 w-4 text-slate-400 hover:text-sky-600 cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent className="max-w-[250px]">
+                  <p className="font-bold text-background mb-1">
+                    {t("tools.yagiCalculator.pro.materialTooltip.title")}
+                  </p>
+                  <p className="text-xs text-background/80">
+                    {t("tools.yagiCalculator.pro.materialTooltip.content")}
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
+            <Select
+              value={proMaterial}
+              onValueChange={(v) => setProMaterial(v as AntennaMaterial)}
+            >
+              <SelectTrigger className="h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="aluminum">
+                  {t("tools.yagiCalculator.pro.materials.aluminum")}
+                </SelectItem>
+                <SelectItem value="copper">
+                  {t("tools.yagiCalculator.pro.materials.copper")}
+                </SelectItem>
+                <SelectItem value="stainless_steel">
+                  {t("tools.yagiCalculator.pro.materials.stainless_steel")}
+                </SelectItem>
+                <SelectItem value="fiberglass">
+                  {t("tools.yagiCalculator.pro.materials.fiberglass")}
                 </SelectItem>
               </SelectContent>
             </Select>

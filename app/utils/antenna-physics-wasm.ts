@@ -152,6 +152,7 @@ export async function generateRadiationPatternData(
  * @param activeHarmonic - Active harmonic number (used for EndFed, Windom)
  * @param isInvertedV - Inverted V flag (used for Windom)
  * @param radialAngle - Radial angle string ("60", "135") for GP antennas
+ * @param material - Antenna material (optional)
  * @returns Normalized gain value (0.0 to 1.0+)
  */
 export async function calculateAntennaGain(
@@ -162,6 +163,7 @@ export async function calculateAntennaGain(
   activeHarmonic: number = 1,
   isInvertedV: boolean = false,
   radialAngle: string = "60",
+  material?: string,
 ): Promise<number> {
   await ensureInitialized();
   return calculate_antenna_gain(
@@ -172,6 +174,7 @@ export async function calculateAntennaGain(
     activeHarmonic,
     isInvertedV,
     radialAngle,
+    material,
   );
 }
 
@@ -185,6 +188,7 @@ export async function calculateAntennaGain(
  * @param activeHarmonic - Active harmonic number
  * @param isInvertedV - Inverted V flag
  * @param radialAngle - Radial angle string
+ * @param material - Antenna material (optional)
  * @returns Array of gain values
  */
 export async function calculateAntennaGainBatch(
@@ -195,6 +199,7 @@ export async function calculateAntennaGainBatch(
   activeHarmonic: number = 1,
   isInvertedV: boolean = false,
   radialAngle: string = "60",
+  material?: string,
 ): Promise<number[]> {
   await ensureInitialized();
 
@@ -214,6 +219,7 @@ export async function calculateAntennaGainBatch(
     activeHarmonic,
     isInvertedV,
     radialAngle,
+    material,
     outputArray,
   );
 
@@ -229,6 +235,7 @@ export async function calculateAntennaGainBatch(
  * @param activeHarmonic - Active harmonic number
  * @param isInvertedV - Inverted V flag
  * @param radialAngle - Radial angle string
+ * @param material - Antenna material (optional)
  * @param numPoints - Number of azimuth points to calculate (default: 360)
  * @returns Array of gain values for azimuth angles 0 to 2π
  */
@@ -239,6 +246,7 @@ export async function calculateAntennaRadiationPattern(
   activeHarmonic: number = 1,
   isInvertedV: boolean = false,
   radialAngle: string = "60",
+  material?: string,
   numPoints: number = 360,
 ): Promise<number[]> {
   await ensureInitialized();
@@ -252,6 +260,7 @@ export async function calculateAntennaRadiationPattern(
     activeHarmonic,
     isInvertedV,
     radialAngle,
+    material,
     numPoints,
     outputArray,
   );

@@ -24,10 +24,18 @@ pub fn calculate_antenna_gain(
     active_harmonic: i32,
     is_inverted_v: bool,
     radial_angle: &str,
+    material: Option<String>,
 ) -> f64 {
     let antenna_type_enum = AntennaType::from(antenna_type);
 
-    match antenna_type_enum {
+    // Material efficiency factor
+    let efficiency = match material.as_deref() {
+        Some("stainless_steel") => 0.85,
+        Some("fiberglass") | Some("plastic") => 0.01,
+        _ => 1.0, // Aluminum, Copper, or undefined
+    };
+
+    let gain = match antenna_type_enum {
         AntennaType::Vertical | AntennaType::GP => {
             // Vertical and GP antennas have omnidirectional pattern
             // GP with radial angle 60 has some directionality
@@ -44,10 +52,30 @@ pub fn calculate_antenna_gain(
             theta.sin().abs()
         }
         AntennaType::Yagi => {
-            // Yagi antenna forward lobe: cos^3(phi) where phi is azimuth off boresight
-            // theta is elevation angle (typically minimal variation)
-            let front = phi.cos().max(0.0);
-            front.powi(3) + 0.1
+            // Improved Yagi pattern with side lobes
+            // Main lobe: cos^2.5(phi)
+            // Side lobes: 0.15 * |cos(3*phi)| for back/side
+
+            let cos_phi = phi.cos();
+
+            // Forward main lobe
+            let main_lobe = if cos_phi > 0.0 {
+                cos_phi.powf(2.5)
+            } else {
+                0.0
+            };
+
+            // Side/Back lobes approximation
+            let side_lobes = (3.0 * phi).cos().abs() * 0.15;
+
+            // Front-to-back ratio floor (non-zero back radiation)
+            let fbr_floor = if cos_phi < 0.0 { 0.05 } else { 0.0 };
+
+            // Composite pattern
+            let raw = main_lobe + side_lobes * (1.0 - main_lobe) + fbr_floor;
+
+            // Normalize to peak at ~1.0 + FBR
+            raw.min(1.0)
         }
         AntennaType::Quad => {
             // Quad antenna similar to Yagi
@@ -105,7 +133,9 @@ pub fn calculate_antenna_gain(
             };
             val.powf(1.5) * 0.5 + 0.05
         }
-    }
+    };
+
+    gain * efficiency
 }
 
 /// Calculate antenna gain for multiple angles in batch
@@ -118,6 +148,7 @@ pub fn calculate_antenna_gain(
 /// * `active_harmonic` - Active harmonic number
 /// * `is_inverted_v` - Inverted V flag
 /// * `radial_angle` - Radial angle string
+/// * `material` - Antenna material (optional)
 /// * `output` - Output buffer for gain values (must be same length as angles_theta)
 #[wasm_bindgen]
 pub fn calculate_antenna_gain_batch(
@@ -128,6 +159,7 @@ pub fn calculate_antenna_gain_batch(
     active_harmonic: i32,
     is_inverted_v: bool,
     radial_angle: &str,
+    material: Option<String>,
     output: &mut [f64],
 ) {
     if angles_theta.len() != angles_phi.len() || angles_theta.len() != output.len() {
@@ -143,6 +175,7 @@ pub fn calculate_antenna_gain_batch(
             active_harmonic,
             is_inverted_v,
             radial_angle,
+            material.clone(),
         );
     }
 }
@@ -156,6 +189,7 @@ pub fn calculate_antenna_gain_batch(
 /// * `active_harmonic` - Active harmonic number
 /// * `is_inverted_v` - Inverted V flag
 /// * `radial_angle` - Radial angle string
+/// * `material` - Antenna material (optional)
 /// * `num_points` - Number of azimuth points to calculate (default 360)
 /// * `output` - Output buffer for gain values (must have length >= num_points)
 #[wasm_bindgen]
@@ -166,6 +200,7 @@ pub fn calculate_antenna_radiation_pattern(
     active_harmonic: i32,
     is_inverted_v: bool,
     radial_angle: &str,
+    material: Option<String>,
     num_points: usize,
     output: &mut [f64],
 ) {
@@ -185,6 +220,7 @@ pub fn calculate_antenna_radiation_pattern(
             active_harmonic,
             is_inverted_v,
             radial_angle,
+            material.clone(),
         );
     }
 }

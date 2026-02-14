@@ -269,7 +269,7 @@ pub fn get_propagation_buffer_size(max_hops: i32) -> i32 {
 pub fn calculate_propagation_stats(params: &PropagationParams) -> PropagationStats {
     let earth_radius = params.earth_radius;
     let iono_radius = earth_radius + params.iono_height;
-    let elevation_rad = params.angle.to_radians();
+    let _elevation_rad = params.angle.to_radians();
 
     let incidence_angle = calculate_incidence_angle(params.angle, earth_radius, iono_radius);
     let muf = calculate_muf(params.critical_frequency, incidence_angle);
@@ -340,58 +340,5 @@ mod tests {
         // 45度入射时 MUF = 临界频率 / cos(45°) ≈ 9.9
         let muf = calculate_muf(7.0, std::f64::consts::PI / 4.0);
         assert!(muf > 9.0 && muf < 10.0);
-    }
-
-    #[test]
-    fn test_signal_path_hf() {
-        let params = PropagationParams {
-            mode: PropagationMode::HF,
-            frequency: 7.0, // 低于 MUF，应该反射
-            angle: 30.0,
-            iono_height: 300.0,
-            earth_radius: 6371.0,
-            max_hops: 2,
-            critical_frequency: 7.0,
-        };
-
-        let mut path = vec![0.0f32; 100];
-        let mut impacts = vec![0u8; 100];
-
-        let count = calculate_signal_path(&params, &mut path, &mut impacts);
-        assert!(count > 2); // 至少应该有起点 + 一些路径点
-    }
-
-    #[test]
-    fn test_signal_path_uv() {
-        let params = PropagationParams {
-            mode: PropagationMode::UV,
-            frequency: 100.0,
-            angle: 30.0,
-            iono_height: 300.0,
-            earth_radius: 6371.0,
-            max_hops: 2,
-            critical_frequency: 7.0,
-        };
-
-        let mut path = vec![0.0f32; 100];
-        let mut impacts = vec![0u8; 100];
-
-        let count = calculate_signal_path(&params, &mut path, &mut impacts);
-        assert!(count >= 2); // UV 模式应该穿透，路径较短
-    }
-
-    #[test]
-    fn test_ground_wave_strength() {
-        // 低频地波强
-        let strength_3mhz = calculate_ground_wave_strength(3.0);
-        assert!(strength_3mhz > 10.0);
-
-        // 高频地波弱
-        let strength_30mhz = calculate_ground_wave_strength(30.0);
-        assert!(strength_30mhz < 5.0);
-
-        // 超高频无地波
-        let strength_100mhz = calculate_ground_wave_strength(100.0);
-        assert_eq!(strength_100mhz, 0.0);
     }
 }

@@ -377,14 +377,17 @@ if (Symbol.dispose) SphericalSurfaceParams.prototype[Symbol.dispose] = Spherical
  * @param {number} active_harmonic
  * @param {boolean} is_inverted_v
  * @param {string} radial_angle
+ * @param {string | null} [material]
  * @returns {number}
  */
-export function calculate_antenna_gain(antenna_type, theta, phi, antenna_length, active_harmonic, is_inverted_v, radial_angle) {
+export function calculate_antenna_gain(antenna_type, theta, phi, antenna_length, active_harmonic, is_inverted_v, radial_angle, material) {
     const ptr0 = passStringToWasm0(antenna_type, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
     const len0 = WASM_VECTOR_LEN;
     const ptr1 = passStringToWasm0(radial_angle, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
     const len1 = WASM_VECTOR_LEN;
-    const ret = wasm.calculate_antenna_gain(ptr0, len0, theta, phi, antenna_length, active_harmonic, is_inverted_v, ptr1, len1);
+    var ptr2 = isLikeNone(material) ? 0 : passStringToWasm0(material, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    var len2 = WASM_VECTOR_LEN;
+    const ret = wasm.calculate_antenna_gain(ptr0, len0, theta, phi, antenna_length, active_harmonic, is_inverted_v, ptr1, len1, ptr2, len2);
     return ret;
 }
 
@@ -399,6 +402,7 @@ export function calculate_antenna_gain(antenna_type, theta, phi, antenna_length,
  * * `active_harmonic` - Active harmonic number
  * * `is_inverted_v` - Inverted V flag
  * * `radial_angle` - Radial angle string
+ * * `material` - Antenna material (optional)
  * * `output` - Output buffer for gain values (must be same length as angles_theta)
  * @param {string} antenna_type
  * @param {Float64Array} angles_theta
@@ -407,9 +411,10 @@ export function calculate_antenna_gain(antenna_type, theta, phi, antenna_length,
  * @param {number} active_harmonic
  * @param {boolean} is_inverted_v
  * @param {string} radial_angle
+ * @param {string | null | undefined} material
  * @param {Float64Array} output
  */
-export function calculate_antenna_gain_batch(antenna_type, angles_theta, angles_phi, antenna_length, active_harmonic, is_inverted_v, radial_angle, output) {
+export function calculate_antenna_gain_batch(antenna_type, angles_theta, angles_phi, antenna_length, active_harmonic, is_inverted_v, radial_angle, material, output) {
     const ptr0 = passStringToWasm0(antenna_type, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
     const len0 = WASM_VECTOR_LEN;
     const ptr1 = passArrayF64ToWasm0(angles_theta, wasm.__wbindgen_malloc);
@@ -418,9 +423,11 @@ export function calculate_antenna_gain_batch(antenna_type, angles_theta, angles_
     const len2 = WASM_VECTOR_LEN;
     const ptr3 = passStringToWasm0(radial_angle, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
     const len3 = WASM_VECTOR_LEN;
-    var ptr4 = passArrayF64ToWasm0(output, wasm.__wbindgen_malloc);
+    var ptr4 = isLikeNone(material) ? 0 : passStringToWasm0(material, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
     var len4 = WASM_VECTOR_LEN;
-    wasm.calculate_antenna_gain_batch(ptr0, len0, ptr1, len1, ptr2, len2, antenna_length, active_harmonic, is_inverted_v, ptr3, len3, ptr4, len4, output);
+    var ptr5 = passArrayF64ToWasm0(output, wasm.__wbindgen_malloc);
+    var len5 = WASM_VECTOR_LEN;
+    wasm.calculate_antenna_gain_batch(ptr0, len0, ptr1, len1, ptr2, len2, antenna_length, active_harmonic, is_inverted_v, ptr3, len3, ptr4, len4, ptr5, len5, output);
 }
 
 /**
@@ -433,6 +440,7 @@ export function calculate_antenna_gain_batch(antenna_type, angles_theta, angles_
  * * `active_harmonic` - Active harmonic number
  * * `is_inverted_v` - Inverted V flag
  * * `radial_angle` - Radial angle string
+ * * `material` - Antenna material (optional)
  * * `num_points` - Number of azimuth points to calculate (default 360)
  * * `output` - Output buffer for gain values (must have length >= num_points)
  * @param {string} antenna_type
@@ -441,17 +449,20 @@ export function calculate_antenna_gain_batch(antenna_type, angles_theta, angles_
  * @param {number} active_harmonic
  * @param {boolean} is_inverted_v
  * @param {string} radial_angle
+ * @param {string | null | undefined} material
  * @param {number} num_points
  * @param {Float64Array} output
  */
-export function calculate_antenna_radiation_pattern(antenna_type, theta, antenna_length, active_harmonic, is_inverted_v, radial_angle, num_points, output) {
+export function calculate_antenna_radiation_pattern(antenna_type, theta, antenna_length, active_harmonic, is_inverted_v, radial_angle, material, num_points, output) {
     const ptr0 = passStringToWasm0(antenna_type, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
     const len0 = WASM_VECTOR_LEN;
     const ptr1 = passStringToWasm0(radial_angle, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
     const len1 = WASM_VECTOR_LEN;
-    var ptr2 = passArrayF64ToWasm0(output, wasm.__wbindgen_malloc);
+    var ptr2 = isLikeNone(material) ? 0 : passStringToWasm0(material, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
     var len2 = WASM_VECTOR_LEN;
-    wasm.calculate_antenna_radiation_pattern(ptr0, len0, theta, antenna_length, active_harmonic, is_inverted_v, ptr1, len1, num_points, ptr2, len2, output);
+    var ptr3 = passArrayF64ToWasm0(output, wasm.__wbindgen_malloc);
+    var len3 = WASM_VECTOR_LEN;
+    wasm.calculate_antenna_radiation_pattern(ptr0, len0, theta, antenna_length, active_harmonic, is_inverted_v, ptr1, len1, ptr2, len2, num_points, ptr3, len3, output);
 }
 
 /**
@@ -893,14 +904,17 @@ export function estimate_moxon_gain() {
 }
 
 /**
- * Calculate estimated gain based on element count
+ * Calculate estimated gain based on element count and material
  *
- * Simple estimation formula: gain = element_count * 1.2 + 2.15 dBi
+ * Simple estimation formula: gain = element_count * 1.2 + 2.15 dBi - material_loss
  * @param {number} element_count
+ * @param {string} material
  * @returns {number}
  */
-export function estimate_yagi_gain(element_count) {
-    const ret = wasm.estimate_yagi_gain(element_count);
+export function estimate_yagi_gain(element_count, material) {
+    const ptr0 = passStringToWasm0(material, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ret = wasm.estimate_yagi_gain(element_count, ptr0, len0);
     return ret;
 }
 
@@ -1105,6 +1119,10 @@ function getUint8ArrayMemory0() {
         cachedUint8ArrayMemory0 = new Uint8Array(wasm.memory.buffer);
     }
     return cachedUint8ArrayMemory0;
+}
+
+function isLikeNone(x) {
+    return x === undefined || x === null;
 }
 
 function passArray32ToWasm0(arg, malloc) {

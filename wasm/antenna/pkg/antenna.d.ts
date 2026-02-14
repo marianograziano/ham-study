@@ -80,7 +80,7 @@ export class SphericalSurfaceParams {
  * # Returns
  * Normalized gain value (0.0 to 1.0+)
  */
-export function calculate_antenna_gain(antenna_type: string, theta: number, phi: number, antenna_length: number, active_harmonic: number, is_inverted_v: boolean, radial_angle: string): number;
+export function calculate_antenna_gain(antenna_type: string, theta: number, phi: number, antenna_length: number, active_harmonic: number, is_inverted_v: boolean, radial_angle: string, material?: string | null): number;
 
 /**
  * Calculate antenna gain for multiple angles in batch
@@ -93,9 +93,10 @@ export function calculate_antenna_gain(antenna_type: string, theta: number, phi:
  * * `active_harmonic` - Active harmonic number
  * * `is_inverted_v` - Inverted V flag
  * * `radial_angle` - Radial angle string
+ * * `material` - Antenna material (optional)
  * * `output` - Output buffer for gain values (must be same length as angles_theta)
  */
-export function calculate_antenna_gain_batch(antenna_type: string, angles_theta: Float64Array, angles_phi: Float64Array, antenna_length: number, active_harmonic: number, is_inverted_v: boolean, radial_angle: string, output: Float64Array): void;
+export function calculate_antenna_gain_batch(antenna_type: string, angles_theta: Float64Array, angles_phi: Float64Array, antenna_length: number, active_harmonic: number, is_inverted_v: boolean, radial_angle: string, material: string | null | undefined, output: Float64Array): void;
 
 /**
  * Calculate antenna radiation pattern (360 degrees in azimuth)
@@ -107,10 +108,11 @@ export function calculate_antenna_gain_batch(antenna_type: string, angles_theta:
  * * `active_harmonic` - Active harmonic number
  * * `is_inverted_v` - Inverted V flag
  * * `radial_angle` - Radial angle string
+ * * `material` - Antenna material (optional)
  * * `num_points` - Number of azimuth points to calculate (default 360)
  * * `output` - Output buffer for gain values (must have length >= num_points)
  */
-export function calculate_antenna_radiation_pattern(antenna_type: string, theta: number, antenna_length: number, active_harmonic: number, is_inverted_v: boolean, radial_angle: string, num_points: number, output: Float64Array): void;
+export function calculate_antenna_radiation_pattern(antenna_type: string, theta: number, antenna_length: number, active_harmonic: number, is_inverted_v: boolean, radial_angle: string, material: string | null | undefined, num_points: number, output: Float64Array): void;
 
 /**
  * Calculate boom correction factor and amount
@@ -333,11 +335,11 @@ export function calculate_yagi_json(config_json: string): string;
 export function estimate_moxon_gain(): number;
 
 /**
- * Calculate estimated gain based on element count
+ * Calculate estimated gain based on element count and material
  *
- * Simple estimation formula: gain = element_count * 1.2 + 2.15 dBi
+ * Simple estimation formula: gain = element_count * 1.2 + 2.15 dBi - material_loss
  */
-export function estimate_yagi_gain(element_count: number): number;
+export function estimate_yagi_gain(element_count: number, material: string): number;
 
 /**
  * 生成球面几何体数据
@@ -396,9 +398,10 @@ export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembl
 
 export interface InitOutput {
     readonly memory: WebAssembly.Memory;
-    readonly calculate_field: (a: number, b: number, c: number, d: number) => number;
-    readonly calculate_field_batch: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: any) => void;
-    readonly calculate_radiation_pattern: (a: number, b: number, c: number, d: number, e: number, f: number, g: any) => void;
+    readonly calculate_boom_correction_json: (a: number, b: number, c: number, d: number) => [number, number];
+    readonly calculate_yagi_element_lengths: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number];
+    readonly calculate_yagi_json: (a: number, b: number) => [number, number];
+    readonly estimate_yagi_gain: (a: number, b: number, c: number) => number;
     readonly __wbg_get_pathpoint_is_impact: (a: number) => number;
     readonly __wbg_get_pathpoint_x: (a: number) => number;
     readonly __wbg_get_pathpoint_y: (a: number) => number;
@@ -438,22 +441,21 @@ export interface InitOutput {
     readonly __wbg_get_propagationstats_ground_wave_strength: (a: number) => number;
     readonly __wbg_get_propagationstats_incidence_angle: (a: number) => number;
     readonly __wbg_get_propagationstats_muf: (a: number) => number;
+    readonly calculate_antenna_gain: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number) => number;
+    readonly calculate_antenna_gain_batch: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: any) => void;
+    readonly calculate_antenna_radiation_pattern: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: any) => void;
     readonly calculate_moxon_factors_json: (a: number, b: number) => [number, number];
     readonly calculate_moxon_json: (a: number, b: number) => [number, number];
     readonly calculate_moxon_simple_json: (a: number, b: number) => [number, number];
     readonly estimate_moxon_gain: () => number;
-    readonly calculate_boom_correction_json: (a: number, b: number, c: number, d: number) => [number, number];
-    readonly calculate_yagi_element_lengths: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number];
-    readonly calculate_yagi_json: (a: number, b: number) => [number, number];
-    readonly estimate_yagi_gain: (a: number) => number;
     readonly calculate_pattern_gain: (a: number, b: number, c: number, d: number, e: number) => number;
     readonly calculate_pattern_gain_grid: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: any) => void;
     readonly calculate_pattern_radiation: (a: number, b: number, c: number, d: number, e: number, f: number, g: any) => void;
     readonly get_pattern_antenna_info: (a: number, b: number, c: number, d: number, e: any, f: number, g: number, h: any) => void;
     readonly list_pattern_antenna_types: () => [number, number];
-    readonly calculate_antenna_gain: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => number;
-    readonly calculate_antenna_gain_batch: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: any) => void;
-    readonly calculate_antenna_radiation_pattern: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: any) => void;
+    readonly calculate_field: (a: number, b: number, c: number, d: number) => number;
+    readonly calculate_field_batch: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: any) => void;
+    readonly calculate_radiation_pattern: (a: number, b: number, c: number, d: number, e: number, f: number, g: any) => void;
     readonly calculate_electric_field: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number, q: number, r: any, s: number, t: number, u: any) => void;
     readonly __wbg_get_sphericalsurfaceparams_max_angle: (a: number) => number;
     readonly __wbg_get_sphericalsurfaceparams_radius: (a: number) => number;

@@ -19,6 +19,7 @@ import { YagiSvgRenderer } from "~/components/tools/yagi-calculator/YagiSvgRende
 import { Button } from "~/components/ui/button";
 import { TooltipProvider } from "~/components/ui/tooltip";
 import {
+  type AntennaMaterial,
   type BoomShape,
   calculateYagi,
   calculateYagiJs,
@@ -85,6 +86,7 @@ export default function YagiCalculator() {
   const [proManualBCFactor, setProManualBCFactor] = useState<
     number | undefined
   >();
+  const [proMaterial, setProMaterial] = useState<AntennaMaterial>("aluminum");
 
   // --- Derived Config ---
   const config: YagiConfig = useMemo(() => {
@@ -134,6 +136,7 @@ export default function YagiCalculator() {
         spacingType: proSpacingType,
         manualSpacing: proManualSpacing,
         manualBCFactor: proManualBCFactor,
+        material: proMaterial,
       };
     }
   }, [
@@ -150,6 +153,7 @@ export default function YagiCalculator() {
     proSpacingType,
     proManualSpacing,
     proManualBCFactor,
+    proMaterial,
   ]);
 
   // --- Design State ---
@@ -445,6 +449,8 @@ export default function YagiCalculator() {
                 setProSpacingType={setProSpacingType}
                 proManualSpacing={proManualSpacing}
                 setProManualSpacing={setProManualSpacing}
+                proMaterial={proMaterial}
+                setProMaterial={setProMaterial}
               />
             )}
           </div>

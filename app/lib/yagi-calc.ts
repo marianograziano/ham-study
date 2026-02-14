@@ -10,6 +10,12 @@ export type MountMethod =
   | "above"
   | "none";
 
+export type AntennaMaterial =
+  | "aluminum"
+  | "copper"
+  | "stainless_steel"
+  | "fiberglass";
+
 export type DrivenElementType = "folded" | "straight";
 export type SpacingType = "dl6wu" | "uniform";
 
@@ -25,6 +31,7 @@ export interface YagiConfig {
   spacingType: SpacingType;
   manualSpacing: number; // in lambda
   manualBCFactor?: number; // Optional override for K factor
+  material?: AntennaMaterial; // Material for skin depth/conductivity
 }
 
 export interface YagiElement {
@@ -79,6 +86,7 @@ async function calculateYagiWasm(config: YagiConfig): Promise<YagiDesign> {
         spacingType: config.spacingType,
         manualSpacing: config.manualSpacing,
         manualBCFactor: config.manualBCFactor,
+        material: config.material,
       });
 
       return {
