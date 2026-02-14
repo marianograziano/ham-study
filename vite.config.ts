@@ -20,6 +20,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "node:worker_threads": "/app/mocks/worker_threads.ts",
+      wasm: "/wasm",
     },
   },
   ssr: {
