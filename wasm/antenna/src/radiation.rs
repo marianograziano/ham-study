@@ -1,6 +1,6 @@
-use wasm_bindgen::prelude::*;
-use crate::AntennaType;
 use crate::calculate_windom_factor;
+use crate::AntennaType;
+use wasm_bindgen::prelude::*;
 
 /// Calculate antenna gain at a specific angle
 ///
@@ -78,12 +78,20 @@ pub fn calculate_antenna_gain(
         }
         AntennaType::Windom => {
             // Windom antenna using numerical integration
-            let n = if active_harmonic > 0 { active_harmonic } else { 1 };
+            let n = if active_harmonic > 0 {
+                active_harmonic
+            } else {
+                1
+            };
             calculate_windom_factor(phi, n, is_inverted_v)
         }
         AntennaType::EndFed => {
             // End-fed antenna pattern
-            let n = if active_harmonic > 0 { active_harmonic } else { 1 };
+            let n = if active_harmonic > 0 {
+                active_harmonic
+            } else {
+                1
+            };
             let cos_theta = phi.cos();
             let sin_theta = phi.sin().abs();
             let safe_sin_theta = sin_theta.max(0.001);

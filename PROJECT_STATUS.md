@@ -38,12 +38,16 @@
 ### ADR-002: 实现治理模式选择机制
 
 - **Date**: 2026-02-09
-- **Status**: In Progress
+- **Status**: Completed
 - **Context**: README 承诺首次运行时会提示用户选择治理模式,但 setup 脚本未实现此功能
 - **Decision**:
   1. 增强 setup.bat 和 setup.sh,添加交互式治理模式选择
   2. 默认推荐 Hybrid 模式,但必须让用户主动选择
-  3. 修改 ResetAG 脚本的提示信息,引导用户运行 setup 脚本
+  3. ResetAG 脚本已引导用户运行 setup 脚本
+- **Implementation**:
+  - setup.sh: 修复了函数定义顺序问题,确保 create_status 在调用前定义
+  - setup.bat: 子程序定义顺序正确,无需修改
+  - 两者都支持三种治理模式选择 (Frozen/Hybrid/Aggressive)
 - **Rationale**:
   - 提升用户体验,避免用户困惑
   - 确保文档与实现一致
@@ -58,10 +62,11 @@
 ## 📝 Last Task Summary
 
 **Task**: 实现治理模式选择机制  
-**Date**: 2026-02-09  
-**Status**: In Progress  
+**Date**: 2026-02-14  
+**Status**: Completed  
 **Summary**:
 
 - ✅ 完成脚本功能匹配性分析
-- ✅ 用户选择 Hybrid 模式
-- 🔄 正在增强 setup 和 ResetAG 脚本
+- ✅ 修复 setup.sh 函数定义顺序问题
+- ✅ 验证 setup.bat 无需修改
+- ✅ 两个脚本都支持治理模式交互选择

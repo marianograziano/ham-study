@@ -21,10 +21,12 @@ import { TooltipProvider } from "~/components/ui/tooltip";
 import {
   type BoomShape,
   calculateYagi,
+  calculateYagiJs,
   type DrivenElementType,
   type MountMethod,
   type SpacingType,
   type YagiConfig,
+  type YagiDesign,
 } from "~/lib/yagi-calc";
 import resources from "~/locales";
 import { getLocale } from "~/middleware/i18next";
@@ -150,7 +152,26 @@ export default function YagiCalculator() {
     proManualBCFactor,
   ]);
 
-  const design = useMemo(() => calculateYagi(config), [config]);
+  // --- Design State ---
+  const [design, setDesign] = useState<YagiDesign | null>(null);
+
+  // --- Calculate Design (WASM or JS fallback) ---
+  useEffect(() => {
+    let cancelled = false;
+
+    async function calc() {
+      const result = await calculateYagi(config);
+      if (!cancelled) {
+        setDesign(result);
+      }
+    }
+
+    calc();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [config]);
 
   // --- Auto-calculate K Factor for display in Pro Mode ---
   const autoKFactor = useMemo(() => {
@@ -202,7 +223,7 @@ export default function YagiCalculator() {
       const rowHeight = 30;
       const headerHeight = 80;
       const footerHeight = 50;
-      const tableH = design.elements.length * rowHeight;
+      const tableH = design!.elements.length * rowHeight;
       const totalH = h_svg + headerHeight + tableH + footerHeight;
 
       canvas.width = w * scale;
@@ -265,7 +286,7 @@ export default function YagiCalculator() {
         ctx.font = "12px monospace";
         y += 10;
 
-        design.elements.forEach((el) => {
+        design!.elements.forEach((el) => {
           y += rowHeight;
           const isDE = el.type === "DE";
           ctx.fillStyle = isDE ? "#38bdf8" : "#cbd5e1";
@@ -315,7 +336,7 @@ export default function YagiCalculator() {
 
         console.log("[YagiDownload] Triggering download click...");
         const a = document.createElement("a");
-        a.download = `yagi_design_${design.config.frequency}MHz.png`;
+        a.download = `yagi_design_${design!.config.frequency}MHz.png`;
         a.href = canvas.toDataURL("image/png");
         a.click();
         console.log("[YagiDownload] Download complete.");
@@ -330,6 +351,17 @@ export default function YagiCalculator() {
       alert(t("tools.yagiCalculator.ui.downloadUnknownError"));
     }
   };
+
+  // Show loading while calculating
+  if (!design) {
+    return (
+      <div className="container mx-auto py-8 px-4 max-w-6xl font-sans">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-slate-400">Loading...</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto py-8 px-4 max-w-6xl font-sans">

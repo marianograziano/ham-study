@@ -29,8 +29,8 @@ import {
 import { demos as demosConfig, tools as toolsConfig } from "~/data/items";
 import { ImageSizes } from "~/lib/images";
 import { lazyWithRetry } from "~/lib/lazy-retry";
-import { calculateMoxon } from "~/lib/moxon-calc";
-import { calculateYagi } from "~/lib/yagi-calc";
+import { calculateMoxonJs } from "~/lib/moxon-calc";
+import { calculateYagiJs } from "~/lib/yagi-calc";
 import resources from "~/locales";
 import { getLocale } from "~/middleware/i18next";
 import type { Route } from "./+types/home";
@@ -421,7 +421,7 @@ export default function Home() {
             href: item.href,
             preview: (
               <YagiSvgRenderer
-                design={calculateYagi({
+                design={calculateYagiJs({
                   frequency: 435.0,
                   elementCount: 5,
                   elementDiameter: 4.0,
@@ -447,7 +447,7 @@ export default function Home() {
             href: item.href,
             preview: (
               <MoxonSvgRenderer
-                design={calculateMoxon({
+                design={calculateMoxonJs({
                   frequency: 435.0,
                   wireDiameter: 3.0,
                 })}
