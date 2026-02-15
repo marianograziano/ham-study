@@ -204,4 +204,32 @@ impl NecContext {
     pub fn calculate_far_field(&self, theta: f64, phi: f64, r_dist: f64) -> f64 {
         self.sim.calculate_far_field(theta, phi, r_dist)
     }
+
+    pub fn calculate_far_field_pattern(&self, num_points: usize, phi: f64) -> Vec<f64> {
+        let mut results = Vec::with_capacity(num_points);
+        let two_pi = 2.0 * std::f64::consts::PI;
+
+        for i in 0..num_points {
+            let theta = two_pi * (i as f64) / (num_points as f64);
+            // r_dist doesn't affect relative pattern in our simplified calc, pass 1.0 or 100.0
+            results.push(self.sim.calculate_far_field(theta, phi, 1000.0));
+        }
+        results
+    }
+
+    pub fn get_impedance(&self, tag: i32) -> Vec<f64> {
+        if let Some(z) = self.sim.get_input_impedance(tag) {
+            vec![z.re, z.im]
+        } else {
+            vec![]
+        }
+    }
+
+    pub fn get_current_magnitude(&self, index: usize) -> f64 {
+        self.sim.get_current(index).norm()
+    }
+
+    pub fn get_current_phase(&self, index: usize) -> f64 {
+        self.sim.get_current(index).arg()
+    }
 }

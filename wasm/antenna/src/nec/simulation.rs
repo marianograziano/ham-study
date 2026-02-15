@@ -235,4 +235,36 @@ impl NecSimulation {
         let mag2 = e_theta.norm_sqr() + e_phi.norm_sqr();
         mag2.sqrt()
     }
+
+    /// Get total current (complex) on a specific segment
+    pub fn get_current(&self, index: usize) -> Complex64 {
+        if index < self.context.current.cur.len() {
+            self.context.current.cur[index]
+        } else {
+            Complex64::new(0.0, 0.0)
+        }
+    }
+
+    /// Calculate Input Impedance for a source with a given tag.
+    /// Returns Some(Z) if source found and current is non-zero.
+    pub fn get_input_impedance(&self, tag: i32) -> Option<Complex64> {
+        // Iterate over all voltage sources
+        for (i, &seg_idx) in self.context.vsorc.isant.iter().enumerate() {
+            // Check if this segment belongs to a wire with the requested tag
+            if seg_idx < self.context.geometry.itag.len() {
+                if self.context.geometry.itag[seg_idx] == tag {
+                    // Found the source
+                    let voltage = self.context.vsorc.vsant[i];
+                    let current = self.context.current.cur[seg_idx];
+
+                    if current.norm_sqr() > 1e-20 {
+                        return Some(voltage / current);
+                    } else {
+                        return None; // Simulation not run or open circuit
+                    }
+                }
+            }
+        }
+        None
+    }
 }

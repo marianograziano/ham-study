@@ -1,6 +1,117 @@
 /* @ts-self-types="./antenna.d.ts" */
 
 /**
+ * WASM wrapper for NEC simulation
+ */
+export class NecContext {
+    __destroy_into_raw() {
+        const ptr = this.__wbg_ptr;
+        this.__wbg_ptr = 0;
+        NecContextFinalization.unregister(this);
+        return ptr;
+    }
+    free() {
+        const ptr = this.__destroy_into_raw();
+        wasm.__wbg_neccontext_free(ptr, 0);
+    }
+    /**
+     * @param {number} tag
+     * @param {number} seg_on_wire
+     * @param {number} real
+     * @param {number} imag
+     */
+    add_voltage_source(tag, seg_on_wire, real, imag) {
+        wasm.neccontext_add_voltage_source(this.__wbg_ptr, tag, seg_on_wire, real, imag);
+    }
+    /**
+     * @param {number} x1
+     * @param {number} y1
+     * @param {number} z1
+     * @param {number} x2
+     * @param {number} y2
+     * @param {number} z2
+     * @param {number} radius
+     * @param {number} segments
+     * @param {number} tag
+     */
+    add_wire(x1, y1, z1, x2, y2, z2, radius, segments, tag) {
+        wasm.neccontext_add_wire(this.__wbg_ptr, x1, y1, z1, x2, y2, z2, radius, segments, tag);
+    }
+    calculate() {
+        const ret = wasm.neccontext_calculate(this.__wbg_ptr);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
+    }
+    /**
+     * @param {number} theta
+     * @param {number} phi
+     * @param {number} r_dist
+     * @returns {number}
+     */
+    calculate_far_field(theta, phi, r_dist) {
+        const ret = wasm.neccontext_calculate_far_field(this.__wbg_ptr, theta, phi, r_dist);
+        return ret;
+    }
+    /**
+     * @param {number} num_points
+     * @param {number} phi
+     * @returns {Float64Array}
+     */
+    calculate_far_field_pattern(num_points, phi) {
+        const ret = wasm.neccontext_calculate_far_field_pattern(this.__wbg_ptr, num_points, phi);
+        var v1 = getArrayF64FromWasm0(ret[0], ret[1]).slice();
+        wasm.__wbindgen_free(ret[0], ret[1] * 8, 8);
+        return v1;
+    }
+    /**
+     * @param {number} index
+     * @returns {number}
+     */
+    get_current_magnitude(index) {
+        const ret = wasm.neccontext_get_current_magnitude(this.__wbg_ptr, index);
+        return ret;
+    }
+    /**
+     * @param {number} index
+     * @returns {number}
+     */
+    get_current_phase(index) {
+        const ret = wasm.neccontext_get_current_phase(this.__wbg_ptr, index);
+        return ret;
+    }
+    /**
+     * @param {number} tag
+     * @returns {Float64Array}
+     */
+    get_impedance(tag) {
+        const ret = wasm.neccontext_get_impedance(this.__wbg_ptr, tag);
+        var v1 = getArrayF64FromWasm0(ret[0], ret[1]).slice();
+        wasm.__wbindgen_free(ret[0], ret[1] * 8, 8);
+        return v1;
+    }
+    /**
+     * @param {number} num_wires
+     */
+    initialize(num_wires) {
+        wasm.neccontext_initialize(this.__wbg_ptr, num_wires);
+    }
+    constructor() {
+        const ret = wasm.neccontext_new();
+        this.__wbg_ptr = ret >>> 0;
+        NecContextFinalization.register(this, this.__wbg_ptr, this);
+        return this;
+    }
+    /**
+     * @param {number} mhz
+     */
+    set_frequency(mhz) {
+        wasm.neccontext_set_frequency(this.__wbg_ptr, mhz);
+    }
+}
+if (Symbol.dispose) NecContext.prototype[Symbol.dispose] = NecContext.prototype.free;
+
+/**
  * 信号路径点
  */
 export class PathPoint {
@@ -1044,6 +1155,11 @@ function __wbg_get_imports() {
         __wbg___wbindgen_throw_be289d5034ed271b: function(arg0, arg1) {
             throw new Error(getStringFromWasm0(arg0, arg1));
         },
+        __wbindgen_cast_0000000000000001: function(arg0, arg1) {
+            // Cast intrinsic for `Ref(String) -> Externref`.
+            const ret = getStringFromWasm0(arg0, arg1);
+            return ret;
+        },
         __wbindgen_init_externref_table: function() {
             const table = wasm.__wbindgen_externrefs;
             const offset = table.grow(4);
@@ -1060,6 +1176,9 @@ function __wbg_get_imports() {
     };
 }
 
+const NecContextFinalization = (typeof FinalizationRegistry === 'undefined')
+    ? { register: () => {}, unregister: () => {} }
+    : new FinalizationRegistry(ptr => wasm.__wbg_neccontext_free(ptr >>> 0, 1));
 const PathPointFinalization = (typeof FinalizationRegistry === 'undefined')
     ? { register: () => {}, unregister: () => {} }
     : new FinalizationRegistry(ptr => wasm.__wbg_pathpoint_free(ptr >>> 0, 1));
@@ -1077,6 +1196,11 @@ function _assertClass(instance, klass) {
     if (!(instance instanceof klass)) {
         throw new Error(`expected instance of ${klass.name}`);
     }
+}
+
+function getArrayF64FromWasm0(ptr, len) {
+    ptr = ptr >>> 0;
+    return getFloat64ArrayMemory0().subarray(ptr / 8, ptr / 8 + len);
 }
 
 function getArrayU8FromWasm0(ptr, len) {
@@ -1188,6 +1312,12 @@ function passStringToWasm0(arg, malloc, realloc) {
 
     WASM_VECTOR_LEN = offset;
     return ptr;
+}
+
+function takeFromExternrefTable0(idx) {
+    const value = wasm.__wbindgen_externrefs.get(idx);
+    wasm.__externref_table_dealloc(idx);
+    return value;
 }
 
 let cachedTextDecoder = new TextDecoder('utf-8', { ignoreBOM: true, fatal: true });

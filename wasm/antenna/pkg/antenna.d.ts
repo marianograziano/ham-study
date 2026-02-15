@@ -2,6 +2,25 @@
 /* eslint-disable */
 
 /**
+ * WASM wrapper for NEC simulation
+ */
+export class NecContext {
+    free(): void;
+    [Symbol.dispose](): void;
+    add_voltage_source(tag: number, seg_on_wire: number, real: number, imag: number): void;
+    add_wire(x1: number, y1: number, z1: number, x2: number, y2: number, z2: number, radius: number, segments: number, tag: number): void;
+    calculate(): void;
+    calculate_far_field(theta: number, phi: number, r_dist: number): number;
+    calculate_far_field_pattern(num_points: number, phi: number): Float64Array;
+    get_current_magnitude(index: number): number;
+    get_current_phase(index: number): number;
+    get_impedance(tag: number): Float64Array;
+    initialize(num_wires: number): void;
+    constructor();
+    set_frequency(mhz: number): void;
+}
+
+/**
  * 信号路径点
  */
 export class PathPoint {
@@ -444,15 +463,31 @@ export interface InitOutput {
     readonly calculate_antenna_gain: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number) => number;
     readonly calculate_antenna_gain_batch: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: any) => void;
     readonly calculate_antenna_radiation_pattern: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: any) => void;
-    readonly calculate_electric_field: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number, q: number, r: any, s: number, t: number, u: any) => void;
-    readonly calculate_field: (a: number, b: number, c: number, d: number) => number;
-    readonly calculate_field_batch: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: any) => void;
+    readonly calculate_moxon_factors_json: (a: number, b: number) => [number, number];
+    readonly calculate_moxon_json: (a: number, b: number) => [number, number];
+    readonly calculate_moxon_simple_json: (a: number, b: number) => [number, number];
     readonly calculate_pattern_gain: (a: number, b: number, c: number, d: number, e: number) => number;
     readonly calculate_pattern_gain_grid: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: any) => void;
     readonly calculate_pattern_radiation: (a: number, b: number, c: number, d: number, e: number, f: number, g: any) => void;
-    readonly calculate_radiation_pattern: (a: number, b: number, c: number, d: number, e: number, f: number, g: any) => void;
+    readonly estimate_moxon_gain: () => number;
     readonly get_pattern_antenna_info: (a: number, b: number, c: number, d: number, e: any, f: number, g: number, h: any) => void;
     readonly list_pattern_antenna_types: () => [number, number];
+    readonly __wbg_neccontext_free: (a: number, b: number) => void;
+    readonly calculate_field: (a: number, b: number, c: number, d: number) => number;
+    readonly calculate_field_batch: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: any) => void;
+    readonly calculate_radiation_pattern: (a: number, b: number, c: number, d: number, e: number, f: number, g: any) => void;
+    readonly neccontext_add_voltage_source: (a: number, b: number, c: number, d: number, e: number) => void;
+    readonly neccontext_add_wire: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number) => void;
+    readonly neccontext_calculate: (a: number) => [number, number];
+    readonly neccontext_calculate_far_field: (a: number, b: number, c: number, d: number) => number;
+    readonly neccontext_calculate_far_field_pattern: (a: number, b: number, c: number) => [number, number];
+    readonly neccontext_get_current_magnitude: (a: number, b: number) => number;
+    readonly neccontext_get_current_phase: (a: number, b: number) => number;
+    readonly neccontext_get_impedance: (a: number, b: number) => [number, number];
+    readonly neccontext_initialize: (a: number, b: number) => void;
+    readonly neccontext_new: () => number;
+    readonly neccontext_set_frequency: (a: number, b: number) => void;
+    readonly calculate_electric_field: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number, q: number, r: any, s: number, t: number, u: any) => void;
     readonly __wbg_get_sphericalsurfaceparams_max_angle: (a: number) => number;
     readonly __wbg_get_sphericalsurfaceparams_radius: (a: number) => number;
     readonly __wbg_get_sphericalsurfaceparams_segments_r: (a: number) => number;
@@ -468,14 +503,11 @@ export interface InitOutput {
     readonly get_spherical_surface_buffer_sizes: (a: number, b: number) => bigint;
     readonly intersect_sphere_batch: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: any) => void;
     readonly sphericalsurfaceparams_new: () => number;
-    readonly calculate_moxon_factors_json: (a: number, b: number) => [number, number];
-    readonly calculate_moxon_json: (a: number, b: number) => [number, number];
-    readonly calculate_moxon_simple_json: (a: number, b: number) => [number, number];
-    readonly estimate_moxon_gain: () => number;
     readonly __wbindgen_externrefs: WebAssembly.Table;
     readonly __wbindgen_malloc: (a: number, b: number) => number;
     readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
     readonly __wbindgen_free: (a: number, b: number, c: number) => void;
+    readonly __externref_table_dealloc: (a: number) => void;
     readonly __wbindgen_start: () => void;
 }
 
