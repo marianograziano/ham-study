@@ -1,4 +1,4 @@
-use crate::nec::common::{Context, PCHCON, PI};
+use crate::nec::common::Context;
 use num_complex::Complex64;
 
 use std::f64::consts::PI as PI_CONST;
@@ -22,7 +22,7 @@ pub fn tbf(i: usize, icap: usize, ctx: &mut Context) {
     ctx.segj.jsno = 0;
 
     let mut pp = 0.0;
-    let mut pm = 0.0;
+    let pm;
 
     let ix = i;
 
@@ -39,15 +39,13 @@ pub fn tbf(i: usize, icap: usize, ctx: &mut Context) {
     // ---------------------------------------------------------
 
     // Start from End 1 of ix
-    let mut current_idx = ix;
-    let mut leaving_end = 1; // 1=End1, 2=End2.
-                             // To trace "Left", we leave End 1 of current segment.
+    // To trace "Left", we leave End 1 of current segment.
 
     let mut jcox = ctx.geometry.icon1[ix];
     let mut sig = -1.0;
     let _jend = -1; // Legacy sign tracking if needed? No, explicit 'sig' is enough.
 
-    let mut njun1 = 0;
+    let njun1;
     let mut loop_idx = 0;
 
     loop {
@@ -112,7 +110,7 @@ pub fn tbf(i: usize, icap: usize, ctx: &mut Context) {
 
         // Prepare next step
         // We entered 'entered_end'. Must leave 'opposite'.
-        leaving_end = if entered_end == 1 { 2 } else { 1 };
+        let leaving_end = if entered_end == 1 { 2 } else { 1 };
 
         if leaving_end == 1 {
             jcox = ctx.geometry.icon1[next_seg_idx];
@@ -134,8 +132,6 @@ pub fn tbf(i: usize, icap: usize, ctx: &mut Context) {
     // Phase 2: Trace End 2 (Right Arm)
     // ---------------------------------------------------------
 
-    current_idx = ix;
-    leaving_end = 2; // Leaving End 2 of source
     jcox = ctx.geometry.icon2[ix];
     sig = 1.0; // Corrected to 1.0 to ensure Positive Ax (Symmetric Basis).
                // Original -1.0 led to Negative Ax for Right Arm (Asymmetry).
@@ -198,7 +194,7 @@ pub fn tbf(i: usize, icap: usize, ctx: &mut Context) {
             break;
         }
 
-        leaving_end = if entered_end == 1 { 2 } else { 1 };
+        let leaving_end = if entered_end == 1 { 2 } else { 1 };
 
         if leaving_end == 1 {
             jcox = ctx.geometry.icon1[next_seg_idx];
@@ -604,7 +600,7 @@ fn gxx(
 
 // Constants from nec2c.h
 const CONST1: Complex64 = Complex64::new(0.0, 4.771341189);
-const CONST4: Complex64 = Complex64::new(0.0, 188.365);
+// const CONST4: Complex64 = Complex64::new(0.0, 188.365);
 
 /// Compute E-field of sine, cosine, and constant current filaments by thin wire approximation.
 /// Returns (Ez_sine, Er_sine, Ez_cos, Er_cos, Ez_const, Er_const)
@@ -632,8 +628,8 @@ pub fn eksc(
     let (gz1, gp1) = gx(z1a, rh, k);
     let (gz2, gp2) = gx(z2a, rh, k);
 
-    let mut gzp1 = gp1 * z1a;
-    let mut gzp2 = gp2 * z2a;
+    let gzp1 = gp1 * z1a;
+    let gzp2 = gp2 * z2a;
 
     let ezs = CONST1 * ((gz2 - gz1) * cs * k - (gzp2 + gzp1) * ss);
     let ezc = -CONST1 * ((gz2 + gz1) * ss * k + (gzp2 - gzp1) * cs);

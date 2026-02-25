@@ -1,7 +1,7 @@
 import { Camera } from "@phosphor-icons/react";
 import { ArcballControls } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
-import { useId, useMemo, useRef, useState } from "react";
+import { useId, useMemo, useRef, useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { CatmullRomCurve3, DoubleSide, SphereGeometry, Vector3 } from "three";
 import { Button } from "~/components/ui/button";
@@ -9,8 +9,114 @@ import { Label } from "~/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
 import { Switch } from "~/components/ui/switch";
 import { ElectricFieldWasm } from "./electric-field-wasm";
+import { initNecWasm, NecContext } from "~/utils/nec-wasm";
+
+function ImpedanceDisplay({
+  lengthFactor,
+  isInvertedV,
+}: {
+  lengthFactor: number;
+  isInvertedV: boolean;
+}) {
+  const [impedance, setImpedance] = useState<{ re: number; im: number } | null>(
+    null,
+  );
+  const [isCalculating, setIsCalculating] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    const calculate = async () => {
+      setIsCalculating(true);
+      try {
+        await initNecWasm();
+        if (!active) return;
+
+        const ctx = new NecContext();
+        ctx.initialize(1);
+        ctx.set_frequency(300.0); // 300MHz gives lambda = 1m
+
+        // Segments relative to wavelength. 11 for 0.5 lambda. Needs to be odd.
+        let segments = Math.floor(lengthFactor * 22);
+        if (segments % 2 === 0) segments += 1;
+
+        const tag = 1;
+
+        if (isInvertedV) {
+          // Approximate with straight wire for now to show something, or omit
+          // Proper inverted V needs two wires, but get_impedance expects one source
+          // For now, let's just use the straight wire impedance
+          ctx.add_wire(
+            -lengthFactor / 2,
+            0,
+            0,
+            lengthFactor / 2,
+            0,
+            0,
+            0.001,
+            segments,
+            tag,
+          );
+        } else {
+          ctx.add_wire(
+            -lengthFactor / 2,
+            0,
+            0,
+            lengthFactor / 2,
+            0,
+            0,
+            0.001,
+            segments,
+            tag,
+          );
+        }
+
+        const centerSeg = Math.floor(segments / 2) + 1;
+        ctx.add_voltage_source(tag, centerSeg, 1.0, 0.0);
+        ctx.calculate();
+
+        const zArr = ctx.get_impedance(tag);
+        if (zArr && zArr.length === 2 && active) {
+          setImpedance({ re: zArr[0], im: zArr[1] });
+        }
+        ctx.free();
+      } catch (err) {
+        console.error("NEC Calculation Error:", err);
+      } finally {
+        if (active) setIsCalculating(false);
+      }
+    };
+
+    // Debounce slightly to avoid locking UI
+    const timer = setTimeout(calculate, 300);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [lengthFactor, isInvertedV]);
+
+  return (
+    <div className="pt-3 border-t border-white/10 mt-3">
+      <div className="mb-2 text-xs md:text-sm font-medium text-zinc-200">
+        Live Impedance (NEC2)
+      </div>
+      <div className="text-xs font-mono bg-black/50 p-2 rounded text-zinc-300">
+        {isCalculating ? (
+          <span className="animate-pulse">Calculating Z...</span>
+        ) : impedance ? (
+          <span>
+            Z = {impedance.re.toFixed(1)} {impedance.im >= 0 ? "+" : "-"} j
+            {Math.abs(impedance.im).toFixed(1)} Ω
+          </span>
+        ) : (
+          <span>--</span>
+        )}
+      </div>
+    </div>
+  );
+}
 
 // Dipole Geometry Component
+
 function DipoleStructure({
   length,
   isInvertedV,
@@ -434,6 +540,8 @@ export default function DipoleAntennaScene({
           {t("common.controls.download")}
         </Button>
       </div>
+
+      <ImpedanceDisplay lengthFactor={lengthFactor} isInvertedV={isInvertedV} />
     </div>
   );
 

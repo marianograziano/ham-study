@@ -1,5 +1,4 @@
 use crate::nec::common::Context;
-use crate::nec::physics::{efld, tbf};
 use num_complex::Complex64;
 
 pub struct Solver {
