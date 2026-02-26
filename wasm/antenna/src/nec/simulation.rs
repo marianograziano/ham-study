@@ -184,15 +184,23 @@ impl NecSimulation {
         let mut e_theta = Complex64::new(0.0, 0.0);
         let mut e_phi = Complex64::new(0.0, 0.0);
 
+        // Since frontend uses:
+        // thetas.push(Math.asin(vertex.y)); // Elevation from XZ plane, Y is UP
+        // phis.push(Math.atan2(vertex.z, vertex.x)); // Azimuth in XZ plane
+        //
+        // This means the observer vector (rx, ry, rz) is:
+        // rx = cos(theta) * cos(phi)
+        // ry = sin(theta)
+        // rz = cos(theta) * sin(phi)
+
         let cost = theta.cos();
         let sint = theta.sin();
         let cosp = phi.cos();
         let sinp = phi.sin();
 
-        // Radial vector to observer:
-        // rx = sint * cosp
-        // ry = sint * sinp
-        // rz = cost
+        let rx = cost * cosp;
+        let ry = sint;
+        let rz = cost * sinp;
 
         for i in 0..self.context.geometry.n {
             let cur = self.context.current.cur[i];
@@ -204,7 +212,7 @@ impl NecSimulation {
 
             // Phase factor relative to origin: exp(j * k * (r . r'))
             // r . r' = xi * rx + yi * ry + zi * rz
-            let phase_arg = k * (xi * sint * cosp + yi * sint * sinp + zi * cost);
+            let phase_arg = k * (xi * rx + yi * ry + zi * rz);
             let phase = Complex64::new(phase_arg.cos(), phase_arg.sin());
 
             // Element pattern (short dipole approx or point source)
@@ -212,15 +220,15 @@ impl NecSimulation {
             let sy = (self.context.geometry.y2[i] - self.context.geometry.y1[i]) / len;
             let sz = (self.context.geometry.z2[i] - self.context.geometry.z1[i]) / len;
 
-            // Theta unit vector: (cost cosp, cost sinp, -sint)
-            let th_x = cost * cosp;
-            let th_y = cost * sinp;
-            let th_z = -sint;
+            // Theta unit vector (derivative of position vector with respect to theta)
+            let th_x = -sint * cosp;
+            let th_y = cost;
+            let th_z = -sint * sinp;
 
-            // Phi unit vector: (-sinp, cosp, 0)
+            // Phi unit vector (derivative of position vector with respect to phi, normalized)
             let ph_x = -sinp;
-            let ph_y = cosp;
-            let ph_z = 0.0;
+            let ph_y = 0.0;
+            let ph_z = cosp;
 
             let dot_th = sx * th_x + sy * th_y + sz * th_z;
             let dot_ph = sx * ph_x + sy * ph_y + sz * ph_z;
@@ -256,7 +264,7 @@ impl NecSimulation {
                 let sy_img = sy;
                 let sz_img = -sz;
 
-                let phase_arg_img = k * (xi * sint * cosp + y_image * sint * sinp + zi * cost);
+                let phase_arg_img = k * (xi * rx + y_image * ry + zi * rz);
                 let phase_img = Complex64::new(phase_arg_img.cos(), phase_arg_img.sin());
 
                 let dot_th_img = sx_img * th_x + sy_img * th_y + sz_img * th_z;
