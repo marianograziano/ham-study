@@ -57,14 +57,18 @@ impl From<&str> for PolarizationType {
 }
 
 /// Calculate Windom antenna factor using numerical integration
-pub(crate) fn calculate_windom_factor(angle: f64, n: i32, is_inverted_v: bool) -> f64 {
+pub(crate) fn calculate_windom_factor(
+    dx: f64,
+    dy: f64,
+    dz: f64,
+    n: i32,
+    is_inverted_v: bool,
+) -> f64 {
     const PI: f64 = std::f64::consts::PI;
-    let k = n as f64 * PI;
-    let segments = 40;
+    let k_current = n as f64 * PI; // For current distribution sin(n * pi * t)
+    let k_phase = n as f64 * PI; // For phase calculation k*r. Length is n*lambda/2, so k*L = n*pi. If we normalize L=1, then k=n*pi.
 
-    let dx = angle.cos();
-    let dy = 0.0;
-    let dz = angle.sin();
+    let segments = 80;
 
     let droop = if is_inverted_v { PI / 6.0 } else { 0.0 };
     let sin_d = droop.sin();
@@ -79,20 +83,21 @@ pub(crate) fn calculate_windom_factor(angle: f64, n: i32, is_inverted_v: bool) -
 
     for i in 0..segments {
         let t = (i as f64 + 0.5) / segments as f64;
-        let current = (k * t).sin();
-        let dist_from_feed = t - 1.0 / 3.0;
+        let current = (k_current * t).sin();
+        let dist_from_left = t;
+        let dist_from_feed = dist_from_left - 1.0 / 3.0; // feed at 1/3 from left
 
         let (px, py, pz, tx, ty, tz) = if dist_from_feed < 0.0 {
             // Left arm
             let d = -dist_from_feed;
-            (0.0, d * -sin_d, d * -cos_d, 0.0, sin_d, cos_d)
+            (0.0, d * -sin_d, d * -cos_d, 0.0, -sin_d, -cos_d)
         } else {
             // Right arm
             let d = dist_from_feed;
             (0.0, d * -sin_d, d * cos_d, 0.0, -sin_d, cos_d)
         };
 
-        let phase = k * (px * dx + py * dy + pz * dz);
+        let phase = k_phase * (px * dx + py * dy + pz * dz);
         let cp = phase.cos();
         let sp = phase.sin();
 
@@ -316,7 +321,13 @@ fn calculate_field_internal(
                             } else {
                                 1
                             };
-                            let val = calculate_windom_factor(angle, n, is_inverted_v);
+                            let val = calculate_windom_factor(
+                                angle.cos(),
+                                0.0,
+                                angle.sin(),
+                                n,
+                                is_inverted_v,
+                            );
                             dir_gain = val.powf(1.5) * 0.5 + 0.05;
                             if polarization_type == PolarizationType::Vertical {
                                 y_scale = 1.0;
@@ -576,11 +587,11 @@ mod tests {
     #[test]
     fn test_windom_factor() {
         // Test Windom factor calculation
-        let factor = calculate_windom_factor(0.0, 1, false);
+        let factor = calculate_windom_factor(1.0, 0.0, 0.0, 1, false);
         assert!(factor >= 0.0, "Windom factor should be non-negative");
         assert!(factor.is_finite(), "Windom factor should be finite");
 
-        let factor_inv = calculate_windom_factor(0.0, 1, true);
+        let factor_inv = calculate_windom_factor(1.0, 0.0, 0.0, 1, true);
         assert!(
             factor_inv >= 0.0,
             "Inverted V Windom factor should be non-negative"

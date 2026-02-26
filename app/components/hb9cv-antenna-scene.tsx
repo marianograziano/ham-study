@@ -1,62 +1,113 @@
 import { Camera } from "@phosphor-icons/react";
 import { ArcballControls } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
-import { useId, useMemo, useRef, useState } from "react";
+import { useId, useMemo, useRef, useState, useEffect } from "react";
 import { Trans, useTranslation } from "react-i18next";
-import { CatmullRomCurve3, SphereGeometry, Vector3 } from "three";
+import {
+  BufferGeometry,
+  CatmullRomCurve3,
+  SphereGeometry,
+  Vector3,
+} from "three";
 import { Button } from "~/components/ui/button";
 import { Label } from "~/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
 import { Switch } from "~/components/ui/switch";
 import { ElectricFieldWasm } from "./electric-field-wasm";
+import {
+  initAntennaWasm,
+  calculateAntennaGainBatch,
+} from "~/utils/antenna-physics-wasm";
 
 function RadiationPattern() {
-  const geometry = useMemo(() => {
-    const geo = new SphereGeometry(1, 60, 40);
-    const posAttribute = geo.attributes.position;
-    const vertex = new Vector3();
-    const scale = 3; // Visual scale
+  const [geometry, setGeometry] = useState<BufferGeometry | null>(null);
 
-    // HB9CV Cardiod Pattern Parameters
-    const kd = Math.PI / 4; // 45 degrees spacing (lambda/8)
-    const delta = (5 * Math.PI) / 4; // 225 degrees phase shift
+  useEffect(() => {
+    let isMounted = true;
 
-    for (let i = 0; i < posAttribute.count; i++) {
-      vertex.fromBufferAttribute(posAttribute, i);
-      vertex.normalize();
+    const generateGeometry = async () => {
+      await initAntennaWasm();
+      if (!isMounted) return;
 
-      // Angle from X-axis (Main Beam Direction)
-      // cosTheta = x coordinate (if normalized) ??
-      // Actually, for full 3D pattern, angle is between position vector and axis (+X).
-      // cosTheta = vertex.x / 1.
-      const cosTheta = vertex.x;
+      const geo = new SphereGeometry(1, 60, 40);
+      const posAttribute = geo.attributes.position;
+      const vertex = new Vector3();
+      const scale = 3; // Visual scale
 
-      // Array Factor Magnitude
-      // AF = | 1 + exp(j(kd * cosTheta + delta)) |
-      // AF = sqrt( 2 * (1 + cos(kd * cosTheta + delta)) )
+      const thetas: number[] = [];
+      const phis: number[] = [];
 
-      const psi = kd * cosTheta + delta;
-      let gain = Math.sqrt(2 * (1 + Math.cos(psi)));
+      for (let i = 0; i < posAttribute.count; i++) {
+        vertex.fromBufferAttribute(posAttribute, i);
+        vertex.normalize();
+        phis.push(Math.atan2(vertex.z, vertex.x));
+        thetas.push(Math.asin(vertex.y));
+      }
 
-      // Normalize max gain (sqrt(2) approx 1.414) to 1 for visual consistency
-      gain = gain / Math.SQRT2;
+      let wasmGains: number[] = [];
+      try {
+        wasmGains = await calculateAntennaGainBatch(
+          "hb9cv",
+          thetas,
+          phis,
+          0.5,
+          1,
+          false,
+          "60",
+          undefined,
+        );
+      } catch (error) {
+        console.warn("WASM batch calculation failed, using fallback", error);
+      }
 
-      // Add a small floor so the mesh doesn't disappear completely
-      gain = Math.max(gain, 0.05);
+      const kd = Math.PI / 4; // 45 degrees spacing (lambda/8)
+      const delta = (5 * Math.PI) / 4; // 225 degrees phase shift
 
-      // Apply gain to vertex distance
-      vertex.multiplyScalar(gain * scale);
-      posAttribute.setXYZ(i, vertex.x, vertex.y, vertex.z);
-    }
-    geo.computeVertexNormals();
-    return geo;
+      for (let i = 0; i < posAttribute.count; i++) {
+        vertex.fromBufferAttribute(posAttribute, i);
+        vertex.normalize();
+
+        let gain = 0;
+        if (wasmGains.length > 0) {
+          gain = wasmGains[i];
+          // Scale max gain approx similarly to visual consistency
+          gain = gain * Math.SQRT2;
+        } else {
+          // Fallback
+          const cosTheta = vertex.x;
+          const psi = kd * cosTheta + delta;
+          gain = Math.sqrt(2 * (1 + Math.cos(psi)));
+        }
+
+        gain = gain / Math.SQRT2;
+        gain = Math.max(gain, 0.05);
+
+        vertex.multiplyScalar(gain * scale);
+        posAttribute.setXYZ(i, vertex.x, vertex.y, vertex.z);
+      }
+      geo.computeVertexNormals();
+
+      if (isMounted) {
+        setGeometry(geo);
+      }
+    };
+
+    generateGeometry();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   useMemo(() => {
     return () => {
-      geometry.dispose();
+      if (geometry) {
+        geometry.dispose();
+      }
     };
   }, [geometry]);
+
+  if (!geometry) return null;
 
   return (
     <group>

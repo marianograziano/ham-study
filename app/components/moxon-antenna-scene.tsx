@@ -1,7 +1,7 @@
 import { Camera } from "@phosphor-icons/react";
 import { ArcballControls } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
-import { useId, useMemo, useRef, useState } from "react";
+import { useId, useMemo, useRef, useState, useEffect } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import {
   BufferGeometry,
@@ -15,6 +15,10 @@ import { Label } from "~/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
 import { Switch } from "~/components/ui/switch";
 import { ElectricFieldWasm } from "./electric-field-wasm";
+import {
+  initAntennaWasm,
+  calculateAntennaGainBatch,
+} from "~/utils/antenna-physics-wasm";
 
 const width = 2;
 const depth = 0.7;
@@ -135,36 +139,87 @@ function MoxonAntenna() {
 }
 
 function RadiationPattern() {
-  const geometry = useMemo(() => {
-    const geo = new SphereGeometry(1, 60, 40);
-    const posAttribute = geo.attributes.position;
-    const vertex = new Vector3();
-    const scale = 8;
+  const [geometry, setGeometry] = useState<BufferGeometry | null>(null);
 
-    for (let i = 0; i < posAttribute.count; i++) {
-      vertex.fromBufferAttribute(posAttribute, i);
-      vertex.normalize();
+  useEffect(() => {
+    let isMounted = true;
 
-      // Moxon pattern: high front-to-back ratio
-      // Strong forward lobe in +Z direction (towards driven element), very weak back lobe
-      let gain = (1 + vertex.z) * 0.6; // Ranges from 0 to 1.2
-      if (gain < 0.2) {
-        gain = 0.05; // Minimal back lobe
+    const generateGeometry = async () => {
+      await initAntennaWasm();
+      if (!isMounted) return;
+
+      const geo = new SphereGeometry(1, 60, 40);
+      const posAttribute = geo.attributes.position;
+      const vertex = new Vector3();
+      const scale = 8;
+
+      const thetas: number[] = [];
+      const phis: number[] = [];
+
+      for (let i = 0; i < posAttribute.count; i++) {
+        vertex.fromBufferAttribute(posAttribute, i);
+        vertex.normalize();
+        phis.push(Math.atan2(vertex.z, vertex.x));
+        thetas.push(Math.asin(vertex.y));
       }
 
-      vertex.multiplyScalar(gain * scale);
-      posAttribute.setXYZ(i, vertex.x, vertex.y, vertex.z);
-    }
-    geo.computeVertexNormals();
-    geo.computeVertexNormals();
-    return geo;
+      let wasmGains: number[] = [];
+      try {
+        wasmGains = await calculateAntennaGainBatch(
+          "moxon",
+          thetas,
+          phis,
+          0.5,
+          1,
+          false,
+          "60",
+          undefined,
+        );
+      } catch (error) {
+        console.warn("WASM batch calculation failed, using fallback", error);
+      }
+
+      for (let i = 0; i < posAttribute.count; i++) {
+        vertex.fromBufferAttribute(posAttribute, i);
+        vertex.normalize();
+
+        let gain = 0;
+        if (wasmGains.length > 0) {
+          gain = wasmGains[i];
+        } else {
+          // Fallback
+          gain = (1 + vertex.z) * 0.6;
+          if (gain < 0.2) {
+            gain = 0.05;
+          }
+        }
+
+        vertex.multiplyScalar(gain * scale);
+        posAttribute.setXYZ(i, vertex.x, vertex.y, vertex.z);
+      }
+      geo.computeVertexNormals();
+
+      if (isMounted) {
+        setGeometry(geo);
+      }
+    };
+
+    generateGeometry();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   useMemo(() => {
     return () => {
-      geometry.dispose();
+      if (geometry) {
+        geometry.dispose();
+      }
     };
   }, [geometry]);
+
+  if (!geometry) return null;
 
   return (
     <group position={[0, 2, 0]}>

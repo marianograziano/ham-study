@@ -1,7 +1,7 @@
 import { Camera } from "@phosphor-icons/react";
 import { ArcballControls } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
-import { useId, useMemo, useRef, useState } from "react";
+import { useId, useMemo, useRef, useState, useEffect } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import {
   BufferGeometry,
@@ -15,6 +15,10 @@ import { Label } from "~/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
 import { Switch } from "~/components/ui/switch";
 import { ElectricFieldWasm } from "./electric-field-wasm";
+import {
+  initAntennaWasm,
+  calculateAntennaGainBatch,
+} from "~/utils/antenna-physics-wasm";
 
 interface QuadElementProps {
   position: [number, number, number];
@@ -145,41 +149,84 @@ function RadiationPattern({
 }: {
   _polarization: "horizontal" | "vertical";
 }) {
-  const geometry = useMemo(() => {
-    const geo = new SphereGeometry(1, 60, 40);
-    const posAttribute = geo.attributes.position;
-    const vertex = new Vector3();
-    const scale = 8;
+  const [geometry, setGeometry] = useState<BufferGeometry | null>(null);
 
-    for (let i = 0; i < posAttribute.count; i++) {
-      vertex.fromBufferAttribute(posAttribute, i);
-      vertex.normalize();
+  useEffect(() => {
+    let isMounted = true;
 
-      // Quad pattern: bidirectional along X-axis (boom is X)?
-      // Wait, Yagi fires along X. Quad is YZ plane. Fires along X.
-      // Gain is highest along X.
-      // But polarization affects the E-field plane.
-      // Code was using Math.abs(vertex.z) for gain? That would beam along Z.
-      // If boom is X, we want beam along X.
-      // Now elements are in YZ plane, beam should be X. Correct.
+    const generateGeometry = async () => {
+      await initAntennaWasm();
+      if (!isMounted) return;
 
-      // Directional cardioid pattern for 2-element Quad (Front-to-back ratio)
-      // Normalized cardioid: (1 + cos(theta)) / 2
-      // vertex is normalized, so vertex.x is cos(theta) where theta is angle from X-axis
-      const gain = ((1 + vertex.x) / 2) ** 2; // Beaming along +X axis
+      const geo = new SphereGeometry(1, 60, 40);
+      const posAttribute = geo.attributes.position;
+      const vertex = new Vector3();
+      const scale = 8;
 
-      vertex.multiplyScalar(gain * scale);
-      posAttribute.setXYZ(i, vertex.x, vertex.y, vertex.z);
-    }
-    geo.computeVertexNormals();
-    return geo;
-  }, []); // Pattern geometry is static for now, or could depend on polarization for minor shape changes?
+      const thetas: number[] = [];
+      const phis: number[] = [];
+
+      for (let i = 0; i < posAttribute.count; i++) {
+        vertex.fromBufferAttribute(posAttribute, i);
+        vertex.normalize();
+        phis.push(Math.atan2(vertex.z, vertex.x));
+        thetas.push(Math.asin(vertex.y));
+      }
+
+      let wasmGains: number[] = [];
+      try {
+        wasmGains = await calculateAntennaGainBatch(
+          "quad",
+          thetas,
+          phis,
+          0.5,
+          1,
+          false,
+          "60",
+          undefined,
+        );
+      } catch (error) {
+        console.warn("WASM batch calculation failed, using fallback", error);
+      }
+
+      for (let i = 0; i < posAttribute.count; i++) {
+        vertex.fromBufferAttribute(posAttribute, i);
+        vertex.normalize();
+
+        let gain = 0;
+        if (wasmGains.length > 0) {
+          gain = wasmGains[i];
+        } else {
+          // Fallback
+          gain = ((1 + vertex.x) / 2) ** 2;
+        }
+
+        vertex.multiplyScalar(gain * scale);
+        posAttribute.setXYZ(i, vertex.x, vertex.y, vertex.z);
+      }
+      geo.computeVertexNormals();
+
+      if (isMounted) {
+        setGeometry(geo);
+      }
+    };
+
+    generateGeometry();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   useMemo(() => {
     return () => {
-      geometry.dispose();
+      if (geometry) {
+        geometry.dispose();
+      }
     };
   }, [geometry]);
+
+  if (!geometry) return null;
 
   return (
     <group position={[0, 2, 0]}>

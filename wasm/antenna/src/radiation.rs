@@ -1,4 +1,3 @@
-use crate::calculate_windom_factor;
 use crate::AntennaType;
 use wasm_bindgen::prelude::*;
 
@@ -35,119 +34,107 @@ pub fn calculate_antenna_gain(
         _ => 1.0, // Aluminum, Copper, or undefined
     };
 
+    let cos_theta = theta.cos();
+    let x = cos_theta * phi.cos();
+    let y = theta.sin();
+    let z = cos_theta * phi.sin();
+
     let gain = match antenna_type_enum {
         AntennaType::Vertical | AntennaType::GP => {
-            // Vertical and GP antennas have omnidirectional pattern
-            // GP with radial angle 60 has some directionality
-            if antenna_type_enum == AntennaType::GP && radial_angle == "60" {
-                // Some directionality for GP 60
-                (theta.sin().abs() + 0.1).min(1.0)
+            if radial_angle == "135" {
+                let cos_theta_from_zenith = y.abs(); // vertical axis is Y
+                let sin_theta_from_zenith = (1.0 - y * y).sqrt().max(0.001);
+
+                let num = (std::f64::consts::PI / 2.0 * cos_theta_from_zenith).cos();
+                (num / sin_theta_from_zenith).abs()
+            } else if radial_angle == "60" {
+                let elevation = y.asin();
+                let target_elevation = std::f64::consts::PI / 4.0; // 45 deg up
+                let beam_shape = (elevation - target_elevation).cos();
+                let mut gain = beam_shape * beam_shape * beam_shape;
+                if y > 0.98 {
+                    gain = 0.0;
+                }
+                gain * 1.2
             } else {
                 1.0
             }
         }
         AntennaType::DP => {
-            // Dipole pattern: sin(θ) for vertical dipole
-            // Assuming vertical orientation (theta is elevation from horizontal)
-            theta.sin().abs()
+            // Dipole axis is Z
+            let cos_gamma = z;
+            let sin_gamma = (1.0 - z * z).sqrt().max(0.001);
+            let kl_2 = std::f64::consts::PI * antenna_length;
+            let num = (kl_2 * cos_gamma).cos() - kl_2.cos();
+            let mut gain = (num / sin_gamma).abs();
+            if is_inverted_v {
+                gain *= 0.9;
+            }
+            gain
         }
         AntennaType::Yagi => {
-            // Improved Yagi pattern with side lobes
-            // Main lobe: cos^2.5(phi)
-            // Side lobes: 0.15 * |cos(3*phi)| for back/side
-
-            let cos_phi = phi.cos();
-
-            // Elevation factor (theta is elevation from horizontal, 0 = horizon, pi/2 = zenith)
-            // We want max gain at theta = 0, so we use cos(theta)
-            let cos_theta = theta.cos();
-            // Protect against negative cos_theta (should be positive for -pi/2 to pi/2, but safety first)
-            let elevation_factor = cos_theta.abs();
-
-            // Forward main lobe
-            // Power factor depends on antenna length (gain)
-            // Longer antenna -> sharper beam -> higher exponent
-            // Base exponent 2.0, plus length contribution
             let exponent = 2.0 + 4.0 * antenna_length.max(0.0);
+            let main_lobe = if x > 0.0 { x.powf(exponent) } else { 0.0 };
 
-            // Combine azimuth and elevation for 3D pencil beam
-            // We apply the same exponent to elevation to get a circular beam cross-section
-            let main_lobe = if cos_phi > 0.0 {
-                cos_phi.powf(exponent) * elevation_factor.powf(exponent)
-            } else {
-                0.0
-            };
+            // Side lobes approximation based on azimuth angle phi and zenith attenuation
+            let side_lobes = (3.0 * phi).cos().abs() * 0.15 * cos_theta.abs();
 
-            // Side/Back lobes approximation
-            // Also attenuate side lobes with elevation, but maybe less aggressively or same?
-            // Realistically side lobes are also 3D structures.
-            // Let's attenuate them normally with elevation to avoid vertical fans
-            let side_lobes = (3.0 * phi).cos().abs() * 0.15 * elevation_factor;
+            let fbr_floor = if x < 0.0 { 0.05 } else { 0.0 };
 
-            // Front-to-back ratio floor (non-zero back radiation)
-            let fbr_floor = if cos_phi < 0.0 { 0.05 } else { 0.0 };
-
-            // Composite pattern
             let raw = main_lobe + side_lobes * (1.0 - main_lobe) + fbr_floor;
-
-            // Normalize to peak at ~1.0 + FBR
             raw.min(1.0)
         }
         AntennaType::Quad => {
-            // Quad antenna similar to Yagi
-            let front = phi.cos().max(0.0);
-            front.powi(2) + 0.1
+            // Quad pointing +X
+            let front = (1.0 + x) / 2.0;
+            front.powi(2)
         }
         AntennaType::Moxon => {
-            // Moxon antenna forward lobe: sin^2(phi)
-            let front = phi.sin().max(0.0);
-            front.powi(2) + 0.1
+            // Moxon pointing +Z
+            let mut gain = 0.1;
+            if z > 0.0 {
+                gain += z * z;
+            }
+            gain
         }
         AntennaType::HB9CV => {
-            // HB9CV pattern based on array factor
+            // HB9CV pointing +X
             let kd = std::f64::consts::PI / 4.0;
             let delta = 5.0 * std::f64::consts::PI / 4.0;
-            let psi = kd * phi.cos() + delta;
+            let psi = kd * x + delta;
             let mag = (2.0 + 2.0 * psi.cos()).sqrt();
             (mag / std::f64::consts::SQRT_2).powi(2)
         }
         AntennaType::MagneticLoop => {
-            // Magnetic loop pattern: cos^2(phi)
-            phi.cos().abs() + 0.05
+            // Magnetic loop in XY plane, nulls at Z
+            (1.0 - z * z).max(0.1)
         }
-        AntennaType::LongWire => {
-            // Long wire antenna pattern using existing WASM calculate_field
-            // Use standing wave type for long wire
-            crate::calculate_field(phi, antenna_length, "standing")
-        }
+        AntennaType::LongWire => crate::calculate_field(phi, antenna_length, "standing"),
         AntennaType::Windom => {
-            // Windom antenna using numerical integration
             let n = if active_harmonic > 0 {
                 active_harmonic
             } else {
                 1
             };
-            calculate_windom_factor(phi, n, is_inverted_v)
+            crate::calculate_windom_factor(x, y, z, n, is_inverted_v)
         }
         AntennaType::EndFed => {
-            // End-fed antenna pattern
             let n = if active_harmonic > 0 {
                 active_harmonic
             } else {
                 1
             };
-            let cos_theta = phi.cos();
-            let sin_theta = phi.sin().abs();
-            let safe_sin_theta = sin_theta.max(0.001);
+            let cos_theta_axis = x;
+            let sin_theta_axis = (1.0 - x * x).sqrt().max(0.001);
 
             let val = if n % 2 == 1 {
-                let num = ((n as f64 * std::f64::consts::PI) / 2.0 * cos_theta).cos();
-                (num / safe_sin_theta).abs()
+                let num = ((n as f64 * std::f64::consts::PI) / 2.0 * cos_theta_axis).cos();
+                (num / sin_theta_axis).abs()
             } else {
-                let num = ((n as f64 * std::f64::consts::PI) / 2.0 * cos_theta).sin();
-                (num / safe_sin_theta).abs()
+                let num = ((n as f64 * std::f64::consts::PI) / 2.0 * cos_theta_axis).sin();
+                (num / sin_theta_axis).abs()
             };
-            val.powf(1.5) * 0.5 + 0.05
+            val
         }
     };
 

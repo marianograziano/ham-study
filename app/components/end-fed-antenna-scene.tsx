@@ -1,7 +1,7 @@
 import { Camera } from "@phosphor-icons/react";
 import { ArcballControls } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
-import { useId, useMemo, useRef, useState } from "react";
+import { useId, useMemo, useRef, useState, useEffect } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import {
   BoxGeometry,
@@ -18,6 +18,10 @@ import { Label } from "~/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
 import { Switch } from "~/components/ui/switch";
 import { ElectricFieldWasm } from "./electric-field-wasm";
+import {
+  initAntennaWasm,
+  calculateAntennaGainBatch,
+} from "~/utils/antenna-physics-wasm";
 
 const wireLength = 8;
 const wireHeight = 2;
@@ -105,66 +109,97 @@ function EndFedAntenna() {
 }
 
 function RadiationPattern({ harmonic = 1 }: { harmonic?: number }) {
-  const geometry = useMemo(() => {
-    const geo = new SphereGeometry(1, 90, 60);
-    const posAttribute = geo.attributes.position;
-    const vertex = new Vector3();
-    const scale = 5;
+  const [geometry, setGeometry] = useState<BufferGeometry | null>(null);
 
-    for (let i = 0; i < posAttribute.count; i++) {
-      vertex.fromBufferAttribute(posAttribute, i);
-      const originalDir = vertex.clone().normalize();
+  useEffect(() => {
+    let isMounted = true;
 
-      // Theoretical Formula Calculation
-      // We align the pattern along the X axis (Dipole axis)
-      // theta is angle from X axis.
-      // x component corresponds to cos(theta)
-      // y,z components correspond to sin(theta) part
-      // cos(theta) = x / r (r=1 here) -> x
-      // sin(theta) = sqrt(y^2 + z^2)
+    const generateGeometry = async () => {
+      await initAntennaWasm();
+      if (!isMounted) return;
 
-      const cosTheta = originalDir.x;
-      const sinTheta = Math.sqrt(
-        originalDir.y * originalDir.y + originalDir.z * originalDir.z,
-      );
+      const geo = new SphereGeometry(1, 90, 60);
+      const posAttribute = geo.attributes.position;
+      const vertex = new Vector3();
+      const scale = 5;
 
-      // Avoid division by zero
-      const safeSinTheta = Math.max(0.001, sinTheta);
+      const thetas: number[] = [];
+      const phis: number[] = [];
 
-      let gain = 0;
-      const n = harmonic;
-
-      if (n % 2 === 1) {
-        // Odd harmonic (1, 3, 5...)
-        // F(theta) = cos(n * pi/2 * cosTheta) / sinTheta
-        const num = Math.cos(((n * Math.PI) / 2) * cosTheta);
-        gain = Math.abs(num / safeSinTheta);
-      } else {
-        // Even harmonic (2, 4...)
-        // F(theta) = sin(n * pi/2 * cosTheta) / sinTheta
-        const num = Math.sin(((n * Math.PI) / 2) * cosTheta);
-        gain = Math.abs(num / safeSinTheta);
+      for (let i = 0; i < posAttribute.count; i++) {
+        vertex.fromBufferAttribute(posAttribute, i);
+        vertex.normalize();
+        phis.push(Math.atan2(vertex.z, vertex.x));
+        thetas.push(Math.asin(vertex.y));
       }
 
-      // Normalize gain somewhat so it fits
-      // For n=1, max is 1. For higher n, max can be different ??
-      // Actually standard formula usually normalized to 1, but let's check.
-      // n=2, max at 45deg -> cos(45)=0.707. n*pi/2*0.707 = pi*0.707 = 2.22 rad. sin(2.22)=0.8. sin(45)=0.707. gain ~ 1.1.
-      // It's reasonably normalized.
+      let wasmGains: number[] = [];
+      try {
+        wasmGains = await calculateAntennaGainBatch(
+          "end-fed",
+          thetas,
+          phis,
+          0.5 * harmonic,
+          harmonic,
+          false,
+          "60",
+          undefined,
+        );
+      } catch (error) {
+        console.warn("WASM batch calculation failed, using fallback", error);
+      }
 
-      vertex.multiplyScalar(gain * scale);
-      posAttribute.setXYZ(i, vertex.x, vertex.y, vertex.z);
-    }
-    geo.computeVertexNormals();
-    geo.computeVertexNormals();
-    return geo;
+      for (let i = 0; i < posAttribute.count; i++) {
+        vertex.fromBufferAttribute(posAttribute, i);
+        const originalDir = vertex.clone().normalize();
+
+        let gain = 0;
+        if (wasmGains.length > 0) {
+          gain = wasmGains[i];
+        } else {
+          // Fallback
+          const cosTheta = originalDir.x;
+          const sinTheta = Math.sqrt(
+            originalDir.y * originalDir.y + originalDir.z * originalDir.z,
+          );
+          const safeSinTheta = Math.max(0.001, sinTheta);
+          const n = harmonic;
+
+          if (n % 2 === 1) {
+            const num = Math.cos(((n * Math.PI) / 2) * cosTheta);
+            gain = Math.abs(num / safeSinTheta);
+          } else {
+            const num = Math.sin(((n * Math.PI) / 2) * cosTheta);
+            gain = Math.abs(num / safeSinTheta);
+          }
+        }
+
+        vertex.multiplyScalar(gain * scale);
+        posAttribute.setXYZ(i, vertex.x, vertex.y, vertex.z);
+      }
+      geo.computeVertexNormals();
+
+      if (isMounted) {
+        setGeometry(geo);
+      }
+    };
+
+    generateGeometry();
+
+    return () => {
+      isMounted = false;
+    };
   }, [harmonic]);
 
   useMemo(() => {
     return () => {
-      geometry.dispose();
+      if (geometry) {
+        geometry.dispose();
+      }
     };
   }, [geometry]);
+
+  if (!geometry) return null;
 
   return (
     <mesh geometry={geometry}>

@@ -9,7 +9,7 @@ import { Label } from "~/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
 import { Switch } from "~/components/ui/switch";
 import {
-  calculateAntennaGain,
+  calculateAntennaGainBatch,
   initAntennaWasm,
 } from "~/utils/antenna-physics-wasm";
 import { ElectricFieldWasm } from "./electric-field-wasm";
@@ -72,40 +72,40 @@ function RadiationPattern({ material }: { material?: string }) {
       const vertex = new Vector3();
       const scale = 10;
 
+      const thetas: number[] = [];
+      const phis: number[] = [];
+
+      for (let i = 0; i < posAttribute.count; i++) {
+        vertex.fromBufferAttribute(posAttribute, i);
+        vertex.normalize();
+        phis.push(Math.atan2(vertex.z, vertex.x));
+        thetas.push(Math.asin(vertex.y));
+      }
+
+      let wasmGains: number[] = [];
+      try {
+        wasmGains = await calculateAntennaGainBatch(
+          "yagi",
+          thetas,
+          phis,
+          0.5,
+          1,
+          false,
+          "60",
+          material,
+        );
+      } catch (error) {
+        console.warn("WASM batch calculation failed, using fallback", error);
+      }
+
       for (let i = 0; i < posAttribute.count; i++) {
         vertex.fromBufferAttribute(posAttribute, i);
         vertex.normalize();
 
-        // Convert vertex direction to spherical coordinates
-        // phi: azimuth angle (0 = forward direction +X)
-        // theta: elevation angle (0 = horizontal plane, π/2 = vertical)
-        const phi = Math.atan2(vertex.z, vertex.x); // azimuth around Y axis
-        // Calculate elevation from horizontal plane (XZ)
-        // sin(theta) = y / radius. Radius is 1 (normalized vertex).
-        const theta = Math.asin(vertex.y);
-
-        // Calculate gain using WASM
         let gain = 0.1; // Base/noise floor
-        try {
-          const wasmGain = await calculateAntennaGain(
-            "yagi",
-            theta,
-            phi,
-            0.5,
-            1,
-            false,
-            "60",
-            material,
-          );
-          // Scale visualization based on gain
-          // Max gain ~12dBi -> ~15 linear.
-          // We want visual scale. WASM returns normalized 0-1 (approx).
-          // Actually WASM returns linear gain?
-          // calculate_antenna_gain returns normalized pattern (max ~1.0 for main lobe).
-          // We scale it for visual punch.
-          gain += wasmGain * 1.5;
-        } catch (error) {
-          console.warn("WASM calculation failed, using fallback", error);
+        if (wasmGains.length > 0) {
+          gain += wasmGains[i] * 1.5;
+        } else {
           // Fallback to simplified model
           const cosAngle = vertex.x;
           if (cosAngle > 0) {

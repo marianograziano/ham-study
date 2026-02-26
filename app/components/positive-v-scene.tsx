@@ -1,14 +1,18 @@
 import { Camera } from "@phosphor-icons/react";
 import { ArcballControls } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
-import { useId, useMemo, useRef, useState } from "react";
+import { useId, useMemo, useRef, useState, useEffect } from "react";
 import { Trans, useTranslation } from "react-i18next";
-import { SphereGeometry, Vector3 } from "three";
+import { BufferGeometry, SphereGeometry, Vector3 } from "three";
 import { Button } from "~/components/ui/button";
 import { Label } from "~/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
 import { Switch } from "~/components/ui/switch";
 import { ElectricFieldWasm } from "./electric-field-wasm";
+import {
+  initAntennaWasm,
+  calculateAntennaGainBatch,
+} from "~/utils/antenna-physics-wasm";
 
 // Height definition
 const height = 3;
@@ -55,34 +59,85 @@ function PositiveVAntenna() {
 }
 
 function RadiationPattern() {
-  // Consuming Inverted V Pattern
-  const geometry = useMemo(() => {
-    const geo = new SphereGeometry(1, 40, 30);
-    const posAttribute = geo.attributes.position;
-    const vertex = new Vector3();
-    const scale = 5;
+  const [geometry, setGeometry] = useState<BufferGeometry | null>(null);
 
-    for (let i = 0; i < posAttribute.count; i++) {
-      vertex.fromBufferAttribute(posAttribute, i);
-      vertex.normalize();
+  useEffect(() => {
+    let isMounted = true;
 
-      // Inverted V Pattern logic
-      const angleFromX = Math.acos(vertex.x);
-      const gain = 0.7 * Math.sin(angleFromX) + 0.3;
+    const generateGeometry = async () => {
+      await initAntennaWasm();
+      if (!isMounted) return;
 
-      vertex.multiplyScalar(gain * scale);
-      posAttribute.setXYZ(i, vertex.x, vertex.y, vertex.z);
-    }
-    geo.computeVertexNormals();
-    geo.computeVertexNormals();
-    return geo;
+      const geo = new SphereGeometry(1, 40, 30);
+      const posAttribute = geo.attributes.position;
+      const vertex = new Vector3();
+      const scale = 5;
+
+      const thetas: number[] = [];
+      const phis: number[] = [];
+
+      for (let i = 0; i < posAttribute.count; i++) {
+        vertex.fromBufferAttribute(posAttribute, i);
+        vertex.normalize();
+        phis.push(Math.atan2(vertex.z, vertex.x));
+        thetas.push(Math.asin(vertex.y));
+      }
+
+      let wasmGains: number[] = [];
+      try {
+        wasmGains = await calculateAntennaGainBatch(
+          "dp",
+          thetas,
+          phis,
+          0.5,
+          1,
+          true,
+          "60",
+          undefined,
+        );
+      } catch (error) {
+        console.warn("WASM batch calculation failed, using fallback", error);
+      }
+
+      for (let i = 0; i < posAttribute.count; i++) {
+        vertex.fromBufferAttribute(posAttribute, i);
+        vertex.normalize();
+
+        let gain = 0;
+        if (wasmGains.length > 0) {
+          gain = wasmGains[i];
+        } else {
+          // Fallback
+          const angleFromX = Math.acos(vertex.x);
+          gain = 0.7 * Math.sin(angleFromX) + 0.3;
+        }
+
+        vertex.multiplyScalar(gain * scale);
+        posAttribute.setXYZ(i, vertex.x, vertex.y, vertex.z);
+      }
+      geo.computeVertexNormals();
+
+      if (isMounted) {
+        setGeometry(geo);
+      }
+    };
+
+    generateGeometry();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   useMemo(() => {
     return () => {
-      geometry.dispose();
+      if (geometry) {
+        geometry.dispose();
+      }
     };
   }, [geometry]);
+
+  if (!geometry) return null;
 
   return (
     <group position={[0, height, 0]}>

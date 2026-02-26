@@ -1,14 +1,24 @@
 import { Camera } from "@phosphor-icons/react";
 import { ArcballControls } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
-import { useId, useMemo, useRef, useState } from "react";
+import { useId, useMemo, useRef, useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { CatmullRomCurve3, DoubleSide, SphereGeometry, Vector3 } from "three";
+import {
+  BufferGeometry,
+  CatmullRomCurve3,
+  DoubleSide,
+  SphereGeometry,
+  Vector3,
+} from "three";
 import { Button } from "~/components/ui/button";
 import { Label } from "~/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
 import { Switch } from "~/components/ui/switch";
 import { ElectricFieldWasm } from "./electric-field-wasm";
+import {
+  initAntennaWasm,
+  calculateAntennaGainBatch,
+} from "~/utils/antenna-physics-wasm";
 
 // Helper to get wire geometry points and currents
 function getWireSegments(
@@ -201,120 +211,145 @@ function RadiationPattern({
   isInvertedV: boolean;
   visualScale: number;
 }) {
-  const geometry = useMemo(() => {
-    const geo = new SphereGeometry(1, 72, 36);
-    const posAttribute = geo.attributes.position;
-    const vertex = new Vector3();
-    const scale = 5;
+  const [geometry, setGeometry] = useState<BufferGeometry | null>(null);
 
-    const segments = getWireSegments(harmonic, visualScale, isInvertedV);
+  useEffect(() => {
+    let isMounted = true;
 
-    // k is wavenumber.
-    // L_physical = visualScale.
-    // But L represents 'harmonic' half-wavelengths.
-    // L = n * (lambda / 2)
-    // => lambda = 2L / n
-    // k = 2pi / lambda = 2pi / (2L/n) = n * pi / L.
-    const k = (harmonic * Math.PI) / visualScale;
+    const generateGeometry = async () => {
+      await initAntennaWasm();
+      if (!isMounted) return;
 
-    // We calculate Far Field pattern by integrating current contribution
-    let maxGain = 0;
-    const gains = new Float32Array(posAttribute.count);
+      const geo = new SphereGeometry(1, 72, 36);
+      const posAttribute = geo.attributes.position;
+      const vertex = new Vector3();
+      const scale = 5;
 
-    for (let i = 0; i < posAttribute.count; i++) {
-      vertex.fromBufferAttribute(posAttribute, i);
-      const dir = vertex.normalize(); // Direction vector r_hat
+      const thetas: number[] = [];
+      const phis: number[] = [];
 
-      // Calculate Vector Potential A ~ Sum( I * exp(j k r.r') )
-      // Ignore constants, we just want relative pattern shape
-
-      // Sum Re/Im parts of the vector integral
-      let rx = 0,
-        ry = 0,
-        rz = 0; // Real parts of vector
-      let ix = 0,
-        iy = 0,
-        iz = 0; // Im parts of vector
-
-      for (const seg of segments) {
-        // Phase shift k * (r . r')
-        // r . r' = dot product of direction and source position
-        const phase = k * dir.dot(seg.pos);
-        const cp = Math.cos(phase);
-        const sp = Math.sin(phase);
-
-        const I = seg.current; // Magnitude and sign of current
-        const tx = seg.tangent.x;
-        const ty = seg.tangent.y;
-        const tz = seg.tangent.z;
-
-        // Vector current phasor: J = I * tangent * e^(j phase)
-        // J_re = I * tangent * cos(phase)
-        // J_im = I * tangent * sin(phase)
-
-        rx += I * tx * cp;
-        ry += I * ty * cp;
-        rz += I * tz * cp;
-
-        ix += I * tx * sp;
-        iy += I * ty * sp;
-        iz += I * tz * sp;
+      for (let i = 0; i < posAttribute.count; i++) {
+        vertex.fromBufferAttribute(posAttribute, i);
+        vertex.normalize();
+        phis.push(Math.atan2(vertex.z, vertex.x));
+        thetas.push(Math.asin(vertex.y));
       }
 
-      // The Electric Field E_theta/phi is proportional to the component of A
-      // perpendicular to r.
-      // E ~ (A - (A.r)r)
-      // Let A_vec = (rx + j ix, ry + j iy, rz + j iz)
+      let wasmGains: number[] = [];
+      try {
+        wasmGains = await calculateAntennaGainBatch(
+          "windom",
+          thetas,
+          phis,
+          0.5 * harmonic,
+          harmonic,
+          isInvertedV,
+          "60",
+          undefined,
+        );
+      } catch (error) {
+        console.warn("WASM batch calculation failed, using fallback", error);
+      }
 
-      // A_dot_r_re = rx*dx + ry*dy + rz*dz
-      const AdotR_re = rx * dir.x + ry * dir.y + rz * dir.z;
-      const AdotR_im = ix * dir.x + iy * dir.y + iz * dir.z;
+      let maxGain = 0;
+      const fallbackGains: number[] = new Array(posAttribute.count).fill(0);
 
-      // A_perp_re = A_re - AdotR_re * dir
-      const Aperp_x_re = rx - AdotR_re * dir.x;
-      const Aperp_y_re = ry - AdotR_re * dir.y;
-      const Aperp_z_re = rz - AdotR_re * dir.z;
+      if (wasmGains.length === 0) {
+        const segments = getWireSegments(harmonic, visualScale, isInvertedV);
+        const k = (harmonic * Math.PI) / visualScale;
 
-      const Aperp_x_im = ix - AdotR_im * dir.x;
-      const Aperp_y_im = iy - AdotR_im * dir.y;
-      const Aperp_z_im = iz - AdotR_im * dir.z;
+        for (let i = 0; i < posAttribute.count; i++) {
+          vertex.fromBufferAttribute(posAttribute, i);
+          const dir = vertex.normalize();
 
-      // Magnitude squared
-      const magSq =
-        Aperp_x_re ** 2 +
-        Aperp_y_re ** 2 +
-        Aperp_z_re ** 2 +
-        (Aperp_x_im ** 2 + Aperp_y_im ** 2 + Aperp_z_im ** 2);
+          let rx = 0,
+            ry = 0,
+            rz = 0;
+          let ix = 0,
+            iy = 0,
+            iz = 0;
 
-      const gain = Math.sqrt(magSq);
-      gains[i] = gain;
-      if (gain > maxGain) maxGain = gain;
-    }
+          for (const seg of segments) {
+            const phase = k * dir.dot(seg.pos);
+            const cp = Math.cos(phase);
+            const sp = Math.sin(phase);
 
-    // Apply gains to vertex positions
-    for (let i = 0; i < posAttribute.count; i++) {
-      vertex.fromBufferAttribute(posAttribute, i);
-      vertex.normalize();
+            const I = seg.current;
+            const tx = seg.tangent.x;
+            const ty = seg.tangent.y;
+            const tz = seg.tangent.z;
 
-      let normalized = 0;
-      if (maxGain > 0.00001) normalized = gains[i] / maxGain;
+            rx += I * tx * cp;
+            ry += I * ty * cp;
+            rz += I * tz * cp;
 
-      // Shaping for visuals
-      const rad = normalized ** 0.8 * scale;
-      vertex.multiplyScalar(rad);
+            ix += I * tx * sp;
+            iy += I * ty * sp;
+            iz += I * tz * sp;
+          }
 
-      posAttribute.setXYZ(i, vertex.x, vertex.y, vertex.z);
-    }
+          const AdotR_re = rx * dir.x + ry * dir.y + rz * dir.z;
+          const AdotR_im = ix * dir.x + iy * dir.y + iz * dir.z;
 
-    geo.computeVertexNormals();
-    return geo;
+          const Aperp_x_re = rx - AdotR_re * dir.x;
+          const Aperp_y_re = ry - AdotR_re * dir.y;
+          const Aperp_z_re = rz - AdotR_re * dir.z;
+
+          const Aperp_x_im = ix - AdotR_im * dir.x;
+          const Aperp_y_im = iy - AdotR_im * dir.y;
+          const Aperp_z_im = iz - AdotR_im * dir.z;
+
+          const magSq =
+            Aperp_x_re ** 2 +
+            Aperp_y_re ** 2 +
+            Aperp_z_re ** 2 +
+            (Aperp_x_im ** 2 + Aperp_y_im ** 2 + Aperp_z_im ** 2);
+
+          const gain = Math.sqrt(magSq);
+          fallbackGains[i] = gain;
+          if (gain > maxGain) maxGain = gain;
+        }
+      }
+
+      for (let i = 0; i < posAttribute.count; i++) {
+        vertex.fromBufferAttribute(posAttribute, i);
+        vertex.normalize();
+
+        let normalized = 0;
+        if (wasmGains.length > 0) {
+          normalized = Math.min(1, wasmGains[i] / 2.0);
+        } else {
+          if (maxGain > 0.00001) normalized = fallbackGains[i] / maxGain;
+        }
+
+        const rad = normalized ** 0.8 * scale;
+        vertex.multiplyScalar(rad);
+        posAttribute.setXYZ(i, vertex.x, vertex.y, vertex.z);
+      }
+
+      geo.computeVertexNormals();
+
+      if (isMounted) {
+        setGeometry(geo);
+      }
+    };
+
+    generateGeometry();
+
+    return () => {
+      isMounted = false;
+    };
   }, [harmonic, isInvertedV, visualScale]);
 
   useMemo(() => {
     return () => {
-      geometry.dispose();
+      if (geometry) {
+        geometry.dispose();
+      }
     };
   }, [geometry]);
+
+  if (!geometry) return null;
 
   return (
     <mesh geometry={geometry}>

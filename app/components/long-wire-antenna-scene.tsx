@@ -20,7 +20,10 @@ import { Button } from "~/components/ui/button";
 import { Label } from "~/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
 import { Switch } from "~/components/ui/switch";
-import { calculateField, initAntennaWasm } from "~/utils/antenna-physics-wasm";
+import {
+  calculateFieldBatch,
+  initAntennaWasm,
+} from "~/utils/antenna-physics-wasm";
 import { ElectricFieldWasm } from "./electric-field-wasm";
 
 const WIRE_START = new Vector3(-5, -1, 0);
@@ -255,16 +258,26 @@ function RadiationPattern({ length }: { length: number }) {
       const vertex = new Vector3();
       const scale = 5; // Scale up to be visible
 
+      const thetas: number[] = [];
+
+      for (let i = 0; i < posAttribute.count; i++) {
+        vertex.fromBufferAttribute(posAttribute, i);
+        // Angle to X axis
+        thetas.push(vertex.angleTo(new Vector3(1, 0, 0)));
+      }
+
+      let wasmGains: number[] = [];
+      try {
+        wasmGains = await calculateFieldBatch(thetas, length, "standing");
+      } catch (error) {
+        console.warn("WASM batch field failed", error);
+        wasmGains = thetas.map((th) => Math.abs(Math.sin(th))); // Minimal fallback
+      }
+
       for (let i = 0; i < posAttribute.count; i++) {
         vertex.fromBufferAttribute(posAttribute, i);
 
-        // Angle to X axis (wire axis in simplified local calc)
-        // Note: calculateField expects angle from axis (0 to PI).
-        // Our sphere vertex angleTo(1,0,0) does exactly that (0 to PI).
-        const theta = vertex.angleTo(new Vector3(1, 0, 0));
-
-        // Use the physics engine (WASM)!
-        const gain = await calculateField(theta, length, "standing");
+        const gain = wasmGains[i] || 0;
 
         // Apply gain to vertex position
         // Add a small epsilon to avoid z-fighting or zero-size

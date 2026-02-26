@@ -2,15 +2,19 @@
 import { Camera } from "@phosphor-icons/react";
 import { ArcballControls } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
-import { useId, useMemo, useRef, useState } from "react";
+import { useId, useMemo, useRef, useState, useEffect } from "react";
 import { Trans, useTranslation } from "react-i18next";
-import { SphereGeometry, Vector3 } from "three";
+import { BufferGeometry, SphereGeometry, Vector3 } from "three";
 import { Button } from "~/components/ui/button";
 import { Label } from "~/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
 import { Switch } from "~/components/ui/switch";
 // import { Slider } from "~/components/ui/slider"; // Removed
 import { ElectricFieldWasm } from "./electric-field-wasm";
+import {
+  initAntennaWasm,
+  calculateAntennaGainBatch,
+} from "~/utils/antenna-physics-wasm";
 
 function MagneticLoopAntenna() {
   return (
@@ -62,51 +66,88 @@ function MagneticLoopAntenna() {
 }
 
 function RadiationPattern() {
-  const geometry = useMemo(() => {
-    const geo = new SphereGeometry(1, 60, 40);
-    const posAttribute = geo.attributes.position;
-    const vertex = new Vector3();
-    const scale = 10;
+  const [geometry, setGeometry] = useState<BufferGeometry | null>(null);
 
-    for (let i = 0; i < posAttribute.count; i++) {
-      vertex.fromBufferAttribute(posAttribute, i);
-      vertex.normalize();
+  useEffect(() => {
+    let isMounted = true;
 
-      // Magnetic Loop Pattern:
-      // Loop axis is Z-axis (since logic is XY plane vertical).
-      // Nulls along Z-axis. Max in XY plane.
-      // Gain = sin(theta) where theta is angle from Z-axis.
-      // cos(theta) = vertex.z
-      // sin(theta) = sqrt(1 - z^2)
+    const generateGeometry = async () => {
+      await initAntennaWasm();
+      if (!isMounted) return;
 
-      // However, mathematically exact small loop pattern is sin(theta).
-      // Let's implement that.
+      const geo = new SphereGeometry(1, 60, 40);
+      const posAttribute = geo.attributes.position;
+      const vertex = new Vector3();
+      const scale = 10;
 
-      const z = vertex.z;
-      const param = Math.sqrt(1 - z * z); // sin(theta), 0 at poles (z=1), 1 at equator (z=0)
+      const thetas: number[] = [];
+      const phis: number[] = [];
 
-      let gain = param;
+      for (let i = 0; i < posAttribute.count; i++) {
+        vertex.fromBufferAttribute(posAttribute, i);
+        vertex.normalize();
+        phis.push(Math.atan2(vertex.z, vertex.x));
+        thetas.push(Math.asin(vertex.y));
+      }
 
-      // Sharpen it slightly for visualization?
-      // Power pattern is sin^2(theta).
-      gain = gain ** 2;
+      let wasmGains: number[] = [];
+      try {
+        wasmGains = await calculateAntennaGainBatch(
+          "magnetic-loop",
+          thetas,
+          phis,
+          0.5,
+          1,
+          false,
+          "60",
+          undefined,
+        );
+      } catch (error) {
+        console.warn("WASM batch calculation failed, using fallback", error);
+      }
 
-      // Base gain
-      gain = Math.max(0.1, gain);
+      for (let i = 0; i < posAttribute.count; i++) {
+        vertex.fromBufferAttribute(posAttribute, i);
+        vertex.normalize();
 
-      vertex.multiplyScalar(gain * scale);
-      posAttribute.setXYZ(i, vertex.x, vertex.y, vertex.z);
-    }
-    geo.computeVertexNormals();
-    return geo;
+        let gain = 0;
+        if (wasmGains.length > 0) {
+          gain = wasmGains[i];
+        } else {
+          // Fallback
+          const z = vertex.z;
+          const param = Math.sqrt(1 - z * z);
+          gain = param ** 2;
+          gain = Math.max(0.1, gain);
+        }
+
+        vertex.multiplyScalar(gain * scale);
+        posAttribute.setXYZ(i, vertex.x, vertex.y, vertex.z);
+      }
+      geo.computeVertexNormals();
+
+      if (isMounted) {
+        setGeometry(geo);
+      }
+    };
+
+    generateGeometry();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   // Cleanup to prevent WebGL context leaks
   useMemo(() => {
     return () => {
-      geometry.dispose();
+      if (geometry) {
+        geometry.dispose();
+      }
     };
   }, [geometry]);
+
+  if (!geometry) return null;
 
   return (
     <group>

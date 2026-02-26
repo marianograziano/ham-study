@@ -3,13 +3,23 @@ import { ArcballControls } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
 import { useId, useMemo, useRef, useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { CatmullRomCurve3, DoubleSide, SphereGeometry, Vector3 } from "three";
+import {
+  BufferGeometry,
+  CatmullRomCurve3,
+  DoubleSide,
+  SphereGeometry,
+  Vector3,
+} from "three";
 import { Button } from "~/components/ui/button";
 import { Label } from "~/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
 import { Switch } from "~/components/ui/switch";
 import { ElectricFieldWasm } from "./electric-field-wasm";
 import { initNecWasm, NecContext } from "~/utils/nec-wasm";
+import {
+  initAntennaWasm,
+  calculateAntennaGainBatch,
+} from "~/utils/antenna-physics-wasm";
 
 function ImpedanceDisplay({
   lengthFactor,
@@ -174,74 +184,97 @@ function RadiationPattern({
   length: number;
   isInvertedV: boolean;
 }) {
-  const geometry = useMemo(() => {
-    // High resolution for smooth pattern
-    const geo = new SphereGeometry(1, 90, 45);
-    const posAttribute = geo.attributes.position;
-    const vertex = new Vector3();
-    const scale = 5; // Visual scale
+  const [geometry, setGeometry] = useState<BufferGeometry | null>(null);
 
-    // L is total length in wavelengths
-    // The prop 'length' passed here is actually physical length in the scene (lengthFactor * visualScale)
-    // We need "length in wavelengths" (lengthFactor) for the formula.
-    // However, DipoleStructure receives 'physicalLength' which is lengthFactor * 6.
-    // We need to reverse this or pass lengthFactor directly.
-    // physicalLength = lengthFactor * 6. So L_lambda = length / 6.
-    const L_lambda = length / 6;
+  useEffect(() => {
+    let isMounted = true;
 
-    // kL/2 = pi * L_lambda
-    const kL_2 = Math.PI * L_lambda;
+    const generateGeometry = async () => {
+      await initAntennaWasm();
+      if (!isMounted) return;
 
-    for (let i = 0; i < posAttribute.count; i++) {
-      vertex.fromBufferAttribute(posAttribute, i);
-      vertex.normalize();
+      // High resolution for smooth pattern
+      const geo = new SphereGeometry(1, 90, 45);
+      const posAttribute = geo.attributes.position;
+      const vertex = new Vector3();
+      const scale = 5; // Visual scale
 
-      // Dipole axis is Z.
-      // Theta is angle with Z-axis. cos(theta) = z component of normalized vertex.
-      const cosTheta = vertex.z;
-      const sinTheta = Math.sqrt(1 - cosTheta * cosTheta);
+      const L_lambda = length / 6;
+      const thetas: number[] = [];
+      const phis: number[] = [];
 
-      // Formula: F(theta) = (cos(kL/2 * cos(theta)) - cos(kL/2)) / sin(theta)
-      // Avoid division by zero at poles (sinTheta = 0)
-      let gain = 0;
-      if (sinTheta > 0.001) {
-        const num = Math.cos(kL_2 * cosTheta) - Math.cos(kL_2);
-        gain = Math.abs(num / sinTheta);
-      } else {
-        // Limit at poles? For half-wave it's 0.
-        // For L=1 lambda, it might be non-zero?
-        // Let's just clamp.
-        gain = 0;
+      for (let i = 0; i < posAttribute.count; i++) {
+        vertex.fromBufferAttribute(posAttribute, i);
+        vertex.normalize();
+        phis.push(Math.atan2(vertex.z, vertex.x));
+        thetas.push(Math.asin(vertex.y));
       }
 
-      // Normalize gain for visualization consistency?
-      // Standard half-wave max gain is 1. (Normalized).
-      // The formula naturally produces nice values.
-
-      // Apply Inverted V distortion roughly?
-      // Inverted V tilts the lobes down (towards -Y?).
-      // The wire bends at X-axis rotating around X?
-      // Let's stick to ideal dipole pattern for now to avoid confusion,
-      // as the exact pattern of V is complex integral.
-      // Maybe reduce gain slightly to show it's less efficient?
-      if (isInvertedV) {
-        gain *= 0.9;
+      let wasmGains: number[] = [];
+      try {
+        wasmGains = await calculateAntennaGainBatch(
+          "dp",
+          thetas,
+          phis,
+          L_lambda,
+          1,
+          isInvertedV,
+          "60",
+          undefined,
+        );
+      } catch (error) {
+        console.warn("WASM batch calculation failed, using fallback", error);
       }
 
-      vertex.multiplyScalar(gain * scale);
-      posAttribute.setXYZ(i, vertex.x, vertex.y, vertex.z);
-    }
+      const kL_2 = Math.PI * L_lambda;
 
-    geo.computeVertexNormals();
-    geo.computeVertexNormals();
-    return geo;
+      for (let i = 0; i < posAttribute.count; i++) {
+        vertex.fromBufferAttribute(posAttribute, i);
+        vertex.normalize();
+
+        let gain = 0;
+        if (wasmGains.length > 0) {
+          gain = wasmGains[i];
+        } else {
+          // Fallback
+          const cosTheta = vertex.z;
+          const sinTheta = Math.sqrt(1 - cosTheta * cosTheta);
+          if (sinTheta > 0.001) {
+            const num = Math.cos(kL_2 * cosTheta) - Math.cos(kL_2);
+            gain = Math.abs(num / sinTheta);
+          }
+          if (isInvertedV) {
+            gain *= 0.9;
+          }
+        }
+
+        vertex.multiplyScalar(gain * scale);
+        posAttribute.setXYZ(i, vertex.x, vertex.y, vertex.z);
+      }
+
+      geo.computeVertexNormals();
+
+      if (isMounted) {
+        setGeometry(geo);
+      }
+    };
+
+    generateGeometry();
+
+    return () => {
+      isMounted = false;
+    };
   }, [length, isInvertedV]);
 
   useMemo(() => {
     return () => {
-      geometry.dispose();
+      if (geometry) {
+        geometry.dispose();
+      }
     };
   }, [geometry]);
+
+  if (!geometry) return null;
 
   return (
     <mesh geometry={geometry}>

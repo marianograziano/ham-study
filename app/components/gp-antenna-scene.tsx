@@ -1,14 +1,18 @@
 import { Camera } from "@phosphor-icons/react";
 import { ArcballControls } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
-import { useId, useMemo, useRef, useState } from "react";
+import { useId, useMemo, useRef, useState, useEffect } from "react";
 import { Trans, useTranslation } from "react-i18next";
-import { SphereGeometry, Vector3 } from "three";
+import { BufferGeometry, SphereGeometry, Vector3 } from "three";
 import { Button } from "~/components/ui/button";
 import { Label } from "~/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
 import { Switch } from "~/components/ui/switch";
 import { ElectricFieldWasm } from "./electric-field-wasm";
+import {
+  initAntennaWasm,
+  calculateAntennaGainBatch,
+} from "~/utils/antenna-physics-wasm";
 
 function GPAntenna({ radialAngle }: { radialAngle: "60" | "135" }) {
   const radials = 4;
@@ -60,86 +64,101 @@ function GPAntenna({ radialAngle }: { radialAngle: "60" | "135" }) {
 }
 
 function RadiationPattern({ radialAngle }: { radialAngle: "60" | "135" }) {
-  const geometry = useMemo(() => {
-    const geo = new SphereGeometry(1, 40, 30);
-    const posAttribute = geo.attributes.position;
-    const vertex = new Vector3();
-    const scale = 5;
+  const [geometry, setGeometry] = useState<BufferGeometry | null>(null);
 
-    for (let i = 0; i < posAttribute.count; i++) {
-      vertex.fromBufferAttribute(posAttribute, i);
-      vertex.normalize();
+  useEffect(() => {
+    let isMounted = true;
 
-      // GP Pattern
-      // Omnidirectional in Azimuth (XZ plane).
-      // Vertical pattern varies. Low takeoff angle usually.
-      // Null at zenith (straight up).
+    const generateGeometry = async () => {
+      await initAntennaWasm();
+      if (!isMounted) return;
 
-      // Monopole Formula from mds/gp.md
-      // F(theta) = (cos(PI/2 * cos(theta))) / sin(theta)
-      // theta is angle from vertical (Zenith).
-      // In Three.js, vertex.y is cos(theta).
-      // sin(theta) is sqrt(1 - y^2).
+      const geo = new SphereGeometry(1, 40, 30);
+      const posAttribute = geo.attributes.position;
+      const vertex = new Vector3();
+      const scale = 5;
 
-      const cosTheta = vertex.y;
-      const sinTheta = Math.sqrt(1.0 - cosTheta * cosTheta);
+      const thetas: number[] = [];
+      const phis: number[] = [];
 
-      let gain = 0;
-
-      // Avoid division by zero at poles (theta=0 or 180, sinTheta=0)
-      // Avoid division by zero at poles
-      if (sinTheta > 0.001) {
-        if (radialAngle === "135") {
-          // 135 deg (Drooping): Behaves closer to a vertical dipole
-          // Standard 1/4 wave monopole on ground plane formula:
-          // F(theta) = (cos(PI/2 * cos(theta))) / sin(theta)
-          const num = Math.cos((Math.PI / 2) * cosTheta);
-          // Allow full sphere radiation (donut shape)
-          gain = Math.abs(num / sinTheta);
-        } else {
-          // 60 deg (Uptilted / Bowl):
-          // Radials act as a reflector, pushing the beam UPWARDS.
-          // We aim for a peak elevation around 45-60 degrees up.
-
-          // 2. Beam Shaping for "Bowl" effect
-          // We want to shift the peak from horizon (y=0) to upwards (y>0).
-          // Let's use a directional factor peaked at target elevation.
-          const elevation = Math.asin(vertex.y); // -PI/2 to PI/2
-          const targetElevation = Math.PI / 4; // 45 deg up
-
-          // Simple beam shape: cos(elevation - target)
-          // Squaring it makes it tighter.
-          const beamShape = Math.cos(elevation - targetElevation);
-
-          // Combine:
-          // We use the beamShape primarily, but keep some monopole characteristic?
-          // Actually, purely directional beam might be clearer for visualization.
-          gain = beamShape * beamShape * beamShape;
-
-          // Ensure null at zenith if strictly vertical wire?
-          // Vertical wire always has null at zenith.
-          if (vertex.y > 0.98) gain = 0;
-
-          // Boost scale slightly to match visual bulk of other patterns
-          gain *= 1.2;
-        }
-      } else {
-        gain = 0;
+      for (let i = 0; i < posAttribute.count; i++) {
+        vertex.fromBufferAttribute(posAttribute, i);
+        vertex.normalize();
+        phis.push(Math.atan2(vertex.z, vertex.x));
+        thetas.push(Math.asin(vertex.y));
       }
 
-      vertex.multiplyScalar(gain * scale);
-      posAttribute.setXYZ(i, vertex.x, vertex.y, vertex.z);
-    }
-    geo.computeVertexNormals();
-    geo.computeVertexNormals();
-    return geo;
+      let wasmGains: number[] = [];
+      try {
+        wasmGains = await calculateAntennaGainBatch(
+          "gp",
+          thetas,
+          phis,
+          0.25,
+          1,
+          false,
+          radialAngle,
+          undefined,
+        );
+      } catch (error) {
+        console.warn("WASM batch calculation failed, using fallback", error);
+      }
+
+      for (let i = 0; i < posAttribute.count; i++) {
+        vertex.fromBufferAttribute(posAttribute, i);
+        vertex.normalize();
+
+        let gain = 0;
+        if (wasmGains.length > 0) {
+          gain = wasmGains[i];
+        } else {
+          // Fallback
+          const cosTheta = vertex.y;
+          const sinTheta = Math.sqrt(1.0 - cosTheta * cosTheta);
+
+          if (sinTheta > 0.001) {
+            if (radialAngle === "135") {
+              const num = Math.cos((Math.PI / 2) * cosTheta);
+              gain = Math.abs(num / sinTheta);
+            } else {
+              const elevation = Math.asin(vertex.y);
+              const targetElevation = Math.PI / 4;
+              const beamShape = Math.cos(elevation - targetElevation);
+              gain = beamShape * beamShape * beamShape;
+              if (vertex.y > 0.98) gain = 0;
+              gain *= 1.2;
+            }
+          } else {
+            gain = 0;
+          }
+        }
+
+        vertex.multiplyScalar(gain * scale);
+        posAttribute.setXYZ(i, vertex.x, vertex.y, vertex.z);
+      }
+      geo.computeVertexNormals();
+
+      if (isMounted) {
+        setGeometry(geo);
+      }
+    };
+
+    generateGeometry();
+
+    return () => {
+      isMounted = false;
+    };
   }, [radialAngle]);
 
   useMemo(() => {
     return () => {
-      geometry.dispose();
+      if (geometry) {
+        geometry.dispose();
+      }
     };
   }, [geometry]);
+
+  if (!geometry) return null;
 
   return (
     <group position={[0, 3, 0]}>
