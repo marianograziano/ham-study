@@ -193,6 +193,7 @@ impl Solver {
                 for k in 0..ctx.segj.jsno {
                     // Segment index from jco (1-based, signed)
                     let jx_raw = ctx.segj.jco[k];
+                    let ssnx = if jx_raw < 0 { -1.0 } else { 1.0 };
                     let jx = (jx_raw.abs() - 1) as usize;
 
                     // Calculate field at i due to segment jx
@@ -206,7 +207,9 @@ impl Solver {
                     let etc = ec.x * cabi + ec.y * sabi + ec.z * salpi;
 
                     // Accumulate weighted by basis function coeff
-                    let term = etk * ctx.segj.ax[k] + ets * ctx.segj.bx[k] + etc * ctx.segj.cx[k];
+                    let term = etk * ctx.segj.ax[k] * ssnx
+                        + ets * ctx.segj.bx[k]
+                        + etc * ctx.segj.cx[k] * ssnx;
 
                     sum_term = sum_term + term;
                 }

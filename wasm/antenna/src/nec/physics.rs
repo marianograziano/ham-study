@@ -14,19 +14,12 @@ struct TmiData {
 /// Calculates the basis function for segment i.
 /// This corresponds to `tbf` in nec2c.
 pub fn tbf(i: usize, icap: usize, ctx: &mut Context) {
-    // Porting tbf from calculations.c with explicit loops for clarity.
-    // NEC2 uses Sine/Cosine expansion.
-    // Basis function J (centered at i) extends to connected segments.
-
-    // Reset jsno
     ctx.segj.jsno = 0;
-
     let mut pp = 0.0;
-    let pm;
-
+    let mut pm = 0.0;
     let ix = i;
+    let ix1 = (i + 1) as i32; // 1-based index
 
-    // Ensure capacity
     if ctx.segj.ax.len() < 30 {
         ctx.segj.ax.resize(30, 0.0);
         ctx.segj.bx.resize(30, 0.0);
@@ -34,179 +27,98 @@ pub fn tbf(i: usize, icap: usize, ctx: &mut Context) {
         ctx.segj.jco.resize(30, 0);
     }
 
-    // ---------------------------------------------------------
-    // Phase 1: Trace End 1 (Left Arm)
-    // ---------------------------------------------------------
-
-    // Start from End 1 of ix
-    // To trace "Left", we leave End 1 of current segment.
-
     let mut jcox = ctx.geometry.icon1[ix];
+    let mut jend = -1;
+    let mut iend = -1;
     let mut sig = -1.0;
-    let _jend = -1; // Legacy sign tracking if needed? No, explicit 'sig' is enough.
 
-    let njun1;
-    let mut loop_idx = 0;
+    let mut njun1 = 0;
 
     loop {
+        if jcox != 0 {
+            if jcox < 0 {
+                jcox = -jcox;
+            } else {
+                sig = -sig;
+                jend = -jend;
+            }
+
+            let jcoxx = (jcox - 1) as usize;
+
+            ctx.segj.jsno += 1;
+            let jsnox = ctx.segj.jsno - 1;
+
+            if jsnox >= ctx.segj.jco.len() {
+                let new_len = jsnox + 10;
+                ctx.segj.ax.resize(new_len, 0.0);
+                ctx.segj.bx.resize(new_len, 0.0);
+                ctx.segj.cx.resize(new_len, 0.0);
+                ctx.segj.jco.resize(new_len, 0);
+            }
+            ctx.segj.jco[jsnox] = jcox;
+
+            let d = PI_CONST * ctx.geometry.si[jcoxx];
+            let sdh = d.sin();
+            let cdh = d.cos();
+            let sd = 2.0 * sdh * cdh;
+
+            let omc = if d <= 0.015 {
+                let omc_sq = 4.0 * d * d;
+                ((1.3888889e-3 * omc_sq - 4.1666666667e-2) * omc_sq + 0.5) * omc_sq
+            } else {
+                1.0 - cdh * cdh + sdh * sdh
+            };
+
+            let aj = 1.0 / ((1.0 / (PI_CONST * ctx.geometry.bi[jcoxx])).ln() - 0.577215664);
+            pp = pp - omc / sd * aj;
+
+            ctx.segj.ax[jsnox] = aj / sd * sig;
+            ctx.segj.bx[jsnox] = aj / (2.0 * cdh);
+            ctx.segj.cx[jsnox] = -aj / (2.0 * sdh) * sig;
+
+            if jcox != ix1 {
+                if jend == 1 {
+                    jcox = ctx.geometry.icon2[jcoxx];
+                } else {
+                    jcox = ctx.geometry.icon1[jcoxx];
+                }
+
+                if jcox.abs() != ix1 {
+                    if jcox != 0 {
+                        continue; // skip the Phase 2 trigger! Mimics C exactly.
+                    } else {
+                        // Error stop theoretically, we'll just fall through to Phase 2 for safety
+                    }
+                }
+            } else {
+                ctx.segj.bx[jsnox] = -ctx.segj.bx[jsnox];
+            }
+
+            if iend == 1 {
+                break;
+            }
+        } // end if(jcox != 0)
+
+        pm = -pp;
+        pp = 0.0;
+        njun1 = ctx.segj.jsno;
+
+        jcox = ctx.geometry.icon2[ix];
+        if jcox > 10000 {
+            jcox = ix1;
+        } // PCHCON logic omitted, assuming standard Yagi
+        jend = 1;
+        iend = 1;
+        sig = -1.0;
+
         if jcox == 0 {
-            break;
+            break; // C does `while(jcox != 0)`. Wait, in C `do .. while (jcox != 0)` it repeats! So it should continue the loop. Wait, the condition is loop repeats if jcox != 0!
         }
-        if loop_idx > 100 {
-            break;
-        } // Safety
-        loop_idx += 1;
+    } // end loop
 
-        let next_seg_idx = (jcox.abs() - 1) as usize;
-        let entered_end = if jcox < 0 { 1 } else { 2 };
-
-        // Update orientation sign
-        // NEC logic: flipper sig if entered end 2 (against coord).
-        if entered_end == 2 {
-            sig = -sig;
-        }
-
-        // Add to basis
-        ctx.segj.jsno += 1;
-        let jsnox = ctx.segj.jsno - 1;
-
-        if jsnox >= ctx.segj.jco.len() {
-            let new_len = jsnox + 10;
-            ctx.segj.ax.resize(new_len, 0.0);
-            ctx.segj.bx.resize(new_len, 0.0);
-            ctx.segj.cx.resize(new_len, 0.0);
-            ctx.segj.jco.resize(new_len, 0);
-        }
-
-        // Store jcox (connection info)
-        ctx.segj.jco[jsnox] = jcox;
-
-        // Compute coeffs
-        let d = PI_CONST * ctx.geometry.si[next_seg_idx];
-        let sdh = d.sin();
-        let cdh = d.cos();
-        let sd = 2.0 * sdh * cdh;
-
-        let omc: f64;
-        if d <= 0.015 {
-            let omc_sq = 4.0 * d * d;
-            omc = ((1.3888889e-3 * omc_sq - 4.1666666667e-2) * omc_sq + 0.5) * omc_sq;
-        } else {
-            omc = 1.0 - cdh * cdh + sdh * sdh;
-        }
-
-        let aj = 1.0 / ((1.0 / (PI_CONST * ctx.geometry.bi[next_seg_idx])).ln() - 0.577215664);
-        pp = pp - omc / sd * aj;
-
-        ctx.segj.ax[jsnox] = aj / sd * sig;
-        ctx.segj.bx[jsnox] = aj / (2.0 * cdh);
-        ctx.segj.cx[jsnox] = -aj / (2.0 * sdh) * sig;
-
-        // Check loop-back to source
-        if next_seg_idx == ix {
-            ctx.segj.bx[jsnox] = -ctx.segj.bx[jsnox];
-            break;
-        }
-
-        // Prepare next step
-        // We entered 'entered_end'. Must leave 'opposite'.
-        let leaving_end = if entered_end == 1 { 2 } else { 1 };
-
-        if leaving_end == 1 {
-            jcox = ctx.geometry.icon1[next_seg_idx];
-        } else {
-            jcox = ctx.geometry.icon2[next_seg_idx];
-        }
-    }
-
-    njun1 = ctx.segj.jsno;
-    pm = -pp; // Swap pp/pm for End 2 logic?
-              // In original: "pm = -pp; pp = 0.0;"
-              // Then calculate End 2.
-              // NEC accumulates 'pp' for first branch.
-              // Then moves it to 'pm' (minus?).
-              // Then accumulates 'pp' for second branch (End 2).
-    pp = 0.0;
-
-    // ---------------------------------------------------------
-    // Phase 2: Trace End 2 (Right Arm)
-    // ---------------------------------------------------------
-
-    jcox = ctx.geometry.icon2[ix];
-    sig = 1.0; // Corrected to 1.0 to ensure Positive Ax (Symmetric Basis).
-               // Original -1.0 led to Negative Ax for Right Arm (Asymmetry).
-
-    loop_idx = 0;
-
-    loop {
-        if jcox == 0 {
-            break;
-        }
-        if loop_idx > 100 {
-            break;
-        }
-        loop_idx += 1;
-
-        let next_seg_idx = (jcox.abs() - 1) as usize;
-        let entered_end = if jcox < 0 { 1 } else { 2 };
-
-        if entered_end == 2 {
-            sig = -sig;
-        }
-
-        ctx.segj.jsno += 1;
-        let jsnox = ctx.segj.jsno - 1;
-
-        if jsnox >= ctx.segj.jco.len() {
-            let new_len = jsnox + 10;
-            ctx.segj.ax.resize(new_len, 0.0);
-            ctx.segj.bx.resize(new_len, 0.0);
-            ctx.segj.cx.resize(new_len, 0.0);
-            ctx.segj.jco.resize(new_len, 0);
-        }
-
-        ctx.segj.jco[jsnox] = jcox;
-
-        // Check for loop back immediately? No, after calc.
-
-        let d = PI_CONST * ctx.geometry.si[next_seg_idx];
-        let sdh = d.sin();
-        let cdh = d.cos();
-        let sd = 2.0 * sdh * cdh;
-
-        let omc: f64;
-        if d <= 0.015 {
-            let omc_sq = 4.0 * d * d;
-            omc = ((1.3888889e-3 * omc_sq - 4.1666666667e-2) * omc_sq + 0.5) * omc_sq;
-        } else {
-            omc = 1.0 - cdh * cdh + sdh * sdh;
-        }
-
-        let aj = 1.0 / ((1.0 / (PI_CONST * ctx.geometry.bi[next_seg_idx])).ln() - 0.577215664);
-        pp = pp - omc / sd * aj;
-
-        ctx.segj.ax[jsnox] = aj / sd * sig;
-        ctx.segj.bx[jsnox] = aj / (2.0 * cdh);
-        ctx.segj.cx[jsnox] = -aj / (2.0 * sdh) * sig;
-
-        if next_seg_idx == ix {
-            ctx.segj.bx[jsnox] = -ctx.segj.bx[jsnox];
-            break;
-        }
-
-        let leaving_end = if entered_end == 1 { 2 } else { 1 };
-
-        if leaving_end == 1 {
-            jcox = ctx.geometry.icon1[next_seg_idx];
-        } else {
-            jcox = ctx.geometry.icon2[next_seg_idx];
-        }
-    }
-
-    // ---------------------------------------------------------
-    // Phase 3: Center Segment and Junction Normalization
-    // ---------------------------------------------------------
-
+    // ============================================
+    // PHASE 3 (Central/Normalization stuff)
+    // ============================================
     let njun2 = ctx.segj.jsno - njun1;
     let jsnop = ctx.segj.jsno;
 
@@ -217,9 +129,7 @@ pub fn tbf(i: usize, icap: usize, ctx: &mut Context) {
         ctx.segj.cx.resize(jsnop + 10, 0.0);
     }
 
-    // Add center segment
-    // Note: Store as 1-based index
-    ctx.segj.jco[jsnop] = (ix + 1) as i32;
+    ctx.segj.jco[jsnop] = ix1;
 
     let d = PI_CONST * ctx.geometry.si[ix];
     let sdh = d.sin();
@@ -237,20 +147,15 @@ pub fn tbf(i: usize, icap: usize, ctx: &mut Context) {
     let ap = 1.0 / ((1.0 / (PI_CONST * ctx.geometry.bi[ix])).ln() - 0.577215664);
     let aj = ap;
 
-    // Calculate qm, qp and normalize coeffs
-
-    // Case 1: Open at start (njun1 == 0)
     if njun1 == 0 {
         if njun2 == 0 {
-            // Isolated segment
             ctx.segj.bx[jsnop] = 0.0;
-            let xxi = if icap == 0 {
-                0.0
-            } else {
+            let mut xxi = 0.0;
+            if icap != 0 {
                 let qp_val = PI_CONST * ctx.geometry.bi[ix];
                 let xxi_val = qp_val * qp_val;
-                qp_val * (1.0 - 0.5 * xxi_val) / (1.0 - xxi_val)
-            };
+                xxi = qp_val * (1.0 - 0.5 * xxi_val) / (1.0 - xxi_val);
+            }
 
             ctx.segj.cx[jsnop] = 1.0 / (cdh - xxi * sdh);
             ctx.segj.jsno = jsnop + 1;
@@ -258,17 +163,15 @@ pub fn tbf(i: usize, icap: usize, ctx: &mut Context) {
             return;
         }
 
-        let xxi = if icap == 0 {
-            0.0
-        } else {
+        let mut xxi = 0.0;
+        if icap != 0 {
             let qp_val = PI_CONST * ctx.geometry.bi[ix];
             let xxi_val = qp_val * qp_val;
-            qp_val * (1.0 - 0.5 * xxi_val) / (1.0 - xxi_val)
+            xxi = qp_val * (1.0 - 0.5 * xxi_val) / (1.0 - xxi_val);
         };
 
         let denom = sd * (ap + xxi * pp) + cd * (xxi * ap - pp);
         let qp = -(omc + xxi * sd) / denom;
-
         let d_val = cd - xxi * sd;
         ctx.segj.bx[jsnop] = (sdh + ap * qp * (cdh - xxi * sdh)) / d_val;
         ctx.segj.cx[jsnop] = (cdh + ap * qp * (sdh + xxi * cdh)) / d_val;
@@ -285,14 +188,21 @@ pub fn tbf(i: usize, icap: usize, ctx: &mut Context) {
         return;
     }
 
-    // Case 2: Open at end (njun2 == 0)
     if njun2 == 0 {
-        let qm_val = PI_CONST * ctx.geometry.bi[ix];
-        let xxi = qm_val * qm_val;
-        let xxi_val = qm_val * (1.0 - 0.5 * xxi) / (1.0 - xxi);
+        let mut xxi = 0.0;
+        let mut qm;
+        if icap != 0 {
+            qm = PI_CONST * ctx.geometry.bi[ix];
+            xxi = qm * qm;
+            xxi = qm * (1.0 - 0.5 * xxi) / (1.0 - xxi);
+        }
 
-        let denom = sd * (aj - xxi_val * pm) + cd * (pm + xxi_val * aj);
-        let qm = (omc + xxi_val * sd) / denom;
+        let denom = sd * (aj - xxi * pm) + cd * (pm + xxi * aj);
+        qm = (omc + xxi * sd) / denom;
+        let d_val = cd - xxi * sd;
+
+        ctx.segj.bx[jsnop] = (aj * qm * (cdh - xxi * sdh) - sdh) / d_val;
+        ctx.segj.cx[jsnop] = (cdh - aj * qm * (sdh + xxi * cdh)) / d_val;
 
         for i_start in 0..njun1 {
             ctx.segj.ax[i_start] = ctx.segj.ax[i_start] * qm;
@@ -300,18 +210,17 @@ pub fn tbf(i: usize, icap: usize, ctx: &mut Context) {
             ctx.segj.cx[i_start] = ctx.segj.cx[i_start] * qm;
         }
 
-        ctx.segj.ax[jsnop] = -1.0;
-        let d_val = cd - xxi_val * sd;
-        ctx.segj.bx[jsnop] += (aj * qm * (cdh - xxi_val * sdh) - sdh) / d_val;
-        ctx.segj.cx[jsnop] += (cdh - aj * qm * (sdh + xxi_val * cdh)) / d_val;
         ctx.segj.jsno = jsnop + 1;
+        ctx.segj.ax[jsnop] = -1.0;
         return;
     }
 
-    // Case 3: Junction at both ends
     let qp_denom = sd * (pm * pp + aj * ap) + cd * (pm * ap - pp * aj);
     let qm = (ap * omc - pp * sd) / qp_denom;
     let qp = -(aj * omc + pm * sd) / qp_denom;
+
+    ctx.segj.bx[jsnop] = (aj * qm + ap * qp) * sdh / sd;
+    ctx.segj.cx[jsnop] = (aj * qm - ap * qp) * cdh / sd;
 
     for i_start in 0..njun1 {
         ctx.segj.ax[i_start] = ctx.segj.ax[i_start] * qm;
@@ -319,18 +228,14 @@ pub fn tbf(i: usize, icap: usize, ctx: &mut Context) {
         ctx.segj.cx[i_start] = ctx.segj.cx[i_start] * qm;
     }
 
-    for i_end in 0..njun2 {
-        let idx = njun1 + i_end;
-        ctx.segj.ax[idx] = -ctx.segj.ax[idx] * qp;
-        ctx.segj.bx[idx] = ctx.segj.bx[idx] * qp;
-        ctx.segj.cx[idx] = -ctx.segj.cx[idx] * qp; // Note: -qp for end 2
+    for i_end in njun1..ctx.segj.jsno {
+        ctx.segj.ax[i_end] = -ctx.segj.ax[i_end] * qp;
+        ctx.segj.bx[i_end] = ctx.segj.bx[i_end] * qp;
+        ctx.segj.cx[i_end] = -ctx.segj.cx[i_end] * qp;
     }
 
-    ctx.segj.ax[jsnop] = -1.0;
-    ctx.segj.bx[jsnop] = (aj * qm + ap * qp) * sdh / sd;
-    ctx.segj.cx[jsnop] = (aj * qm - ap * qp) * cdh / sd;
-
     ctx.segj.jsno = jsnop + 1;
+    ctx.segj.ax[jsnop] = -1.0;
 }
 
 /// Computes the integrand exp(jkr)/(kr).

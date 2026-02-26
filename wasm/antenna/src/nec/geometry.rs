@@ -101,7 +101,7 @@ impl GeometryData {
                     + (yi2 - self.y1[idx]).abs()
                     + (zi2 - self.z1[idx]).abs();
                 if sep1 <= slen {
-                    self.icon2[i] = -((idx + 1) as i32);
+                    self.icon2[i] = (idx + 1) as i32; // Correct sign: positive
                     break;
                 }
 
@@ -110,7 +110,7 @@ impl GeometryData {
                     + (yi2 - self.y2[idx]).abs()
                     + (zi2 - self.z2[idx]).abs();
                 if sep2 <= slen {
-                    self.icon2[i] = (idx + 1) as i32;
+                    self.icon2[i] = -((idx + 1) as i32); // Correct sign: negative
                     break;
                 }
             }
