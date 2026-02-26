@@ -65,6 +65,22 @@ export class NecContext {
         return v1;
     }
     /**
+     * Calculate 3D far field pattern (batch)
+     * `thetas` and `phis` must be of same length. `output` must be at least that length.
+     * @param {Float64Array} thetas
+     * @param {Float64Array} phis
+     * @param {Float64Array} output
+     */
+    calculate_far_field_pattern_3d(thetas, phis, output) {
+        const ptr0 = passArrayF64ToWasm0(thetas, wasm.__wbindgen_malloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passArrayF64ToWasm0(phis, wasm.__wbindgen_malloc);
+        const len1 = WASM_VECTOR_LEN;
+        var ptr2 = passArrayF64ToWasm0(output, wasm.__wbindgen_malloc);
+        var len2 = WASM_VECTOR_LEN;
+        wasm.neccontext_calculate_far_field_pattern_3d(this.__wbg_ptr, ptr0, len0, ptr1, len1, ptr2, len2, output);
+    }
+    /**
      * @param {number} index
      * @returns {number}
      */
@@ -107,6 +123,13 @@ export class NecContext {
      */
     set_frequency(mhz) {
         wasm.neccontext_set_frequency(this.__wbg_ptr, mhz);
+    }
+    /**
+     * Set ground height in wavelengths. Use negative or `None` equivalent (by not calling this) for free-space
+     * @param {number} height_lambda
+     */
+    set_ground(height_lambda) {
+        wasm.neccontext_set_ground(this.__wbg_ptr, height_lambda);
     }
 }
 if (Symbol.dispose) NecContext.prototype[Symbol.dispose] = NecContext.prototype.free;

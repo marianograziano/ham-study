@@ -205,6 +205,26 @@ impl NecContext {
         self.sim.calculate_far_field(theta, phi, r_dist)
     }
 
+    /// Set ground height in wavelengths. Use negative or `None` equivalent (by not calling this) for free-space
+    pub fn set_ground(&mut self, height_lambda: f64) {
+        if height_lambda > 0.0 {
+            self.sim.set_ground(Some(height_lambda));
+        } else {
+            self.sim.set_ground(None);
+        }
+    }
+
+    /// Calculate 3D far field pattern (batch)
+    /// `thetas` and `phis` must be of same length. `output` must be at least that length.
+    pub fn calculate_far_field_pattern_3d(&self, thetas: &[f64], phis: &[f64], output: &mut [f64]) {
+        if thetas.len() != phis.len() || output.len() < thetas.len() {
+            return;
+        }
+        for i in 0..thetas.len() {
+            output[i] = self.sim.calculate_far_field(thetas[i], phis[i], 1000.0);
+        }
+    }
+
     pub fn calculate_far_field_pattern(&self, num_points: usize, phi: f64) -> Vec<f64> {
         let mut results = Vec::with_capacity(num_points);
         let two_pi = 2.0 * std::f64::consts::PI;

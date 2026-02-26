@@ -238,6 +238,17 @@ export default {
           uniform: "Uniform Spacing (Custom)",
         },
         fixedSpacing: "Fixed Spacing (λ)",
+        material: "Material",
+        materialTooltip: {
+          title: "Boom Material",
+          content:
+            "Selected material conductivity affects element design slightly.",
+        },
+        materials: {
+          metal_bonded: "Metal Boom - Bonded",
+          metal_insulated: "Metal Boom - Insulated",
+          pvc: "PVC/PPR Boom",
+        },
       },
       results: {
         title: "Cut List",

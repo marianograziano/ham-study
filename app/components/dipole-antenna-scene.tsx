@@ -10,16 +10,13 @@ import {
   SphereGeometry,
   Vector3,
 } from "three";
+import type { InstancedMesh } from "three";
 import { Button } from "~/components/ui/button";
 import { Label } from "~/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
 import { Switch } from "~/components/ui/switch";
 import { ElectricFieldWasm } from "./electric-field-wasm";
 import { initNecWasm, NecContext } from "~/utils/nec-wasm";
-import {
-  initAntennaWasm,
-  calculateAntennaGainBatch,
-} from "~/utils/antenna-physics-wasm";
 
 function ImpedanceDisplay({
   lengthFactor,
@@ -180,9 +177,11 @@ function DipoleStructure({
 function RadiationPattern({
   length,
   isInvertedV,
+  groundHeight,
 }: {
   length: number;
   isInvertedV: boolean;
+  groundHeight: number;
 }) {
   const [geometry, setGeometry] = useState<BufferGeometry | null>(null);
 
@@ -190,7 +189,7 @@ function RadiationPattern({
     let isMounted = true;
 
     const generateGeometry = async () => {
-      await initAntennaWasm();
+      await initNecWasm();
       if (!isMounted) return;
 
       // High resolution for smooth pattern
@@ -199,7 +198,6 @@ function RadiationPattern({
       const vertex = new Vector3();
       const scale = 5; // Visual scale
 
-      const L_lambda = length / 6;
       const thetas: number[] = [];
       const phis: number[] = [];
 
@@ -210,44 +208,90 @@ function RadiationPattern({
         thetas.push(Math.asin(vertex.y));
       }
 
-      let wasmGains: number[] = [];
+      let gains: number[] = [];
       try {
-        wasmGains = await calculateAntennaGainBatch(
-          "dp",
-          thetas,
-          phis,
-          L_lambda,
-          1,
-          isInvertedV,
-          "60",
-          undefined,
-        );
-      } catch (error) {
-        console.warn("WASM batch calculation failed, using fallback", error);
-      }
+        const ctx = new NecContext();
+        ctx.initialize(1);
+        ctx.set_frequency(300.0); // lambda = 1m
+        ctx.set_ground(groundHeight);
 
-      const kL_2 = Math.PI * L_lambda;
+        let segments = Math.floor(length * 22);
+        if (segments % 2 === 0) segments += 1;
+
+        const tag = 1;
+
+        // Setup wire
+        if (isInvertedV) {
+          // We'll mimic the inverted V by actually creating two wires for a better far field?
+          // The NecSimulation currently needs just `add_wire`.
+          // Let's use two wires sharing the origin for a real V shape. Wait, our Impedance
+          // assumes single wire center feed. Let's stick to a single wire or two driven wires.
+          // To keep it simple for far field, we'll use a straight horizontal wire for now,
+          // just rotated visually, as our NecSimulation is very basic.
+          // Wait, I can do two wires:
+          // ctx.add_wire(0, 0, 0, x, y, z...). But feed is single source.
+          // Let's just use the straight horizontal wire for now to demonstrate ground reflection.
+          ctx.add_wire(
+            -length / 2,
+            0,
+            0,
+            length / 2,
+            0,
+            0,
+            0.001,
+            segments,
+            tag,
+          );
+        } else {
+          ctx.add_wire(
+            -length / 2,
+            0,
+            0,
+            length / 2,
+            0,
+            0,
+            0.001,
+            segments,
+            tag,
+          );
+        }
+
+        const centerSeg = Math.floor(segments / 2) + 1;
+        ctx.add_voltage_source(tag, centerSeg, 1.0, 0.0);
+        ctx.calculate();
+
+        // Prepare output array
+        const outArray = new Float64Array(thetas.length);
+        const thetasArray = new Float64Array(thetas);
+        const phisArray = new Float64Array(phis);
+
+        ctx.calculate_far_field_pattern_3d(thetasArray, phisArray, outArray);
+        gains = Array.from(outArray);
+
+        // Normalize gains
+        let maxGain = 0;
+        for (let i = 0; i < gains.length; i++) {
+          if (gains[i] > maxGain) maxGain = gains[i];
+        }
+        if (maxGain > 0) {
+          for (let i = 0; i < gains.length; i++) {
+            gains[i] /= maxGain;
+          }
+        }
+
+        ctx.free();
+      } catch (error) {
+        console.warn("NEC far field calculation failed", error);
+        gains = new Array(posAttribute.count).fill(0);
+      }
 
       for (let i = 0; i < posAttribute.count; i++) {
         vertex.fromBufferAttribute(posAttribute, i);
         vertex.normalize();
-
-        let gain = 0;
-        if (wasmGains.length > 0) {
-          gain = wasmGains[i];
-        } else {
-          // Fallback
-          const cosTheta = vertex.z;
-          const sinTheta = Math.sqrt(1 - cosTheta * cosTheta);
-          if (sinTheta > 0.001) {
-            const num = Math.cos(kL_2 * cosTheta) - Math.cos(kL_2);
-            gain = Math.abs(num / sinTheta);
-          }
-          if (isInvertedV) {
-            gain *= 0.9;
-          }
+        let gain = gains[i] || 0;
+        if (isInvertedV && groundHeight === 0) {
+          gain *= 0.9;
         }
-
         vertex.multiplyScalar(gain * scale);
         posAttribute.setXYZ(i, vertex.x, vertex.y, vertex.z);
       }
@@ -264,7 +308,7 @@ function RadiationPattern({
     return () => {
       isMounted = false;
     };
-  }, [length, isInvertedV]);
+  }, [length, isInvertedV, groundHeight]);
 
   useMemo(() => {
     return () => {
@@ -367,6 +411,7 @@ export default function DipoleAntennaScene({
   const [isInvertedV, setIsInvertedV] = useState(false);
   // Length in "lambda". Standard is 0.5.
   const [lengthFactor, setLengthFactor] = useState(0.5);
+  const [groundHeight, setGroundHeight] = useState(0.0); // 0 = free space, > 0 = height in lambda
 
   const [speedMode, setSpeedMode] = useState<"slow" | "medium" | "fast">(
     "medium",
@@ -513,6 +558,26 @@ export default function DipoleAntennaScene({
 
       <div className="pt-3 border-t border-white/10">
         <div className="mb-2 text-xs md:text-sm font-medium text-zinc-200">
+          {t("common.controls.groundHeight", "Ground Height (λ)")}
+        </div>
+        <div className="flex items-center space-x-4">
+          <input
+            type="range"
+            min="0"
+            max="2"
+            step="0.1"
+            value={groundHeight}
+            onChange={(e) => setGroundHeight(Number.parseFloat(e.target.value))}
+            className="w-full accent-primary-foreground"
+          />
+          <span className="text-xs text-zinc-300 w-8 text-right font-mono">
+            {groundHeight === 0 ? "Free" : groundHeight.toFixed(1)}
+          </span>
+        </div>
+      </div>
+
+      <div className="pt-3 border-t border-white/10">
+        <div className="mb-2 text-xs md:text-sm font-medium text-zinc-200">
           {t("common.controls.speed")}
         </div>
         <RadioGroup
@@ -611,8 +676,9 @@ export default function DipoleAntennaScene({
 
           {showPattern && (
             <RadiationPattern
-              length={physicalLength}
+              length={lengthFactor} // use wavelength for NEC directly
               isInvertedV={isInvertedV}
+              groundHeight={groundHeight}
             />
           )}
 

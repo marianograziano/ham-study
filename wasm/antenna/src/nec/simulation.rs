@@ -7,6 +7,9 @@ pub struct NecSimulation {
     pub context: Context,
     pub solver: Solver,
     pub frequency_mhz: f64,
+    /// Height above perfectly conducting ground in wavelengths.
+    /// If None, simulation is in free space.
+    pub ground_height: Option<f64>,
 }
 
 impl NecSimulation {
@@ -15,7 +18,13 @@ impl NecSimulation {
             context: Context::new(),
             solver: Solver::new(0),
             frequency_mhz: 300.0, // Default to something reasonable
+            ground_height: None,
         }
+    }
+
+    /// Set ground height in wavelengths (None for free space)
+    pub fn set_ground(&mut self, height: Option<f64>) {
+        self.ground_height = height;
     }
 
     /// Initialize the simulation with a defined number of wires.
@@ -199,10 +208,6 @@ impl NecSimulation {
             let phase = Complex64::new(phase_arg.cos(), phase_arg.sin());
 
             // Element pattern (short dipole approx or point source)
-            // Project segment vector onto Theta/Phi unit vectors.
-            // Segment vector s:
-            // sx = cab * L (wait cab = cos(alpha)*cos(beta)?)
-            // x2-x1/L
             let sx = (self.context.geometry.x2[i] - self.context.geometry.x1[i]) / len;
             let sy = (self.context.geometry.y2[i] - self.context.geometry.y1[i]) / len;
             let sz = (self.context.geometry.z2[i] - self.context.geometry.z1[i]) / len;
@@ -220,16 +225,47 @@ impl NecSimulation {
             let dot_th = sx * th_x + sy * th_y + sz * th_z;
             let dot_ph = sx * ph_x + sy * ph_y + sz * ph_z;
 
-            // Contribution: I * L * phase * dot
-            // (Far field of short dipole ~ I * L * sin(angle_between_wire_and_r))
-            // Actually E_theta ~ dot_th, E_phi ~ dot_ph
-            // Factor j * eta * k / (4 pi r) * exp(-jkr) is common factor.
-            // We return normalized field or gain.
-
-            // Using current * length as moment
+            // Moment of the primary element
             let moment = cur * len * phase;
-            e_theta = e_theta + moment * dot_th;
-            e_phi = e_phi + moment * dot_ph;
+            e_theta += moment * dot_th;
+            e_phi += moment * dot_ph;
+
+            // Ground Image processing
+            if let Some(height_lambda) = self.ground_height {
+                // If the ground is at Y = -height (assuming antenna is around Y=0)
+                // Actually the standard orientation has the ground at Z=-height or Y=-height.
+                // In our Three.js, Y is UP. So ground is at Y = -height.
+                // The image source is at y_image = -yi - 2*height
+                // Wait, if antenna is placed AT Y=0, and ground parameter is the height of antenna,
+                // then the ground plane is at Y = -height. The image of a point (xi, yi, zi)
+                // across the plane Y = -height is (xi, -yi - 2*height, zi).
+                let height_meters = height_lambda * self.context.geometry.wlam;
+                let y_image = -yi - 2.0 * height_meters;
+
+                // Reflection coefficient for perfect ground.
+                // Horizontal polarization (parallel to ground): reflected E is inverted (reflection coeff = -1)
+                // Vertical polarization (normal to ground): reflected E is the same (reflection coeff = +1)
+
+                // Let's break the segment vector into horizontal and vertical parts.
+                // The horizontal part (X, Z) reflects and flips: sx_img = -sx, sz_img = -sz, sy_img = sy
+                // Wait, the current direction in a mirrored image:
+                // For a horizontally oriented wire (sx, 0, sz), the image current is perfectly opposite (-sx, 0, -sz)
+                // For a vertically oriented wire (0, sy, 0), the image current points the SAME way (0, sy, 0)
+                // So image segment vector is (-sx, sy, -sz).
+                let sx_img = -sx;
+                let sy_img = sy;
+                let sz_img = -sz;
+
+                let phase_arg_img = k * (xi * sint * cosp + y_image * sint * sinp + zi * cost);
+                let phase_img = Complex64::new(phase_arg_img.cos(), phase_arg_img.sin());
+
+                let dot_th_img = sx_img * th_x + sy_img * th_y + sz_img * th_z;
+                let dot_ph_img = sx_img * ph_x + sy_img * ph_y + sz_img * ph_z;
+
+                let moment_img = cur * len * phase_img;
+                e_theta += moment_img * dot_th_img;
+                e_phi += moment_img * dot_ph_img;
+            }
         }
 
         let mag2 = e_theta.norm_sqr() + e_phi.norm_sqr();

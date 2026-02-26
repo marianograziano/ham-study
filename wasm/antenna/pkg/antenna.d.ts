@@ -12,12 +12,21 @@ export class NecContext {
     calculate(): void;
     calculate_far_field(theta: number, phi: number, r_dist: number): number;
     calculate_far_field_pattern(num_points: number, phi: number): Float64Array;
+    /**
+     * Calculate 3D far field pattern (batch)
+     * `thetas` and `phis` must be of same length. `output` must be at least that length.
+     */
+    calculate_far_field_pattern_3d(thetas: Float64Array, phis: Float64Array, output: Float64Array): void;
     get_current_magnitude(index: number): number;
     get_current_phase(index: number): number;
     get_impedance(tag: number): Float64Array;
     initialize(num_wires: number): void;
     constructor();
     set_frequency(mhz: number): void;
+    /**
+     * Set ground height in wavelengths. Use negative or `None` equivalent (by not calling this) for free-space
+     */
+    set_ground(height_lambda: number): void;
 }
 
 /**
@@ -481,13 +490,14 @@ export interface InitOutput {
     readonly neccontext_calculate: (a: number) => [number, number];
     readonly neccontext_calculate_far_field: (a: number, b: number, c: number, d: number) => number;
     readonly neccontext_calculate_far_field_pattern: (a: number, b: number, c: number) => [number, number];
+    readonly neccontext_calculate_far_field_pattern_3d: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: any) => void;
     readonly neccontext_get_current_magnitude: (a: number, b: number) => number;
     readonly neccontext_get_current_phase: (a: number, b: number) => number;
     readonly neccontext_get_impedance: (a: number, b: number) => [number, number];
     readonly neccontext_initialize: (a: number, b: number) => void;
     readonly neccontext_new: () => number;
     readonly neccontext_set_frequency: (a: number, b: number) => void;
-    readonly calculate_electric_field: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number, q: number, r: any, s: number, t: number, u: any) => void;
+    readonly neccontext_set_ground: (a: number, b: number) => void;
     readonly __wbg_get_sphericalsurfaceparams_max_angle: (a: number) => number;
     readonly __wbg_get_sphericalsurfaceparams_radius: (a: number) => number;
     readonly __wbg_get_sphericalsurfaceparams_segments_r: (a: number) => number;
@@ -503,6 +513,7 @@ export interface InitOutput {
     readonly get_spherical_surface_buffer_sizes: (a: number, b: number) => bigint;
     readonly intersect_sphere_batch: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: any) => void;
     readonly sphericalsurfaceparams_new: () => number;
+    readonly calculate_electric_field: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number, q: number, r: any, s: number, t: number, u: any) => void;
     readonly __wbindgen_externrefs: WebAssembly.Table;
     readonly __wbindgen_malloc: (a: number, b: number) => number;
     readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;

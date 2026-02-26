@@ -65,13 +65,14 @@ export const neccontext_add_wire: (a: number, b: number, c: number, d: number, e
 export const neccontext_calculate: (a: number) => [number, number];
 export const neccontext_calculate_far_field: (a: number, b: number, c: number, d: number) => number;
 export const neccontext_calculate_far_field_pattern: (a: number, b: number, c: number) => [number, number];
+export const neccontext_calculate_far_field_pattern_3d: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: any) => void;
 export const neccontext_get_current_magnitude: (a: number, b: number) => number;
 export const neccontext_get_current_phase: (a: number, b: number) => number;
 export const neccontext_get_impedance: (a: number, b: number) => [number, number];
 export const neccontext_initialize: (a: number, b: number) => void;
 export const neccontext_new: () => number;
 export const neccontext_set_frequency: (a: number, b: number) => void;
-export const calculate_electric_field: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number, q: number, r: any, s: number, t: number, u: any) => void;
+export const neccontext_set_ground: (a: number, b: number) => void;
 export const __wbg_get_sphericalsurfaceparams_max_angle: (a: number) => number;
 export const __wbg_get_sphericalsurfaceparams_radius: (a: number) => number;
 export const __wbg_get_sphericalsurfaceparams_segments_r: (a: number) => number;
@@ -87,6 +88,7 @@ export const generate_spherical_surface: (a: number, b: number, c: number, d: an
 export const get_spherical_surface_buffer_sizes: (a: number, b: number) => bigint;
 export const intersect_sphere_batch: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: any) => void;
 export const sphericalsurfaceparams_new: () => number;
+export const calculate_electric_field: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number, q: number, r: any, s: number, t: number, u: any) => void;
 export const __wbindgen_externrefs: WebAssembly.Table;
 export const __wbindgen_malloc: (a: number, b: number) => number;
 export const __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
