@@ -169,12 +169,13 @@ export function calculate_boom_correction_json(element_diameter: number, boom_di
  * * `active_harmonic` - Active harmonic number
  * * `is_inverted_v` - Inverted V flag for Windom antenna
  * * `time` - Current time for animation
+ * * `ground_height` - Antenna height above ground in wavelengths (0.0 = free space)
  * * `grid_size` - Size of the grid (grid_size x grid_size)
  * * `spacing` - Spacing between grid points
  * * `matrix_buffer` - Output buffer for instance matrices (16 floats per instance)
  * * `color_buffer` - Output buffer for instance colors (3 floats per instance)
  */
-export function calculate_electric_field(antenna_type: string, polarization_type: string, speed: number, amplitude_scale: number, is_rhcp: boolean, antenna_length: number, radial_angle: string, active_harmonic: number, is_inverted_v: boolean, time: number, grid_size: number, spacing: number, matrix_buffer: Float32Array, color_buffer: Float32Array): void;
+export function calculate_electric_field(antenna_type: string, polarization_type: string, speed: number, amplitude_scale: number, is_rhcp: boolean, antenna_length: number, radial_angle: string, active_harmonic: number, is_inverted_v: boolean, time: number, ground_height: number, grid_size: number, spacing: number, matrix_buffer: Float32Array, color_buffer: Float32Array): void;
 
 /**
  * Calculate electric field intensity for a single angle
@@ -498,6 +499,7 @@ export interface InitOutput {
     readonly neccontext_new: () => number;
     readonly neccontext_set_frequency: (a: number, b: number) => void;
     readonly neccontext_set_ground: (a: number, b: number) => void;
+    readonly calculate_electric_field: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number, q: number, r: number, s: any, t: number, u: number, v: any) => void;
     readonly __wbg_get_sphericalsurfaceparams_max_angle: (a: number) => number;
     readonly __wbg_get_sphericalsurfaceparams_radius: (a: number) => number;
     readonly __wbg_get_sphericalsurfaceparams_segments_r: (a: number) => number;
@@ -513,7 +515,6 @@ export interface InitOutput {
     readonly get_spherical_surface_buffer_sizes: (a: number, b: number) => bigint;
     readonly intersect_sphere_batch: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: any) => void;
     readonly sphericalsurfaceparams_new: () => number;
-    readonly calculate_electric_field: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number, q: number, r: any, s: number, t: number, u: any) => void;
     readonly __wbindgen_externrefs: WebAssembly.Table;
     readonly __wbindgen_malloc: (a: number, b: number) => number;
     readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;

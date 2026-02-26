@@ -643,6 +643,7 @@ export function calculate_boom_correction_json(element_diameter, boom_diameter, 
  * * `active_harmonic` - Active harmonic number
  * * `is_inverted_v` - Inverted V flag for Windom antenna
  * * `time` - Current time for animation
+ * * `ground_height` - Antenna height above ground in wavelengths (0.0 = free space)
  * * `grid_size` - Size of the grid (grid_size x grid_size)
  * * `spacing` - Spacing between grid points
  * * `matrix_buffer` - Output buffer for instance matrices (16 floats per instance)
@@ -657,12 +658,13 @@ export function calculate_boom_correction_json(element_diameter, boom_diameter, 
  * @param {number} active_harmonic
  * @param {boolean} is_inverted_v
  * @param {number} time
+ * @param {number} ground_height
  * @param {number} grid_size
  * @param {number} spacing
  * @param {Float32Array} matrix_buffer
  * @param {Float32Array} color_buffer
  */
-export function calculate_electric_field(antenna_type, polarization_type, speed, amplitude_scale, is_rhcp, antenna_length, radial_angle, active_harmonic, is_inverted_v, time, grid_size, spacing, matrix_buffer, color_buffer) {
+export function calculate_electric_field(antenna_type, polarization_type, speed, amplitude_scale, is_rhcp, antenna_length, radial_angle, active_harmonic, is_inverted_v, time, ground_height, grid_size, spacing, matrix_buffer, color_buffer) {
     const ptr0 = passStringToWasm0(antenna_type, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
     const len0 = WASM_VECTOR_LEN;
     const ptr1 = passStringToWasm0(polarization_type, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
@@ -673,7 +675,7 @@ export function calculate_electric_field(antenna_type, polarization_type, speed,
     var len3 = WASM_VECTOR_LEN;
     var ptr4 = passArrayF32ToWasm0(color_buffer, wasm.__wbindgen_malloc);
     var len4 = WASM_VECTOR_LEN;
-    wasm.calculate_electric_field(ptr0, len0, ptr1, len1, speed, amplitude_scale, is_rhcp, antenna_length, ptr2, len2, active_harmonic, is_inverted_v, time, grid_size, spacing, ptr3, len3, matrix_buffer, ptr4, len4, color_buffer);
+    wasm.calculate_electric_field(ptr0, len0, ptr1, len1, speed, amplitude_scale, is_rhcp, antenna_length, ptr2, len2, active_harmonic, is_inverted_v, time, ground_height, grid_size, spacing, ptr3, len3, matrix_buffer, ptr4, len4, color_buffer);
 }
 
 /**

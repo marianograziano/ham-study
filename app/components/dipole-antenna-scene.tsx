@@ -49,28 +49,25 @@ function ImpedanceDisplay({
         const tag = 1;
 
         if (isInvertedV) {
-          // Approximate with straight wire for now to show something, or omit
-          // Proper inverted V needs two wires, but get_impedance expects one source
-          // For now, let's just use the straight wire impedance
           ctx.add_wire(
+            0,
+            0,
             -lengthFactor / 2,
             0,
             0,
             lengthFactor / 2,
-            0,
-            0,
             0.001,
             segments,
             tag,
           );
         } else {
           ctx.add_wire(
+            0,
+            0,
             -lengthFactor / 2,
             0,
             0,
             lengthFactor / 2,
-            0,
-            0,
             0.001,
             segments,
             tag,
@@ -222,34 +219,27 @@ function RadiationPattern({
 
         // Setup wire
         if (isInvertedV) {
-          // We'll mimic the inverted V by actually creating two wires for a better far field?
-          // The NecSimulation currently needs just `add_wire`.
-          // Let's use two wires sharing the origin for a real V shape. Wait, our Impedance
-          // assumes single wire center feed. Let's stick to a single wire or two driven wires.
-          // To keep it simple for far field, we'll use a straight horizontal wire for now,
-          // just rotated visually, as our NecSimulation is very basic.
-          // Wait, I can do two wires:
-          // ctx.add_wire(0, 0, 0, x, y, z...). But feed is single source.
-          // Let's just use the straight horizontal wire for now to demonstrate ground reflection.
+          // For inverted V, we'll keep it as a straight wire for now in far field
+          // but properly aligned to Z axis.
           ctx.add_wire(
+            0,
+            0,
             -length / 2,
             0,
             0,
             length / 2,
-            0,
-            0,
             0.001,
             segments,
             tag,
           );
         } else {
           ctx.add_wire(
+            0,
+            0,
             -length / 2,
             0,
             0,
             length / 2,
-            0,
-            0,
             0.001,
             segments,
             tag,
@@ -690,6 +680,7 @@ export default function DipoleAntennaScene({
               amplitudeScale={1.5}
               antennaLength={lengthFactor} // Passing lambda fraction
               radialAngle={isInvertedV ? "120" : "180"} // Just for potential use
+              groundHeight={groundHeight}
             />
           )}
         </Canvas>

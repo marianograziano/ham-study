@@ -187,6 +187,7 @@ fn calculate_field_internal(
     active_harmonic: i32,
     is_inverted_v: bool,
     time: f64,
+    ground_height: f64,
     grid_size: i32,
     spacing: f64,
     matrix_buffer: &mut [f32],
@@ -226,6 +227,31 @@ fn calculate_field_internal(
 
             // Phase calculation
             let phase = k * dist - time * speed_factor;
+            let mut val_y_base = phase.sin();
+            let mut val_h_base = phase.cos();
+            let mut wave_pulse_base = (phase.sin() + 1.0) * 0.5;
+
+            if ground_height > 0.0 {
+                // If ground is present, add the reflected wave
+                // Reflecting perfectly conducting horizontal ground assumption:
+                // Grid is in the plane of the antenna (Y=0 usually).
+                // Distance to image = sqrt(pos_x^2 + pos_z^2 + (2H)^2)
+                // We use height in terms of lambda (1.0 = lambda). k = 2.0 in our visual scale?
+                // Wait, in visual scale, spacing=0.4, grid=100.
+                // In visualization, k=2.0 generates typical wave density.
+                // For height mapping we need to convert ground_height (in lambda) to the same visual scale metrics.
+                // The visual wavelength = 2*pi / k = pi ~ 3.14.
+                // So ground_height visual = ground_height * pi.
+                let height_visual = ground_height * std::f64::consts::PI;
+                let dist_img =
+                    (pos_x * pos_x + pos_z * pos_z + 4.0 * height_visual * height_visual).sqrt();
+                let phase_img = k * dist_img - time * speed_factor;
+
+                // For Horizontal polarization, reflection coeff is -1
+                val_y_base -= phase_img.sin();
+                val_h_base -= phase_img.cos();
+                wave_pulse_base = (val_y_base + 1.0) * 0.5;
+            }
 
             // Direction & handedness
             let angle = pos_z.atan2(pos_x);
@@ -401,8 +427,8 @@ fn calculate_field_internal(
             let decay = (1.0 - dist / 22.0).max(0.0);
             let effective_amp = amp * decay;
 
-            let val_y = phase.sin();
-            let val_h = phase.cos();
+            let val_y = val_y_base;
+            let val_h = val_h_base;
 
             let disp_y = val_y * y_scale * effective_amp;
             let disp_h = val_h * h_scale * effective_amp;
@@ -459,7 +485,7 @@ fn calculate_field_internal(
                 hsl_to_rgb(0.55, 0.9, 0.5)
             };
 
-            let wave_pulse = (phase.sin() + 1.0) * 0.5;
+            let wave_pulse = wave_pulse_base;
             let sharpness = wave_pulse.powi(2);
             let effective_gain = dir_gain.max(0.3);
             let brightness = sharpness * decay * 2.0 * effective_gain + 0.2;
@@ -489,6 +515,7 @@ fn calculate_field_internal(
 /// * `active_harmonic` - Active harmonic number
 /// * `is_inverted_v` - Inverted V flag for Windom antenna
 /// * `time` - Current time for animation
+/// * `ground_height` - Antenna height above ground in wavelengths (0.0 = free space)
 /// * `grid_size` - Size of the grid (grid_size x grid_size)
 /// * `spacing` - Spacing between grid points
 /// * `matrix_buffer` - Output buffer for instance matrices (16 floats per instance)
@@ -505,6 +532,7 @@ pub fn calculate_electric_field(
     active_harmonic: i32,
     is_inverted_v: bool,
     time: f64,
+    ground_height: f64,
     grid_size: i32,
     spacing: f64,
     matrix_buffer: &mut [f32],
@@ -524,6 +552,7 @@ pub fn calculate_electric_field(
         active_harmonic,
         is_inverted_v,
         time,
+        ground_height,
         grid_size,
         spacing,
         matrix_buffer,

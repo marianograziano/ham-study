@@ -245,9 +245,10 @@ export default {
             "Selected material conductivity affects element design slightly.",
         },
         materials: {
-          metal_bonded: "Metal Boom - Bonded",
-          metal_insulated: "Metal Boom - Insulated",
-          pvc: "PVC/PPR Boom",
+          aluminum: "Aluminum - Standard",
+          copper: "Copper - High Conductivity",
+          stainless_steel: "Stainless Steel - High Resistance",
+          fiberglass: "Fiberglass - Insulator",
         },
       },
       results: {
