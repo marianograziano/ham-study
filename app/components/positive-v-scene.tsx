@@ -79,7 +79,10 @@ function RadiationPattern() {
       for (let i = 0; i < posAttribute.count; i++) {
         vertex.fromBufferAttribute(posAttribute, i);
         vertex.normalize();
-        phis.push(Math.atan2(vertex.z, vertex.x));
+        // The WASM dipole model expects the antenna along the Z-axis,
+        // but our 3D V-antenna models are primarily along the X-axis.
+        // We shift azimuth by 90 deg (PI/2) to orient the pattern correctly.
+        phis.push(Math.atan2(vertex.z, vertex.x) + Math.PI / 2);
         thetas.push(Math.asin(vertex.y));
       }
 
