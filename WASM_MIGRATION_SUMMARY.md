@@ -345,15 +345,30 @@ const gains = await calculatePatternGainGrid("yagi", positionsX, positionsZ, 0.5
 
 ## 后续建议
 
-### 阶段 4: 性能优化
+## 阶段 4: V型天线 NEC2 真实物理迁移 (已完成) ✅
+
+已将基于经验公式的天线场景迁移至真实的 NEC2 物理模拟核心：
+- `app/components/positive-v-scene.tsx`
+- `app/components/inverted-v-scene.tsx`
+
+**关键改进：**
+1. **采用 3 段导线 (3-segment wire) 的精密几何模型**：左臂、右臂，以及居中的激磁短线，从而确保两臂天线拥有完美且对等的对称性。
+2. **实时阻抗计算 (Live Impedance计算)**：首次为 V 型天线提供了真实的实部和虚部阻抗实时估测。
+3. **真实方向图和大地效应参数 (Ground Height)**：不再使用写死的基于球坐标的三角函数包络，而是调用 NEC2 从底层场方程直接求解得到的高精度远场数据，可以准确呈现离地高度变化导致的反弹干涉。
+
+---
+
+## 阶段 5: 其余天线物理迁移 (进行中)
+
+- 同样需要为 Yagi、Quad、端馈、Windom 等其他使用旧版 `calculateAntennaGainBatch` 后备算式的天线绑定更真实的基于 `NecContext` 的物理网格分析。
+
+---
+
+## 阶段 6: 性能优化 与 扩展功能
 
 - 集成 Web Worker 进行批量计算
 - 添加几何体缓存
 - 实现计算结果缓存
-
-### 阶段 5: 扩展功能
-
-- 添加更多天线类型计算 (Log-Periodic, Discone)
 - 集成专业传播预测 (VOACAP)
 
 ---

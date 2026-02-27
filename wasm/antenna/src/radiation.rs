@@ -136,6 +136,16 @@ pub fn calculate_antenna_gain(
             };
             val
         }
+        AntennaType::InvertedV | AntennaType::PositiveV => {
+            // V-antennas: slightly broader than a normal dipole in the main planes
+            let cos_gamma = z;
+            let sin_gamma = (1.0 - z * z).sqrt().max(0.001);
+            let kl_2 = std::f64::consts::PI * antenna_length;
+            let num = (kl_2 * cos_gamma).cos() - kl_2.cos();
+            let mut gain = (num / sin_gamma).abs();
+            gain *= 0.95; // Slightly less peak gain than straight dipole
+            gain
+        }
     };
 
     gain * efficiency

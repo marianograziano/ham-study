@@ -3,31 +3,111 @@ import { ArcballControls } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
-import { type BufferGeometry, SphereGeometry, Vector3 } from "three";
+import { type BufferGeometry, SphereGeometry, Vector3, DoubleSide } from "three";
 import { Button } from "~/components/ui/button";
 import { Label } from "~/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
 import { Switch } from "~/components/ui/switch";
-import {
-  calculateAntennaGainBatch,
-  initAntennaWasm,
-} from "~/utils/antenna-physics-wasm";
+import { initNecWasm, NecContext } from "~/utils/nec-wasm";
 import { ElectricFieldWasm } from "./electric-field-wasm";
 
-// Height definition
-const height = 3;
+const height = 3; // Mast height base
 
-function PositiveVAntenna() {
-  // Positive V Geometry (Dipole bent upwards)
+function ImpedanceDisplay({
+  lengthFactor,
+  groundHeight,
+}: {
+  lengthFactor: number;
+  groundHeight: number;
+}) {
+  const [impedance, setImpedance] = useState<{ re: number; im: number } | null>(null);
+  const [isCalculating, setIsCalculating] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    const calculate = async () => {
+      setIsCalculating(true);
+      try {
+        await initNecWasm();
+        if (!active) return;
+
+        const ctx = new NecContext();
+        ctx.initialize(1);
+        ctx.set_frequency(300.0); // lambda = 1m
+        if (groundHeight > 0) ctx.set_ground(groundHeight);
+
+        const armLength = lengthFactor / 2;
+        const angle = Math.PI / 4;
+        const d = 0.005; // half length of center feed wire
+        let armSegments = Math.floor((armLength - d) / 0.02);
+        if (armSegments < 1) armSegments = 1;
+
+        const ySign = 1;
+        const xTip = (armLength - d) * Math.sin(angle); // same as cos for 45 deg, keeping matching geometry
+        const yTip = ySign * (armLength - d) * Math.cos(angle);
+
+        // Center wire (TAG 1)
+        ctx.add_wire(-d, 0, 0, d, 0, 0, 0.001, 1, 1);
+        // Right wire (TAG 2)
+        ctx.add_wire(d, 0, 0, xTip + d, yTip, 0, 0.001, armSegments, 2);
+        // Left wire (TAG 3)
+        ctx.add_wire(-d, 0, 0, -xTip - d, yTip, 0, 0.001, armSegments, 3);
+
+        ctx.add_voltage_source(1, 1, 1.0, 0.0);
+        ctx.calculate();
+
+        const zArr = ctx.get_impedance(1);
+        if (zArr && zArr.length === 2 && active) {
+          setImpedance({ re: zArr[0], im: zArr[1] });
+        }
+        ctx.free();
+      } catch (err) {
+        console.error("NEC Calculation Error:", err);
+      } finally {
+        if (active) setIsCalculating(false);
+      }
+    };
+
+    const timer = setTimeout(calculate, 300);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [lengthFactor, groundHeight]);
+
+  return (
+    <div className="pt-3 border-t border-white/10 mt-3">
+      <div className="mb-2 text-xs md:text-sm font-medium text-zinc-200">
+        Live Impedance (NEC2)
+      </div>
+      <div className="text-xs font-mono bg-black/50 p-2 rounded text-zinc-300">
+        {isCalculating ? (
+          <span className="animate-pulse">Calculating Z...</span>
+        ) : impedance ? (
+          <span>
+            Z = {impedance.re.toFixed(1)} {impedance.im >= 0 ? "+" : "-"} j
+            {Math.abs(impedance.im).toFixed(1)} Ω
+          </span>
+        ) : (
+          <span>--</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function PositiveVAntenna({ length }: { length: number }) {
   const angle = Math.PI / 4; // 45 degrees
-  const length = 2; // Arm length
+  const armLength = length / 2;
 
-  // To pin base at (0,0) and point Up-Left (for Left Leg):
-  // Rotation: +45deg (Z). Local Up is (-sin, cos).
-  // Center needs to be at (+L/2 * -sin(45), +L/2 * cos(45)).
-
-  const xOffset = (length / 2) * Math.sin(angle); // 0.707
-  const yOffset = (length / 2) * Math.cos(angle); // 0.707
+  const ySign = 1;
+  const xTip = armLength * Math.sin(angle);
+  const yTip = ySign * armLength * Math.cos(angle);
+  
+  // Angle for right leg. Tip is at (xTip, yTip). Base at (0,0).
+  const rightAngle = Math.atan2(yTip, xTip);
+  // Angle for left leg. Tip is at (-xTip, yTip).
+  const leftAngle = Math.atan2(yTip, -xTip);
 
   return (
     <group position={[0, height, 0]}>
@@ -43,32 +123,44 @@ function PositiveVAntenna() {
         <meshStandardMaterial color="white" />
       </mesh>
 
-      {/* Left Leg (Up and Left) */}
-      <mesh position={[-xOffset, yOffset, 0]} rotation={[0, 0, angle]}>
-        <cylinderGeometry args={[0.02, 0.02, length, 16]} />
+      {/* Left Leg (-X) */}
+      <mesh
+        position={[-xTip / 2, yTip / 2, 0]}
+        rotation={[0, 0, leftAngle - Math.PI / 2]}
+      >
+        <cylinderGeometry args={[0.02, 0.02, armLength, 16]} />
         <meshStandardMaterial color="#ef4444" />
       </mesh>
 
-      {/* Right Leg (Up and Right) */}
-      <mesh position={[xOffset, yOffset, 0]} rotation={[0, 0, -angle]}>
-        <cylinderGeometry args={[0.02, 0.02, length, 16]} />
+      {/* Right Leg (+X) */}
+      <mesh
+        position={[xTip / 2, yTip / 2, 0]}
+        rotation={[0, 0, rightAngle - Math.PI / 2]}
+      >
+        <cylinderGeometry args={[0.02, 0.02, armLength, 16]} />
         <meshStandardMaterial color="#ef4444" />
       </mesh>
     </group>
   );
 }
 
-function RadiationPattern() {
+function RadiationPattern({
+  lengthFactor,
+  groundHeight,
+}: {
+  lengthFactor: number;
+  groundHeight: number;
+}) {
   const [geometry, setGeometry] = useState<BufferGeometry | null>(null);
 
   useEffect(() => {
     let isMounted = true;
 
     const generateGeometry = async () => {
-      await initAntennaWasm();
+      await initNecWasm();
       if (!isMounted) return;
 
-      const geo = new SphereGeometry(1, 40, 30);
+      const geo = new SphereGeometry(1, 60, 30);
       const posAttribute = geo.attributes.position;
       const vertex = new Vector3();
       const scale = 5;
@@ -79,44 +171,65 @@ function RadiationPattern() {
       for (let i = 0; i < posAttribute.count; i++) {
         vertex.fromBufferAttribute(posAttribute, i);
         vertex.normalize();
-        // Since DP pattern in WASM assumes wire is on Z-axis,
-        // and our wire is on X-axis, we rotate the azimuth by 90 degrees
-        phis.push(Math.atan2(vertex.z, vertex.x) + Math.PI / 2);
+        phis.push(Math.atan2(vertex.z, vertex.x));
         thetas.push(Math.asin(vertex.y));
       }
 
-      let wasmGains: number[] = [];
+      let gains: number[] = [];
       try {
-        wasmGains = await calculateAntennaGainBatch(
-          "dp",
-          thetas,
-          phis,
-          0.5,
-          1,
-          false,
-          "60",
-          undefined,
-        );
+        const ctx = new NecContext();
+        ctx.initialize(1);
+        ctx.set_frequency(300.0);
+        ctx.set_ground(groundHeight);
+
+        const armLength = lengthFactor / 2;
+        const angle = Math.PI / 4;
+        const d = 0.005;
+        let armSegments = Math.floor((armLength - d) / 0.02);
+        if (armSegments < 1) armSegments = 1;
+
+        const ySign = 1;
+        const xTip = (armLength - d) * Math.sin(angle);
+        const yTip = ySign * (armLength - d) * Math.cos(angle);
+
+        ctx.add_wire(-d, 0, 0, d, 0, 0, 0.001, 1, 1);
+        ctx.add_wire(d, 0, 0, xTip + d, yTip, 0, 0.001, armSegments, 2);
+        ctx.add_wire(-d, 0, 0, -xTip - d, yTip, 0, 0.001, armSegments, 3);
+
+        ctx.add_voltage_source(1, 1, 1.0, 0.0);
+        ctx.calculate();
+
+        const outArray = new Float64Array(thetas.length);
+        const thetasArray = new Float64Array(thetas);
+        const phisArray = new Float64Array(phis);
+
+        ctx.calculate_far_field_pattern_3d(thetasArray, phisArray, outArray);
+        gains = Array.from(outArray);
+
+        let maxGain = 0;
+        for (let i = 0; i < gains.length; i++) {
+          if (gains[i] > maxGain) maxGain = gains[i];
+        }
+        if (maxGain > 0) {
+          for (let i = 0; i < gains.length; i++) {
+            gains[i] /= maxGain;
+          }
+        }
+
+        ctx.free();
       } catch (error) {
-        console.warn("WASM batch calculation failed, using fallback", error);
+        console.warn("NEC far field calculation failed", error);
+        gains = new Array(posAttribute.count).fill(0);
       }
 
       for (let i = 0; i < posAttribute.count; i++) {
         vertex.fromBufferAttribute(posAttribute, i);
         vertex.normalize();
-
-        let gain = 0;
-        if (wasmGains.length > 0) {
-          gain = wasmGains[i];
-        } else {
-          // Fallback
-          const angleFromX = Math.acos(vertex.x);
-          gain = 0.7 * Math.sin(angleFromX) + 0.3;
-        }
-
+        let gain = gains[i] || 0;
         vertex.multiplyScalar(gain * scale);
         posAttribute.setXYZ(i, vertex.x, vertex.y, vertex.z);
       }
+
       geo.computeVertexNormals();
 
       if (isMounted) {
@@ -129,7 +242,7 @@ function RadiationPattern() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [lengthFactor, groundHeight]);
 
   useMemo(() => {
     return () => {
@@ -146,9 +259,10 @@ function RadiationPattern() {
       <mesh geometry={geometry}>
         <meshBasicMaterial
           color="#22c55e"
-          wireframe={true}
-          transparent={true}
+          wireframe
+          transparent
           opacity={0.3}
+          side={DoubleSide}
         />
       </mesh>
     </group>
@@ -165,9 +279,9 @@ export default function PositiveVAntennaScene({
   const { t } = useTranslation("scene");
   const [showWaves, setShowWaves] = useState(true);
   const [showPattern, setShowPattern] = useState(true);
-  const [speedMode, setSpeedMode] = useState<"slow" | "medium" | "fast">(
-    "medium",
-  );
+  const [lengthFactor, setLengthFactor] = useState(0.5);
+  const [groundHeight, setGroundHeight] = useState(0.0);
+  const [speedMode, setSpeedMode] = useState<"slow" | "medium" | "fast">("medium");
 
   const uniqueId = useId();
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -175,12 +289,11 @@ export default function PositiveVAntennaScene({
   const handleDownload = () => {
     if (canvasRef.current) {
       const link = document.createElement("a");
-      link.download = "positive-v.png";
+      link.download = "positive-v-scene.png";
       link.href = canvasRef.current.toDataURL("image/png");
       link.click();
     }
   };
-  // Removed vizMode logic
 
   const speedMultiplier = {
     slow: 0.3,
@@ -189,6 +302,8 @@ export default function PositiveVAntennaScene({
   }[speedMode];
 
   const effectiveSpeed = isThumbnail && !isHovered ? 0 : speedMultiplier;
+  const visualScale = 6;
+  const physicalLength = lengthFactor * visualScale;
 
   const LegendContent = () => (
     <>
@@ -217,7 +332,6 @@ export default function PositiveVAntennaScene({
           <span>{t("positiveVAntenna.pattern")}</span>
         </div>
         <div className="flex items-center gap-2">
-          {/* Gradient Legend for E-field Strength */}
           <div
             className="w-16 h-3 rounded-sm"
             style={{
@@ -233,7 +347,6 @@ export default function PositiveVAntennaScene({
 
   const ControlsContent = () => (
     <div className="flex flex-col space-y-3">
-      {/* Visualization Mode */}
       <div className="pt-3 border-t border-white/10 md:border-none md:pt-0">
         <div className="mb-2 text-xs md:text-sm font-medium text-zinc-200">
           {t("common.controls.visualization")}
@@ -267,6 +380,78 @@ export default function PositiveVAntennaScene({
               {t("common.controls.showPattern")}
             </Label>
           </div>
+        </div>
+      </div>
+
+      <div className="pt-3 border-t border-white/10">
+        <div className="mb-2 text-xs md:text-sm font-medium text-zinc-200">
+          {t("common.controls.length")}
+        </div>
+        <RadioGroup
+          defaultValue="0.5"
+          value={lengthFactor.toString()}
+          onValueChange={(v) => setLengthFactor(Number.parseFloat(v))}
+          className="flex gap-4"
+        >
+          <div className="flex items-center space-x-2">
+            <RadioGroupItem
+              value="0.5"
+              id={`${uniqueId}l-half`}
+              className="border-zinc-400 text-primary-foreground data-[state=checked]:bg-transparent data-[state=checked]:border-primary-foreground data-[state=checked]:text-input"
+            />
+            <Label
+              htmlFor={`${uniqueId}l-half`}
+              className="text-xs cursor-pointer text-zinc-300"
+            >
+              0.5λ
+            </Label>
+          </div>
+          <div className="flex items-center space-x-2">
+            <RadioGroupItem
+              value="1.0"
+              id={`${uniqueId}l-full`}
+              className="border-zinc-400 text-primary-foreground data-[state=checked]:bg-transparent data-[state=checked]:border-primary-foreground data-[state=checked]:text-input"
+            />
+            <Label
+              htmlFor={`${uniqueId}l-full`}
+              className="text-xs cursor-pointer text-zinc-300"
+            >
+              1.0λ
+            </Label>
+          </div>
+          <div className="flex items-center space-x-2">
+            <RadioGroupItem
+              value="1.5"
+              id={`${uniqueId}l-1.5`}
+              className="border-zinc-400 text-primary-foreground data-[state=checked]:bg-transparent data-[state=checked]:border-primary-foreground data-[state=checked]:text-input"
+            />
+            <Label
+              htmlFor={`${uniqueId}l-1.5`}
+              className="text-xs cursor-pointer text-zinc-300"
+            >
+              1.5λ
+            </Label>
+          </div>
+        </RadioGroup>
+      </div>
+
+      <div className="pt-3 border-t border-white/10">
+        <div className="mb-2 text-xs md:text-sm font-medium text-zinc-200">
+          {t("common.controls.groundHeight", "Ground Height (λ)")}
+        </div>
+        <div className="flex items-center space-x-4">
+          <input
+            type="range"
+            min="0"
+            max="2"
+            step="0.1"
+            value={groundHeight}
+            onChange={(e) => setGroundHeight(Number.parseFloat(e.target.value))}
+            className="w-full accent-primary-foreground"
+          />
+          <span className="text-xs text-zinc-300 w-8 text-right font-mono">
+            {groundHeight === 0 ? "Free" : groundHeight.toFixed(1)}
+          </span>
         </div>
       </div>
 
@@ -321,6 +506,7 @@ export default function PositiveVAntennaScene({
           </div>
         </RadioGroup>
       </div>
+
       <div className="pt-3 border-t border-white/10">
         <Button
           variant="secondary"
@@ -332,6 +518,8 @@ export default function PositiveVAntennaScene({
           {t("common.controls.download")}
         </Button>
       </div>
+
+      <ImpedanceDisplay lengthFactor={lengthFactor} groundHeight={groundHeight} />
     </div>
   );
 
@@ -361,17 +549,12 @@ export default function PositiveVAntennaScene({
           <axesHelper args={[5]} />
           <gridHelper
             args={[20, 20, 0x333333, 0x222222]}
-            // Using height/2 for grid helper relative to mast bottom?
-            // Original Inverted V was position={[0, -height/2, 0]}.
-            // Original Positive V was position={[0, -1, 0]}.
-            // Let's stick to the Inverted V logic for grid since we are using its mast.
             position={[0, 0, 0]}
           />
 
-          <PositiveVAntenna />
-          {showPattern && <RadiationPattern />}
-          {/* Surface/Field Mode */}
-          {/* Surface/Field Mode - Lifted to match antenna height */}
+          <PositiveVAntenna length={physicalLength} />
+          {showPattern && <RadiationPattern lengthFactor={lengthFactor} groundHeight={groundHeight} />}
+          
           {showWaves && (
             <group position={[0, height, 0]}>
               <ElectricFieldWasm
@@ -379,8 +562,9 @@ export default function PositiveVAntennaScene({
                 polarizationType="horizontal"
                 speed={effectiveSpeed}
                 amplitudeScale={1.5}
-                antennaLength={0.5}
+                antennaLength={lengthFactor}
                 rotation={[0, Math.PI / 2, 0]}
+                groundHeight={groundHeight}
               />
             </group>
           )}
@@ -405,12 +589,9 @@ export default function PositiveVAntennaScene({
 
       {!isThumbnail && (
         <div className="flex flex-col gap-4 md:hidden">
-          {/* Mobile Controls below chart */}
           <div className="bg-zinc-900 border rounded-lg p-4">
             <ControlsContent />
           </div>
-
-          {/* Mobile Legend below chart */}
           <div className="bg-zinc-50 dark:bg-zinc-900 border rounded-lg p-4">
             <LegendContent />
           </div>

@@ -14,6 +14,8 @@ pub enum AntennaType {
     LongWire,
     Windom,
     EndFed,
+    InvertedV,
+    PositiveV,
 }
 
 impl From<&str> for AntennaType {
@@ -21,7 +23,7 @@ impl From<&str> for AntennaType {
         match s {
             "vertical" => AntennaType::Vertical,
             "gp" => AntennaType::GP,
-            "dp" | "inverted-v" | "positive-v" => AntennaType::DP,
+            "dp" => AntennaType::DP,
             "yagi" => AntennaType::Yagi,
             "quad" => AntennaType::Quad,
             "moxon" => AntennaType::Moxon,
@@ -30,6 +32,8 @@ impl From<&str> for AntennaType {
             "long-wire" => AntennaType::LongWire,
             "windom" => AntennaType::Windom,
             "end-fed" => AntennaType::EndFed,
+            "inverted-v" => AntennaType::InvertedV,
+            "positive-v" => AntennaType::PositiveV,
             _ => AntennaType::Vertical,
         }
     }
@@ -402,6 +406,41 @@ fn calculate_field_internal(
                                     let kl_2 = (std::f64::consts::PI * 2.0 * l_lambda) / 2.0;
                                     let num = (kl_2 * cos_theta).cos() - kl_2.cos();
                                     dir_gain = (num / safe_sin_theta).abs();
+                                    y_scale = 0.0;
+                                    h_scale = 1.0;
+                                }
+                                AntennaType::InvertedV | AntennaType::PositiveV => {
+                                    let l_lambda = antenna_length;
+                                    let is_inv = antenna_type == AntennaType::InvertedV;
+
+                                    // A V-antenna field is roughly the sum of two angled dipoles.
+                                    // For visualization, we can use a superposition approximation.
+                                    // Angle of the V is 90 degrees total (45 deg arms).
+                                    let arm_angle = std::f64::consts::PI / 4.0;
+                                    let _y_sign = if is_inv { -1.0 } else { 1.0 };
+
+                                    // We'll calculate the gain in the X-Z plane (the horizontal plane shown in E-field view)
+                                    // In our coordinate system for E-field:
+                                    // antenna is along X-Y plane, we look at grid in X-Z.
+                                    // Angle 'angle' is atan2(pos_z, pos_x).
+
+                                    // Simplified V-antenna gain:
+                                    // It's like a dipole but with some X-component and some Y-component.
+                                    // In X-Z plane (Y=0), the gain is mostly from the X-projection.
+                                    let cos_phi = angle.cos(); // along X
+                                    let sin_phi = angle.sin(); // along Z
+
+                                    // Projections of 45-deg arms onto X axis is cos(45)=0.707
+                                    // Gain is roughly dipole-like but broadens a bit.
+                                    let l_eff = l_lambda * arm_angle.cos();
+                                    let kl_2 = (std::f64::consts::PI * 2.0 * l_eff) / 2.0;
+                                    let num = (kl_2 * sin_phi).cos() - kl_2.cos();
+                                    let den = cos_phi.abs().max(0.001);
+                                    dir_gain = (num / den).abs();
+
+                                    // Add a bit of omni-directional component for the "V" effect
+                                    dir_gain = dir_gain * 0.9 + 0.1;
+
                                     y_scale = 0.0;
                                     h_scale = 1.0;
                                 }
