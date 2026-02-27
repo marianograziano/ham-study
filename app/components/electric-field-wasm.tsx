@@ -105,6 +105,7 @@ export function ElectricFieldWasm(props: ElectricFieldWasmProps) {
         activeHarmonic ?? 1,
         isInvertedV,
         timeRef.current,
+        groundHeight,
         gridSize,
         spacing,
         matrixBuffer.current,
