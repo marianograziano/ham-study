@@ -21,7 +21,7 @@ impl From<&str> for AntennaType {
         match s {
             "vertical" => AntennaType::Vertical,
             "gp" => AntennaType::GP,
-            "dp" => AntennaType::DP,
+            "dp" | "inverted-v" | "positive-v" => AntennaType::DP,
             "yagi" => AntennaType::Yagi,
             "quad" => AntennaType::Quad,
             "moxon" => AntennaType::Moxon,

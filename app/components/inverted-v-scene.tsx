@@ -20,8 +20,8 @@ const height = 3;
 function InvertedVAntenna() {
   const angle = Math.PI / 4; // 45 degrees
   const length = 2; // Arm length
-  // Rotation for downward legs: 135 degrees (90 + 45)
-  const legRotation = angle + Math.PI / 2;
+  // For X-axis alignment, rotate around Z axis
+  const legRotation = Math.PI / 2 - angle;
 
   return (
     <group position={[0, height, 0]}>
@@ -37,27 +37,27 @@ function InvertedVAntenna() {
         <meshStandardMaterial color="white" />
       </mesh>
 
-      {/* Left Leg (Down and Forward/Z) */}
+      {/* Left Leg (Down and Left/-X) */}
       <mesh
         position={[
-          0,
+          (-length * Math.cos(angle)) / 2,
           (-length * Math.sin(angle)) / 2,
-          (length * Math.cos(angle)) / 2,
+          0,
         ]}
-        rotation={[legRotation, 0, 0]}
+        rotation={[0, 0, legRotation]}
       >
         <cylinderGeometry args={[0.02, 0.02, length, 16]} />
         <meshStandardMaterial color="#ef4444" />
       </mesh>
 
-      {/* Right Leg (Down and Backward/-Z) */}
+      {/* Right Leg (Down and Right/+X) */}
       <mesh
         position={[
-          0,
+          (length * Math.cos(angle)) / 2,
           (-length * Math.sin(angle)) / 2,
-          (-length * Math.cos(angle)) / 2,
+          0,
         ]}
-        rotation={[-legRotation, 0, 0]}
+        rotation={[0, 0, -legRotation]}
       >
         <cylinderGeometry args={[0.02, 0.02, length, 16]} />
         <meshStandardMaterial color="#ef4444" />
@@ -87,7 +87,9 @@ function RadiationPattern() {
       for (let i = 0; i < posAttribute.count; i++) {
         vertex.fromBufferAttribute(posAttribute, i);
         vertex.normalize();
-        phis.push(Math.atan2(vertex.z, vertex.x));
+        // Since DP pattern in WASM assumes wire is on Z-axis,
+        // and our wire is on X-axis, we rotate the azimuth by 90 degrees
+        phis.push(Math.atan2(vertex.z, vertex.x) + Math.PI / 2);
         thetas.push(Math.asin(vertex.y));
       }
 
@@ -382,6 +384,8 @@ export default function InvertedVAntennaScene({
                 polarizationType="horizontal"
                 speed={effectiveSpeed}
                 amplitudeScale={1.5}
+                antennaLength={0.5}
+                rotation={[0, Math.PI / 2, 0]}
               />
             </group>
           )}

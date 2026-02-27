@@ -26,7 +26,7 @@ function PositiveVAntenna() {
   // Rotation: +45deg (Z). Local Up is (-sin, cos).
   // Center needs to be at (+L/2 * -sin(45), +L/2 * cos(45)).
 
-  const zOffset = (length / 2) * Math.sin(angle); // 0.707
+  const xOffset = (length / 2) * Math.sin(angle); // 0.707
   const yOffset = (length / 2) * Math.cos(angle); // 0.707
 
   return (
@@ -43,14 +43,14 @@ function PositiveVAntenna() {
         <meshStandardMaterial color="white" />
       </mesh>
 
-      {/* Left Leg (Up and Forward) */}
-      <mesh position={[0, yOffset, zOffset]} rotation={[angle, 0, 0]}>
+      {/* Left Leg (Up and Left) */}
+      <mesh position={[-xOffset, yOffset, 0]} rotation={[0, 0, angle]}>
         <cylinderGeometry args={[0.02, 0.02, length, 16]} />
         <meshStandardMaterial color="#ef4444" />
       </mesh>
 
-      {/* Right Leg (Up and Backward) */}
-      <mesh position={[0, yOffset, -zOffset]} rotation={[-angle, 0, 0]}>
+      {/* Right Leg (Up and Right) */}
+      <mesh position={[xOffset, yOffset, 0]} rotation={[0, 0, -angle]}>
         <cylinderGeometry args={[0.02, 0.02, length, 16]} />
         <meshStandardMaterial color="#ef4444" />
       </mesh>
@@ -79,7 +79,9 @@ function RadiationPattern() {
       for (let i = 0; i < posAttribute.count; i++) {
         vertex.fromBufferAttribute(posAttribute, i);
         vertex.normalize();
-        phis.push(Math.atan2(vertex.z, vertex.x));
+        // Since DP pattern in WASM assumes wire is on Z-axis,
+        // and our wire is on X-axis, we rotate the azimuth by 90 degrees
+        phis.push(Math.atan2(vertex.z, vertex.x) + Math.PI / 2);
         thetas.push(Math.asin(vertex.y));
       }
 
@@ -91,7 +93,7 @@ function RadiationPattern() {
           phis,
           0.5,
           1,
-          true,
+          false,
           "60",
           undefined,
         );
@@ -377,6 +379,8 @@ export default function PositiveVAntennaScene({
                 polarizationType="horizontal"
                 speed={effectiveSpeed}
                 amplitudeScale={1.5}
+                antennaLength={0.5}
+                rotation={[0, Math.PI / 2, 0]}
               />
             </group>
           )}
