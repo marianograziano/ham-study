@@ -210,7 +210,6 @@ impl Solver {
                     let term = etk * ctx.segj.ax[k] * ssnx
                         + ets * ctx.segj.bx[k]
                         + etc * ctx.segj.cx[k] * ssnx;
-
                     sum_term = sum_term + term;
                 }
 

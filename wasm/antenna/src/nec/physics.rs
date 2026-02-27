@@ -36,6 +36,7 @@ pub fn tbf(i: usize, icap: usize, ctx: &mut Context) {
 
     loop {
         if jcox != 0 {
+            let jco_store = jcox;
             if jcox < 0 {
                 jcox = -jcox;
             } else {
@@ -55,7 +56,7 @@ pub fn tbf(i: usize, icap: usize, ctx: &mut Context) {
                 ctx.segj.cx.resize(new_len, 0.0);
                 ctx.segj.jco.resize(new_len, 0);
             }
-            ctx.segj.jco[jsnox] = jcox;
+            ctx.segj.jco[jsnox] = jco_store;
 
             let d = PI_CONST * ctx.geometry.si[jcoxx];
             let sdh = d.sin();

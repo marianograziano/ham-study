@@ -46,18 +46,14 @@ fn test_dipole_impedance() {
 
     // Theoretical half-wave dipole (infinitely thin) ~ 73 + j42.5
     // With thickness, it varies slightly (often slightly shorter for resonance).
-    // Just check it's in the ballpark.
+    // The new MoM engine correctly produces ~70 ohms.
 
     let r = impedance.re;
     let x = impedance.im;
 
-    // Validating against current implementation baseline (coarse mesh 11 segs).
-    // Theoretical 73 ohms is for thin wire / fine mesh.
-    // Current result ~ 133 ohms is physically consistent (order of magnitude)
-    // and symmetric.
     assert!(
-        r > 100.0 && r < 150.0,
-        "Resistance {} should be around 130 ohms",
+        r > 60.0 && r < 85.0,
+        "Resistance {} should be around 73 ohms",
         r
     );
     assert!(
@@ -73,7 +69,7 @@ fn test_radiation_pattern_sanity() {
     sim.set_frequency(300.0);
     sim.initialize(1);
 
-    // Z-directed dipole (Vertical)
+    // Z-directed dipole
     // -0.25 to 0.25 on Z axis
     sim.add_wire(0.0, 0.0, -0.25, 0.0, 0.0, 0.25, 0.001, 11, 1);
     sim.add_voltage_source(1, 6, 1.0, 0.0); // Center feed
@@ -81,12 +77,13 @@ fn test_radiation_pattern_sanity() {
     sim.calculate().unwrap();
 
     // Check Broadside gain (theta=90, phi=0) -> Should be max
-    // theta is angle from Z-axis. Broadside is 90 deg (PI/2).
+    // theta is elevation from XZ plane, phi is azimuth in XZ plane from X axis.
+    // theta=90 (PI/2) is the Y-axis. Perpendicular to Z-axis.
     let max_gain = sim.calculate_far_field(std::f64::consts::PI / 2.0, 0.0, 100.0);
 
-    // Check Endfire gain (theta=0, phi=0) -> Should be zero (null)
-    // Along the wire axis.
-    let null_gain = sim.calculate_far_field(0.0, 0.0, 100.0);
+    // Check Endfire gain (theta=0, phi=90) -> Should be zero (null)
+    // theta=0, phi=90 (PI/2) is the Z-axis. Along the wire axis.
+    let null_gain = sim.calculate_far_field(0.0, std::f64::consts::PI / 2.0, 100.0);
 
     println!("Max Gain (Broadside): {}", max_gain);
     println!("Null Gain (Endfire): {}", null_gain);
