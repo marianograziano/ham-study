@@ -58,7 +58,7 @@ pub fn tbf(i: usize, icap: usize, ctx: &mut Context) {
             }
             ctx.segj.jco[jsnox] = jco_store;
 
-            let d = PI_CONST * ctx.geometry.si[jcoxx];
+            let d = PI_CONST * ctx.geometry.si[jcoxx] / ctx.geometry.wlam;
             let sdh = d.sin();
             let cdh = d.cos();
             let sd = 2.0 * sdh * cdh;
@@ -70,7 +70,9 @@ pub fn tbf(i: usize, icap: usize, ctx: &mut Context) {
                 1.0 - cdh * cdh + sdh * sdh
             };
 
-            let aj = 1.0 / ((1.0 / (PI_CONST * ctx.geometry.bi[jcoxx])).ln() - 0.577215664);
+            let aj = 1.0
+                / ((1.0 / (PI_CONST * ctx.geometry.bi[jcoxx] / ctx.geometry.wlam)).ln()
+                    - 0.577215664);
             pp = pp - omc / sd * aj;
 
             ctx.segj.ax[jsnox] = aj / sd * sig;
@@ -132,7 +134,7 @@ pub fn tbf(i: usize, icap: usize, ctx: &mut Context) {
 
     ctx.segj.jco[jsnop] = ix1;
 
-    let d = PI_CONST * ctx.geometry.si[ix];
+    let d = PI_CONST * ctx.geometry.si[ix] / ctx.geometry.wlam;
     let sdh = d.sin();
     let cdh = d.cos();
     let sd = 2.0 * sdh * cdh;
@@ -145,7 +147,8 @@ pub fn tbf(i: usize, icap: usize, ctx: &mut Context) {
         1.0 - cd
     };
 
-    let ap = 1.0 / ((1.0 / (PI_CONST * ctx.geometry.bi[ix])).ln() - 0.577215664);
+    let ap =
+        1.0 / ((1.0 / (PI_CONST * ctx.geometry.bi[ix] / ctx.geometry.wlam)).ln() - 0.577215664);
     let aj = ap;
 
     if njun1 == 0 {
@@ -153,7 +156,7 @@ pub fn tbf(i: usize, icap: usize, ctx: &mut Context) {
             ctx.segj.bx[jsnop] = 0.0;
             let mut xxi = 0.0;
             if icap != 0 {
-                let qp_val = PI_CONST * ctx.geometry.bi[ix];
+                let qp_val = PI_CONST * ctx.geometry.bi[ix] / ctx.geometry.wlam;
                 let xxi_val = qp_val * qp_val;
                 xxi = qp_val * (1.0 - 0.5 * xxi_val) / (1.0 - xxi_val);
             }
@@ -193,7 +196,7 @@ pub fn tbf(i: usize, icap: usize, ctx: &mut Context) {
         let mut xxi = 0.0;
         let mut qm;
         if icap != 0 {
-            qm = PI_CONST * ctx.geometry.bi[ix];
+            qm = PI_CONST * ctx.geometry.bi[ix] / ctx.geometry.wlam;
             xxi = qm * qm;
             xxi = qm * (1.0 - 0.5 * xxi) / (1.0 - xxi);
         }
@@ -504,8 +507,8 @@ fn gxx(
     (g1, g1p, g2, g2p, g3, gzp)
 }
 
-// Constants from nec2c.h
-const CONST1: Complex64 = Complex64::new(0.0, 4.771341189);
+// Constants from nec2c: CONST1 = -j * 30.0 (related to eta/(4*pi))
+const CONST1: Complex64 = Complex64::new(0.0, -30.0);
 // const CONST4: Complex64 = Complex64::new(0.0, 188.365);
 
 /// Compute E-field of sine, cosine, and constant current filaments by thin wire approximation.
@@ -756,7 +759,7 @@ pub fn efld(
     }
 
     // Call eksc or ekscx
-    let k = 2.0 * PI_CONST;
+    let k = 2.0 * PI_CONST / ctx.geometry.wlam;
     let radius_s = ctx.geometry.bi[s_idx];
 
     // Determine flag for eksc/intx (0 means singular/self)

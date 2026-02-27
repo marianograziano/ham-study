@@ -63,7 +63,7 @@ export const calculate_radiation_pattern: (a: number, b: number, c: number, d: n
 export const neccontext_add_voltage_source: (a: number, b: number, c: number, d: number, e: number) => void;
 export const neccontext_add_wire: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number) => void;
 export const neccontext_calculate: (a: number) => [number, number];
-export const neccontext_calculate_far_field: (a: number, b: number, c: number, d: number) => number;
+export const neccontext_calculate_far_field: (a: number, b: number, c: number) => number;
 export const neccontext_calculate_far_field_pattern: (a: number, b: number, c: number) => [number, number];
 export const neccontext_calculate_far_field_pattern_3d: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: any) => void;
 export const neccontext_get_current_magnitude: (a: number, b: number) => number;

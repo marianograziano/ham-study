@@ -10,10 +10,10 @@ export class NecContext {
     add_voltage_source(tag: number, seg_on_wire: number, real: number, imag: number): void;
     add_wire(x1: number, y1: number, z1: number, x2: number, y2: number, z2: number, radius: number, segments: number, tag: number): void;
     calculate(): void;
-    calculate_far_field(theta: number, phi: number, r_dist: number): number;
+    calculate_far_field(theta: number, phi: number): number;
     calculate_far_field_pattern(num_points: number, phi: number): Float64Array;
     /**
-     * Calculate 3D far field pattern (batch)
+     * Calculate 3D far field pattern (batch) with normalization
      * `thetas` and `phis` must be of same length. `output` must be at least that length.
      */
     calculate_far_field_pattern_3d(thetas: Float64Array, phis: Float64Array, output: Float64Array): void;
@@ -489,7 +489,7 @@ export interface InitOutput {
     readonly neccontext_add_voltage_source: (a: number, b: number, c: number, d: number, e: number) => void;
     readonly neccontext_add_wire: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number) => void;
     readonly neccontext_calculate: (a: number) => [number, number];
-    readonly neccontext_calculate_far_field: (a: number, b: number, c: number, d: number) => number;
+    readonly neccontext_calculate_far_field: (a: number, b: number, c: number) => number;
     readonly neccontext_calculate_far_field_pattern: (a: number, b: number, c: number) => [number, number];
     readonly neccontext_calculate_far_field_pattern_3d: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: any) => void;
     readonly neccontext_get_current_magnitude: (a: number, b: number) => number;

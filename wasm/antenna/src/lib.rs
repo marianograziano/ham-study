@@ -201,8 +201,8 @@ impl NecContext {
         self.sim.calculate()
     }
 
-    pub fn calculate_far_field(&self, theta: f64, phi: f64, r_dist: f64) -> f64 {
-        self.sim.calculate_far_field(theta, phi, r_dist)
+    pub fn calculate_far_field(&self, theta: f64, phi: f64) -> f64 {
+        self.sim.calculate_far_field(theta, phi)
     }
 
     /// Set ground height in wavelengths. Use negative or `None` equivalent (by not calling this) for free-space
@@ -214,14 +214,27 @@ impl NecContext {
         }
     }
 
-    /// Calculate 3D far field pattern (batch)
+    /// Calculate 3D far field pattern (batch) with normalization
     /// `thetas` and `phis` must be of same length. `output` must be at least that length.
     pub fn calculate_far_field_pattern_3d(&self, thetas: &[f64], phis: &[f64], output: &mut [f64]) {
         if thetas.len() != phis.len() || output.len() < thetas.len() {
             return;
         }
+        let mut max_val = 0.0;
         for i in 0..thetas.len() {
-            output[i] = self.sim.calculate_far_field(thetas[i], phis[i], 1000.0);
+            let val = self.sim.calculate_far_field(thetas[i], phis[i]);
+            output[i] = val;
+            if val > max_val {
+                max_val = val;
+            }
+        }
+
+        // Normalize values for 3D visualization.
+        // We use linear magnitude as the phase fix now produces the correct teardrop.
+        if max_val > 1e-12 {
+            for i in 0..thetas.len() {
+                output[i] = output[i] / max_val;
+            }
         }
     }
 
@@ -231,8 +244,7 @@ impl NecContext {
 
         for i in 0..num_points {
             let theta = two_pi * (i as f64) / (num_points as f64);
-            // r_dist doesn't affect relative pattern in our simplified calc, pass 1.0 or 100.0
-            results.push(self.sim.calculate_far_field(theta, phi, 1000.0));
+            results.push(self.sim.calculate_far_field(theta, phi));
         }
         results
     }

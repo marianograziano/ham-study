@@ -293,14 +293,53 @@ fn calculate_field_internal(
                             }
                         }
                         AntennaType::Yagi | AntennaType::Quad => {
-                            let front = cos_dir.max(0.0);
-                            let back = (-cos_dir).max(0.0);
-                            // Yagi/Quad usually has better F/B ratio than a simple 1+cos
                             if antenna_type == AntennaType::Yagi {
-                                dir_gain =
-                                    (front.powi(3) * 1.2 + 0.1 * back.powi(2) + 0.05).min(1.5);
+                                // Analytical array factor for 3-element Yagi at 430 MHz
+                                // Matches the RadiationPattern component's calculation
+                                const LAMBDA: f64 = 0.697; // 430 MHz
+                                const K_YAGI: f64 = 2.0 * std::f64::consts::PI / LAMBDA;
+                                const X_REF: f64 = -0.139; // Reflector position
+                                const X_DIR: f64 = 0.105; // Director position
+
+                                // Phase angles for constructive interference toward +X
+                                const I_REF_MAG: f64 = 0.9;
+                                const I_REF_PHASE: f64 = 72.0 * std::f64::consts::PI / 180.0;
+                                const I_DRV_MAG: f64 = 1.0;
+                                const I_DRV_PHASE: f64 = 0.0;
+                                const I_DIR_MAG: f64 = 0.8;
+                                const I_DIR_PHASE: f64 = -54.0 * std::f64::consts::PI / 180.0;
+
+                                // E-field grid is in XZ plane (Y=0), angle is atan2(z,x)
+                                // boom direction is +X, element direction is Z
+                                // For the half-wave dipole element pattern:
+                                // cos_alpha = component along element axis (Z) = sin(angle)
+                                // sin_alpha = component perpendicular to element = cos(angle)
+                                let cos_alpha = angle.sin().abs();
+                                let sin_alpha = angle.cos().abs().max(0.01);
+                                let element_pattern =
+                                    ((std::f64::consts::PI / 2.0) * cos_alpha).cos() / sin_alpha;
+
+                                // Array factor: boom_cosine = cos(angle) = component along X
+                                let boom_cos = angle.cos();
+                                let ph_ref = K_YAGI * X_REF * boom_cos + I_REF_PHASE;
+                                let ph_drv = K_YAGI * 0.0 * boom_cos + I_DRV_PHASE;
+                                let ph_dir = K_YAGI * X_DIR * boom_cos + I_DIR_PHASE;
+
+                                let af_re = I_REF_MAG * ph_ref.cos()
+                                    + I_DRV_MAG * ph_drv.cos()
+                                    + I_DIR_MAG * ph_dir.cos();
+                                let af_im = I_REF_MAG * ph_ref.sin()
+                                    + I_DRV_MAG * ph_drv.sin()
+                                    + I_DIR_MAG * ph_dir.sin();
+                                let array_factor = (af_re * af_re + af_im * af_im).sqrt();
+
+                                dir_gain = element_pattern.abs() * array_factor;
+                                // Normalize: max is ~2.7 (from verification), scale to ~1.2
+                                dir_gain = (dir_gain / 2.25).min(1.5);
                             } else {
                                 // Quad
+                                let front = cos_dir.max(0.0);
+                                let back = (-cos_dir).max(0.0);
                                 dir_gain =
                                     (front.powi(2) * 1.1 + 0.2 * back.powi(2) + 0.1).min(1.3);
                             }

@@ -165,101 +165,65 @@ impl NecSimulation {
     ///
     /// For simplistic Yagi verification:
     /// Calculate E-field at large distance R.
-    pub fn calculate_far_field(&self, theta: f64, phi: f64, _r_dist: f64) -> f64 {
-        // Using `efld` or specialized far-field routine?
-        // `efld` is for near field mostly.
-        // `ffld` is usually used for far field patterns.
-
-        // Let's implement a basic far-field summation here as `ffld` is not ported yet.
-        // E = Sum( I_j * Field_Factor_j )
-
-        let k = 2.0 * PI_CONST / self.context.geometry.wlam;
-        // Actually `efld` expects `k` to be handled via `tbf`/geometry interactions.
-        // But for far field:
-        // E ~ Sum [ I_j * exp(j * k * r_j) * vector_orientation ]
-
-        // Simplified implementation for verification:
-        // Sum contributions of all segments.
-
-        let mut e_theta = Complex64::new(0.0, 0.0);
-        let mut e_phi = Complex64::new(0.0, 0.0);
-
-        // Since frontend uses:
-        // thetas.push(Math.asin(vertex.y)); // Elevation from XZ plane, Y is UP
-        // phis.push(Math.atan2(vertex.z, vertex.x)); // Azimuth in XZ plane
-        //
-        // This means the observer vector (rx, ry, rz) is:
-        // rx = cos(theta) * cos(phi)
-        // ry = sin(theta)
-        // rz = cos(theta) * sin(phi)
+    pub fn calculate_far_field(&self, theta: f64, phi: f64) -> f64 {
+        // Standard spherical coordinate system:
+        // theta: angle from +Y (up), 0 to PI
+        // phi: angle in XZ plane from +X, 0 to 2PI
 
         let cost = theta.cos();
         let sint = theta.sin();
         let cosp = phi.cos();
         let sinp = phi.sin();
 
-        let rx = cost * cosp;
-        let ry = sint;
-        let rz = cost * sinp;
+        // Observation vector (rx, ry, rz)
+        // In our scene, Y is UP.
+        let rx = sint * cosp;
+        let ry = cost;
+        let rz = sint * sinp;
+
+        // Theta unit vector (tangent to theta meridian, pointing "down" from +Y)
+        let th_x = cost * cosp;
+        let th_y = -sint;
+        let th_z = cost * sinp;
+
+        // Phi unit vector (tangent to phi circle, pointing CCW)
+        let ph_x = -sinp;
+        let ph_y = 0.0;
+        let ph_z = cosp;
+
+        let k = 2.0 * PI_CONST / self.context.geometry.wlam;
+        let mut e_theta = Complex64::new(0.0, 0.0);
+        let mut e_phi = Complex64::new(0.0, 0.0);
 
         for i in 0..self.context.geometry.n {
             let cur = self.context.current.cur[i];
             let len = self.context.geometry.si[i];
-
             let xi = self.context.geometry.x[i];
             let yi = self.context.geometry.y[i];
             let zi = self.context.geometry.z[i];
 
-            // Phase factor relative to origin: exp(j * k * (r . r'))
-            // r . r' = xi * rx + yi * ry + zi * rz
+            // Propagation phase: exp(j * k * (r . r'))
             let phase_arg = k * (xi * rx + yi * ry + zi * rz);
             let phase = Complex64::new(phase_arg.cos(), phase_arg.sin());
 
-            // Element pattern (short dipole approx or point source)
-            let sx = (self.context.geometry.x2[i] - self.context.geometry.x1[i]) / len;
-            let sy = (self.context.geometry.y2[i] - self.context.geometry.y1[i]) / len;
-            let sz = (self.context.geometry.z2[i] - self.context.geometry.z1[i]) / len;
-
-            // Theta unit vector (derivative of position vector with respect to theta)
-            let th_x = -sint * cosp;
-            let th_y = cost;
-            let th_z = -sint * sinp;
-
-            // Phi unit vector (derivative of position vector with respect to phi, normalized)
-            let ph_x = -sinp;
-            let ph_y = 0.0;
-            let ph_z = cosp;
+            // Use stored direction cosines
+            let sx = self.context.geometry.cab[i];
+            let sy = self.context.geometry.salp[i]; // Vertical in our system
+            let sz = self.context.geometry.sab[i];
 
             let dot_th = sx * th_x + sy * th_y + sz * th_z;
             let dot_ph = sx * ph_x + sy * ph_y + sz * ph_z;
 
-            // Moment of the primary element
             let moment = cur * len * phase;
             e_theta += moment * dot_th;
             e_phi += moment * dot_ph;
 
-            // Ground Image processing
             if let Some(height_lambda) = self.ground_height {
-                // If the ground is at Y = -height (assuming antenna is around Y=0)
-                // Actually the standard orientation has the ground at Z=-height or Y=-height.
-                // In our Three.js, Y is UP. So ground is at Y = -height.
-                // The image source is at y_image = -yi - 2*height
-                // Wait, if antenna is placed AT Y=0, and ground parameter is the height of antenna,
-                // then the ground plane is at Y = -height. The image of a point (xi, yi, zi)
-                // across the plane Y = -height is (xi, -yi - 2*height, zi).
                 let height_meters = height_lambda * self.context.geometry.wlam;
+                // Ground is at Y = -height
                 let y_image = -yi - 2.0 * height_meters;
 
-                // Reflection coefficient for perfect ground.
-                // Horizontal polarization (parallel to ground): reflected E is inverted (reflection coeff = -1)
-                // Vertical polarization (normal to ground): reflected E is the same (reflection coeff = +1)
-
-                // Let's break the segment vector into horizontal and vertical parts.
-                // The horizontal part (X, Z) reflects and flips: sx_img = -sx, sz_img = -sz, sy_img = sy
-                // Wait, the current direction in a mirrored image:
-                // For a horizontally oriented wire (sx, 0, sz), the image current is perfectly opposite (-sx, 0, -sz)
-                // For a vertically oriented wire (0, sy, 0), the image current points the SAME way (0, sy, 0)
-                // So image segment vector is (-sx, sy, -sz).
+                // Image segment vector: Horizontal components flip, Vertical stays
                 let sx_img = -sx;
                 let sy_img = sy;
                 let sz_img = -sz;
@@ -276,8 +240,8 @@ impl NecSimulation {
             }
         }
 
-        let mag2 = e_theta.norm_sqr() + e_phi.norm_sqr();
-        mag2.sqrt()
+        // Return electric field magnitude
+        (e_theta.norm_sqr() + e_phi.norm_sqr()).sqrt()
     }
 
     /// Get total current (complex) on a specific segment

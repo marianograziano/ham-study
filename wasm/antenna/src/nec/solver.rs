@@ -108,18 +108,23 @@ impl Solver {
             self.ip[r] = pivot_row;
 
             // Swap pivot to diagonal position in scratch
+            // Step 5: Pivot row swap was missing for previous columns in matrix!
+            // But since this is LU, we need only to store it in current column.
+            // Wait, let's re-verify C code. c[r+r*ndim]=scm[pr]; scm[pr]=scm[r];
+            // This is actually what we have.
+            // Let's check Step 5: Divide by pivot.
             let pr = pivot_row;
             self.matrix[r + r * n] = col_k_cache[pr];
             col_k_cache[pr] = col_k_cache[r];
 
-            // Step 5: Divide by pivot
-            if r + 1 < n {
-                let diag = self.matrix[r + r * n];
-                if diag.norm_sqr() < 1e-40 {
-                    return Err("Zero pivot encountered".to_string());
-                }
-                let inv_diag = Complex64::new(1.0, 0.0) / diag;
+            // Check for singularity
+            let diag = self.matrix[r + r * n];
+            if diag.norm_sqr() < 1e-40 {
+                return Err("Zero pivot encountered".to_string());
+            }
+            let inv_diag = Complex64::new(1.0, 0.0) / diag;
 
+            if r + 1 < n {
                 for i in (r + 1)..n {
                     self.matrix[i + r * n] = col_k_cache[i] * inv_diag;
                 }
@@ -213,9 +218,11 @@ impl Solver {
                     sum_term = sum_term + term;
                 }
 
-                // Store in column-major matrix
-                // matrix[row + col * nrow]
-                self.matrix[i + j * n] = sum_term;
+                // NEC2: matrix elements are integrated fields (Volts)
+                // -E_tan * delta_L * lambda? Or just -E_tan * delta_L.
+                // nec2c uses: -fld * data.si[i] * data.wlam;
+                let wlam = ctx.geometry.wlam;
+                self.matrix[i + j * n] = -sum_term * ctx.geometry.si[i] * wlam;
             }
         }
     }

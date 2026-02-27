@@ -46,11 +46,10 @@ export class NecContext {
     /**
      * @param {number} theta
      * @param {number} phi
-     * @param {number} r_dist
      * @returns {number}
      */
-    calculate_far_field(theta, phi, r_dist) {
-        const ret = wasm.neccontext_calculate_far_field(this.__wbg_ptr, theta, phi, r_dist);
+    calculate_far_field(theta, phi) {
+        const ret = wasm.neccontext_calculate_far_field(this.__wbg_ptr, theta, phi);
         return ret;
     }
     /**
@@ -65,7 +64,7 @@ export class NecContext {
         return v1;
     }
     /**
-     * Calculate 3D far field pattern (batch)
+     * Calculate 3D far field pattern (batch) with normalization
      * `thetas` and `phis` must be of same length. `output` must be at least that length.
      * @param {Float64Array} thetas
      * @param {Float64Array} phis
