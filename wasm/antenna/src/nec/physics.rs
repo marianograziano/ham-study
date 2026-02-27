@@ -87,6 +87,10 @@ pub fn tbf(i: usize, icap: usize, ctx: &mut Context) {
                 }
 
                 if jcox.abs() != ix1 {
+                    if jcox == jco_store {
+                        // Open circuit reflection! Path ends.
+                        break;
+                    }
                     if jcox != 0 {
                         continue; // skip the Phase 2 trigger! Mimics C exactly.
                     } else {

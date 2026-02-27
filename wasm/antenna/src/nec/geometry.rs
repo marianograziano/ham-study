@@ -97,7 +97,7 @@ impl GeometryData {
                     + (yi2 - self.y1[idx]).abs()
                     + (zi2 - self.z1[idx]).abs();
                 if sep1 <= slen {
-                    self.icon2[i] = (idx + 1) as i32; // Positive if connecting to end 1
+                    self.icon2[i] = -((idx + 1) as i32); // Negative if connecting to end 1
                     break;
                 }
 
@@ -106,7 +106,7 @@ impl GeometryData {
                     + (yi2 - self.y2[idx]).abs()
                     + (zi2 - self.z2[idx]).abs();
                 if sep2 <= slen {
-                    self.icon2[i] = -((idx + 1) as i32); // Negative if connecting to end 2
+                    self.icon2[i] = (idx + 1) as i32; // Positive if connecting to end 2
                     break;
                 }
             }
@@ -156,7 +156,10 @@ mod tests {
         // Indices are 1-based in icon arrays.
 
         assert_eq!(geo.icon1[0], 1, "Seg 1 start should be open (self 1)");
-        assert_eq!(geo.icon2[0], 2, "Seg 1 end should connect to Seg 2 start");
+        assert_eq!(
+            geo.icon2[0], -2,
+            "Seg 1 end should connect to Seg 2 start (-2)"
+        );
 
         assert_eq!(
             geo.icon1[1], -1,
