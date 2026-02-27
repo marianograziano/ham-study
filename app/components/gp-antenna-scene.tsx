@@ -1,18 +1,18 @@
 import { Camera } from "@phosphor-icons/react";
 import { ArcballControls } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
-import { useId, useMemo, useRef, useState, useEffect } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
-import { BufferGeometry, SphereGeometry, Vector3 } from "three";
+import { type BufferGeometry, SphereGeometry, Vector3 } from "three";
 import { Button } from "~/components/ui/button";
 import { Label } from "~/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
 import { Switch } from "~/components/ui/switch";
-import { ElectricFieldWasm } from "./electric-field-wasm";
 import {
-  initAntennaWasm,
   calculateAntennaGainBatch,
+  initAntennaWasm,
 } from "~/utils/antenna-physics-wasm";
+import { ElectricFieldWasm } from "./electric-field-wasm";
 
 function GPAntenna({ radialAngle }: { radialAngle: "60" | "135" }) {
   const radials = 4;

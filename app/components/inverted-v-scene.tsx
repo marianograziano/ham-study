@@ -1,18 +1,18 @@
 import { Camera } from "@phosphor-icons/react";
 import { ArcballControls } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
-import { useId, useMemo, useRef, useState, useEffect } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
-import { BufferGeometry, SphereGeometry, Vector3 } from "three";
+import { type BufferGeometry, SphereGeometry, Vector3 } from "three";
 import { Button } from "~/components/ui/button";
 import { Label } from "~/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
 import { Switch } from "~/components/ui/switch";
-import { ElectricFieldWasm } from "./electric-field-wasm";
 import {
-  initAntennaWasm,
   calculateAntennaGainBatch,
+  initAntennaWasm,
 } from "~/utils/antenna-physics-wasm";
+import { ElectricFieldWasm } from "./electric-field-wasm";
 
 // Height adjusted to allow legs to hang down without clipping ground
 const height = 3;
@@ -37,27 +37,27 @@ function InvertedVAntenna() {
         <meshStandardMaterial color="white" />
       </mesh>
 
-      {/* Left Leg (Down and Left) */}
+      {/* Left Leg (Down and Forward/Z) */}
       <mesh
         position={[
-          (-length * Math.cos(angle)) / 2,
-          (-length * Math.sin(angle)) / 2,
           0,
+          (-length * Math.sin(angle)) / 2,
+          (length * Math.cos(angle)) / 2,
         ]}
-        rotation={[0, 0, legRotation]}
+        rotation={[legRotation, 0, 0]}
       >
         <cylinderGeometry args={[0.02, 0.02, length, 16]} />
         <meshStandardMaterial color="#ef4444" />
       </mesh>
 
-      {/* Right Leg (Down and Right) */}
+      {/* Right Leg (Down and Backward/-Z) */}
       <mesh
         position={[
-          (length * Math.cos(angle)) / 2,
-          (-length * Math.sin(angle)) / 2,
           0,
+          (-length * Math.sin(angle)) / 2,
+          (-length * Math.cos(angle)) / 2,
         ]}
-        rotation={[0, 0, -legRotation]}
+        rotation={[-legRotation, 0, 0]}
       >
         <cylinderGeometry args={[0.02, 0.02, length, 16]} />
         <meshStandardMaterial color="#ef4444" />
@@ -87,10 +87,7 @@ function RadiationPattern() {
       for (let i = 0; i < posAttribute.count; i++) {
         vertex.fromBufferAttribute(posAttribute, i);
         vertex.normalize();
-        // The WASM dipole model expects the antenna along the Z-axis,
-        // but our 3D V-antenna models are primarily along the X-axis.
-        // We shift azimuth by 90 deg (PI/2) to orient the pattern correctly.
-        phis.push(Math.atan2(vertex.z, vertex.x) + Math.PI / 2);
+        phis.push(Math.atan2(vertex.z, vertex.x));
         thetas.push(Math.asin(vertex.y));
       }
 

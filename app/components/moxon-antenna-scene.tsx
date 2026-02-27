@@ -1,7 +1,7 @@
 import { Camera } from "@phosphor-icons/react";
 import { ArcballControls } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
-import { useId, useMemo, useRef, useState, useEffect } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import {
   BufferGeometry,
@@ -14,11 +14,11 @@ import { Button } from "~/components/ui/button";
 import { Label } from "~/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
 import { Switch } from "~/components/ui/switch";
-import { ElectricFieldWasm } from "./electric-field-wasm";
 import {
-  initAntennaWasm,
   calculateAntennaGainBatch,
+  initAntennaWasm,
 } from "~/utils/antenna-physics-wasm";
+import { ElectricFieldWasm } from "./electric-field-wasm";
 
 const width = 2;
 const depth = 0.7;

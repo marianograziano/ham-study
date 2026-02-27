@@ -35,6 +35,7 @@ export function ElectricFieldWasm(props: ElectricFieldWasmProps) {
     // axialRatio is accepted but currently not used by WASM - reserved for future enhancement
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     axialRatio,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     groundHeight = 0.0,
   } = props;
 
@@ -104,7 +105,6 @@ export function ElectricFieldWasm(props: ElectricFieldWasmProps) {
         activeHarmonic ?? 1,
         isInvertedV,
         timeRef.current,
-        groundHeight,
         gridSize,
         spacing,
         matrixBuffer.current,

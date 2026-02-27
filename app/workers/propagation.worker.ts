@@ -161,7 +161,13 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
             result,
           },
           // Transfer buffers to avoid copying
-          { transfer: [result.vertices.buffer, result.uvs.buffer, result.indices.buffer] },
+          {
+            transfer: [
+              result.vertices.buffer,
+              result.uvs.buffer,
+              result.indices.buffer,
+            ],
+          },
         );
         break;
       }
