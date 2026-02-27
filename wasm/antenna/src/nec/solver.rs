@@ -218,17 +218,18 @@ impl Solver {
                     sum_term = sum_term + term;
                 }
 
-                // NEC2: matrix elements are integrated fields (Volts)
-                // -E_tan * delta_L * lambda? Or just -E_tan * delta_L.
-                // nec2c uses: -fld * data.si[i] * data.wlam;
-                let wlam = ctx.geometry.wlam;
-                self.matrix[i + j * n] = -sum_term * ctx.geometry.si[i] * wlam;
+                // Apply EXACT physical dimension mapping:
+                // sum_term_nec = lambda^2 * sum_term_my
+                // I_true = lambda * I_nec
+                // I_nec = [sum_term_nec]^-1 * (-V / si_m)
+                // => I_true = [lambda^2 * sum_term_my]^-1 * (-V / si_m) * lambda
+                // => I_true = [sum_term_my]^-1 * (-V / (lambda * si_m))
+                self.matrix[i + j * n] = sum_term;
             }
         }
     }
 
-    /// Fills the excitation vector (RHS) for voltage sources.
-    /// Corresponds to `etmns` logic for voltage sources (ipr=0).
+    /// Fill right-hand side (excitation)
     pub fn fill_excitation(&self, ctx: &Context, rhs: &mut [Complex64]) {
         // Clear rhs
         for x in rhs.iter_mut() {
@@ -245,13 +246,10 @@ impl Solver {
             let volt = ctx.vsorc.vsant[i];
 
             if seg_idx < rhs.len() {
-                // NEC2C: e[is]= -vsorc.vsant[i]/( data.si[is]* data.wlam);
-                // We assume stored vsant is already complex if needed, or V + j0.
-
                 let len = ctx.geometry.si[seg_idx];
                 let wlam = ctx.geometry.wlam;
 
-                if wlam.abs() > 1e-20 && len.abs() > 1e-20 {
+                if len.abs() > 1e-20 {
                     rhs[seg_idx] = -volt / (len * wlam);
                 }
             }

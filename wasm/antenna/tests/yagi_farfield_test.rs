@@ -52,7 +52,7 @@ fn yagi_430mhz_far_field_debug() {
     for deg in (0..360).step_by(15) {
         let phi = (deg as f64) * PI / 180.0;
         let theta = 0.0;
-        let gain = sim.calculate_far_field(theta, phi, 1000.0);
+        let gain = sim.calculate_far_field(theta, phi);
         gains.push((deg, gain));
         if gain > max_gain {
             max_gain = gain;
@@ -81,7 +81,7 @@ fn yagi_430mhz_far_field_debug() {
     for deg in (-90..=90).step_by(15) {
         let theta = (deg as f64) * PI / 180.0;
         let phi = 0.0;
-        let gain = sim.calculate_far_field(theta, phi, 1000.0);
+        let gain = sim.calculate_far_field(theta, phi);
         gains2.push((deg, gain));
         if gain > max_gain2 {
             max_gain2 = gain;

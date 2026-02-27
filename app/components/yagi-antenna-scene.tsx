@@ -128,113 +128,85 @@ function RadiationPattern({ groundHeight }: { groundHeight: number }) {
   const [geometry, setGeometry] = useState<BufferGeometry | null>(null);
 
   useEffect(() => {
-    let isMounted = true;
+    let active = true;
 
     const generateGeometry = async () => {
-      if (!isMounted) return;
+      try {
+        await initNecWasm();
+        if (!active) return;
 
-      const geo = new SphereGeometry(1, 60, 40);
-      const posAttribute = geo.attributes.position;
-      const vertex = new Vector3();
-      const scale = 10;
+        const geo = new SphereGeometry(1, 60, 40);
+        const posAttribute = geo.attributes.position;
+        const vertex = new Vector3();
+        const scale = 10;
 
-      // Analytical 3-element Yagi pattern using array factor
-      // 430 MHz, λ = 0.697m, k = 2π/λ
-      const lambda = 0.697;
-      const k = (2 * Math.PI) / lambda;
-      // Element positions along the boom (X-axis), same proportions as NEC2 model
-      const xRef = -0.139; // Reflector at -0.2λ
-      const xDrv = 0; // Driven at origin
-      const xDir = 0.105; // Director at +0.15λ
-      // Relative currents for constructive interference in +X (director direction):
-      //   0.2λ spacing → 72° phase compensation for reflector
-      //   0.15λ spacing → 54° phase compensation for director
-      // Front-to-back ratio ~12:1 (~21 dB)
-      const Iref = { mag: 0.9, phaseDeg: 72 };
-      const Idrv = { mag: 1.0, phaseDeg: 0 };
-      const Idir = { mag: 0.8, phaseDeg: -54 };
+        const ctx = new NecContext();
+        ctx.initialize(1);
+        ctx.set_frequency(430.0);
+        if (groundHeight > 0)
+          Object.getPrototypeOf(ctx).set_ground
+            ? ctx.set_ground(groundHeight)
+            : void 0;
 
-      const toRad = (deg: number) => (deg * Math.PI) / 180;
+        // Exact geometry configuration for 3-element Yagi at 430 MHz
+        ctx.add_wire(-0.139, 0, -0.174, -0.139, 0, 0.174, 0.003, 11, 1);
+        ctx.add_wire(0, 0, -0.164, 0, 0, 0.164, 0.003, 11, 2);
+        ctx.add_wire(0.105, 0, -0.153, 0.105, 0, 0.153, 0.003, 11, 3);
+        ctx.add_voltage_source(2, 6, 1.0, 0.0);
+        ctx.calculate();
 
-      // Save original directions before modifying positions
-      const gains: number[] = new Array(posAttribute.count);
-      const dirs: Vector3[] = new Array(posAttribute.count);
+        const count = posAttribute.count;
+        const thetas = new Float64Array(count);
+        const phis = new Float64Array(count);
+        const gains = new Float64Array(count);
+        const dirs: Vector3[] = new Array(count);
 
-      for (let i = 0; i < posAttribute.count; i++) {
-        vertex.fromBufferAttribute(posAttribute, i);
-        vertex.normalize();
-        dirs[i] = vertex.clone();
+        for (let i = 0; i < count; i++) {
+          vertex.fromBufferAttribute(posAttribute, i);
+          vertex.normalize();
+          dirs[i] = vertex.clone();
 
-        // vertex is a unit vector: (x, y, z) is the 3D observation direction
-        // Boom axis = +X, Element axis = Z
-        //
-        // cos_boom = dot(observation, boom) = vertex.x
-        // This is the key 3D direction cosine for the array factor
-        const cos_boom = vertex.x; // projection onto boom axis (+X)
+          // Standard spherical conversion (Y is UP)
+          const r = Math.sqrt(
+            vertex.x * vertex.x + vertex.y * vertex.y + vertex.z * vertex.z,
+          );
+          // Clamp y/r to [-1, 1] to avoid NaN from floating point inaccuracies
+          const y_norm = Math.max(-1, Math.min(1, vertex.y / r));
+          let theta = Math.acos(y_norm);
+          let phi = Math.atan2(vertex.z, vertex.x);
+          if (phi < 0) phi += 2 * Math.PI;
 
-        // 1. Array factor in 3D: depends only on cos_boom
-        //    Phase = k * position * cos_boom + current_phase
-        const phRef = k * xRef * cos_boom + toRad(Iref.phaseDeg);
-        const phDrv = k * xDrv * cos_boom + toRad(Idrv.phaseDeg);
-        const phDir = k * xDir * cos_boom + toRad(Idir.phaseDeg);
-
-        const af_re =
-          Iref.mag * Math.cos(phRef) +
-          Idrv.mag * Math.cos(phDrv) +
-          Idir.mag * Math.cos(phDir);
-        const af_im =
-          Iref.mag * Math.sin(phRef) +
-          Idrv.mag * Math.sin(phDrv) +
-          Idir.mag * Math.sin(phDir);
-        const arrayFactor = Math.sqrt(af_re * af_re + af_im * af_im);
-
-        // 2. Half-wave dipole element pattern (elements along Z-axis)
-        //    Null along Z-axis, max perpendicular to Z
-        //    cos_alpha = |dot(observation, Z)| = |vertex.z|
-        const cos_alpha = Math.abs(vertex.z);
-        const sin_alpha = Math.sqrt(vertex.x * vertex.x + vertex.y * vertex.y);
-        let elementPattern = 0.0;
-        if (sin_alpha > 0.01) {
-          elementPattern = Math.cos((Math.PI / 2) * cos_alpha) / sin_alpha;
+          thetas[i] = theta;
+          phis[i] = phi;
         }
 
-        // 3. Ground reflection
-        let groundFactor = 1.0;
-        if (groundHeight > 0) {
-          const heightM = groundHeight * lambda;
-          const sinElev = vertex.y; // sine of elevation angle
-          groundFactor = Math.abs(2 * Math.sin(k * heightM * sinElev));
+        // Use the newly corrected WASM physics engine to batch-calculate the true 3D pattern
+        ctx.calculate_far_field_pattern_3d(thetas, phis, gains);
+
+        for (let i = 0; i < count; i++) {
+          // values from calculate_far_field_pattern_3d are already normalized and power-scaled
+          // (or linearly scaled if square removed)
+          const power = gains[i];
+          const rad = (0.05 + power * 1.5) * scale;
+          const dir = dirs[i];
+          posAttribute.setXYZ(i, dir.x * rad, dir.y * rad, dir.z * rad);
         }
 
-        gains[i] = Math.abs(elementPattern) * arrayFactor * groundFactor;
-      }
+        geo.computeVertexNormals();
+        ctx.free();
 
-      // Normalize and apply with power scaling for visual contrast
-      let maxGain = 0;
-      for (let i = 0; i < gains.length; i++) {
-        if (gains[i] > maxGain) maxGain = gains[i];
-      }
-
-      for (let i = 0; i < posAttribute.count; i++) {
-        const normalized = maxGain > 0 ? gains[i] / maxGain : 0;
-        // Use power pattern (squared) for better visual contrast
-        const power = normalized * normalized;
-        const rad = (0.05 + power * 1.5) * scale;
-        const dir = dirs[i];
-        posAttribute.setXYZ(i, dir.x * rad, dir.y * rad, dir.z * rad);
-      }
-
-      geo.computeVertexNormals();
-
-      if (isMounted) {
-        setGeometry(geo);
+        if (active) {
+          setGeometry(geo);
+        }
+      } catch (err) {
+        console.error("Pattern Calculation Error:", err);
       }
     };
 
     generateGeometry();
 
     return () => {
-      isMounted = false;
+      active = false;
     };
   }, [groundHeight]);
 

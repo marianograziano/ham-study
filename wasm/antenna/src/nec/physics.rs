@@ -507,8 +507,8 @@ fn gxx(
     (g1, g1p, g2, g2p, g3, gzp)
 }
 
-// Constants from nec2c: CONST1 = -j * 30.0 (related to eta/(4*pi))
-const CONST1: Complex64 = Complex64::new(0.0, -30.0);
+// Constants from nec2c.h
+const CONST1: Complex64 = Complex64::new(0.0, 4.771341189);
 // const CONST4: Complex64 = Complex64::new(0.0, 188.365);
 
 /// Compute E-field of sine, cosine, and constant current filaments by thin wire approximation.

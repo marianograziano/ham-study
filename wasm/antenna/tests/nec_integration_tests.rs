@@ -79,11 +79,11 @@ fn test_radiation_pattern_sanity() {
     // Check Broadside gain (theta=90, phi=0) -> Should be max
     // theta is elevation from XZ plane, phi is azimuth in XZ plane from X axis.
     // theta=90 (PI/2) is the Y-axis. Perpendicular to Z-axis.
-    let max_gain = sim.calculate_far_field(std::f64::consts::PI / 2.0, 0.0, 100.0);
+    let max_gain = sim.calculate_far_field(std::f64::consts::PI / 2.0, 0.0);
 
     // Check Endfire gain (theta=0, phi=90) -> Should be zero (null)
     // theta=0, phi=90 (PI/2) is the Z-axis. Along the wire axis.
-    let null_gain = sim.calculate_far_field(0.0, std::f64::consts::PI / 2.0, 100.0);
+    let null_gain = sim.calculate_far_field(0.0, std::f64::consts::PI / 2.0);
 
     println!("Max Gain (Broadside): {}", max_gain);
     println!("Null Gain (Endfire): {}", null_gain);
