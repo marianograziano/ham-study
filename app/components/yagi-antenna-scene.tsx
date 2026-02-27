@@ -1,17 +1,14 @@
 import { Camera } from "@phosphor-icons/react";
 import { ArcballControls } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { type BufferGeometry, SphereGeometry, Vector3 } from "three";
 import { Button } from "~/components/ui/button";
 import { Label } from "~/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
 import { Switch } from "~/components/ui/switch";
-import {
-  calculateAntennaGainBatch,
-  initAntennaWasm,
-} from "~/utils/antenna-physics-wasm";
+import { initNecWasm, NecContext } from "~/utils/nec-wasm";
 import { ElectricFieldWasm } from "./electric-field-wasm";
 
 function YagiAntenna() {
@@ -55,7 +52,77 @@ function YagiAntenna() {
   );
 }
 
-function RadiationPattern({ material }: { material?: string }) {
+function ImpedanceDisplay({ groundHeight }: { groundHeight: number }) {
+  const [impedance, setImpedance] = useState<{ re: number; im: number } | null>(
+    null,
+  );
+  const [isCalculating, setIsCalculating] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    const calculate = async () => {
+      setIsCalculating(true);
+      try {
+        await initNecWasm();
+        if (!active) return;
+
+        const ctx = new NecContext();
+        ctx.initialize(1);
+        ctx.set_frequency(100.0); // Lambda=3m approx 100MHz for elements around 3m
+        if (groundHeight > 0) ctx.set_ground(groundHeight);
+
+        // 3-element Yagi
+        // Reflector (Tag 1)
+        ctx.add_wire(-1.5, 0, -1.6, -1.5, 0, 1.6, 0.002, 15, 1);
+        // Driven (Tag 2)
+        ctx.add_wire(0, 0, -1.5, 0, 0, 1.5, 0.002, 15, 2);
+        // Director (Tag 3)
+        ctx.add_wire(1.5, 0, -1.4, 1.5, 0, 1.4, 0.002, 15, 3);
+
+        ctx.add_voltage_source(2, 8, 1.0, 0.0); // feed at driven element center
+        ctx.calculate();
+
+        const zArr = ctx.get_impedance(2);
+        if (zArr && zArr.length === 2 && active) {
+          setImpedance({ re: zArr[0], im: zArr[1] });
+        }
+        ctx.free();
+      } catch (err) {
+        console.error("NEC Calculation Error:", err);
+      } finally {
+        if (active) setIsCalculating(false);
+      }
+    };
+
+    const timer = setTimeout(calculate, 300);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [groundHeight]);
+
+  return (
+    <div className="pt-3 border-t border-white/10 mt-3">
+      <div className="mb-2 text-xs md:text-sm font-medium text-zinc-200">
+        Live Impedance (NEC2)
+      </div>
+      <div className="text-xs font-mono bg-black/50 p-2 rounded text-zinc-300">
+        {isCalculating ? (
+          <span className="animate-pulse">Calculating Z...</span>
+        ) : impedance ? (
+          <span>
+            Z = {impedance.re.toFixed(1)} {impedance.im >= 0 ? "+" : "-"} j
+            {Math.abs(impedance.im).toFixed(1)} Ω
+          </span>
+        ) : (
+          <span>--</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function RadiationPattern({ groundHeight }: { groundHeight: number }) {
   const [geometry, setGeometry] = useState<BufferGeometry | null>(null);
 
   useEffect(() => {
@@ -63,7 +130,7 @@ function RadiationPattern({ material }: { material?: string }) {
 
     const generateGeometry = async () => {
       // Initialize WASM first
-      await initAntennaWasm();
+      await initNecWasm();
 
       if (!isMounted) return;
 
@@ -84,18 +151,38 @@ function RadiationPattern({ material }: { material?: string }) {
 
       let wasmGains: number[] = [];
       try {
-        wasmGains = await calculateAntennaGainBatch(
-          "yagi",
-          thetas,
-          phis,
-          0.5,
-          1,
-          false,
-          "60",
-          material,
-        );
+        const ctx = new NecContext();
+        ctx.initialize(1);
+        ctx.set_frequency(100.0);
+        if (groundHeight > 0) ctx.set_ground(groundHeight);
+
+        // Yagi geometry
+        ctx.add_wire(-1.5, 0, -1.6, -1.5, 0, 1.6, 0.002, 15, 1);
+        ctx.add_wire(0, 0, -1.5, 0, 0, 1.5, 0.002, 15, 2);
+        ctx.add_wire(1.5, 0, -1.4, 1.5, 0, 1.4, 0.002, 15, 3);
+
+        ctx.add_voltage_source(2, 8, 1.0, 0.0);
+        ctx.calculate();
+
+        const outArray = new Float64Array(thetas.length);
+        const thetasArray = new Float64Array(thetas);
+        const phisArray = new Float64Array(phis);
+
+        ctx.calculate_far_field_pattern_3d(thetasArray, phisArray, outArray);
+        wasmGains = Array.from(outArray);
+
+        let maxGain = 0;
+        for (let i = 0; i < wasmGains.length; i++) {
+          if (wasmGains[i] > maxGain) maxGain = wasmGains[i];
+        }
+        if (maxGain > 0) {
+          for (let i = 0; i < wasmGains.length; i++) {
+            wasmGains[i] /= maxGain;
+          }
+        }
+        ctx.free();
       } catch (error) {
-        console.warn("WASM batch calculation failed, using fallback", error);
+        console.warn("NEC calculation failed, using fallback", error);
       }
 
       for (let i = 0; i < posAttribute.count; i++) {
@@ -131,7 +218,7 @@ function RadiationPattern({ material }: { material?: string }) {
     return () => {
       isMounted = false;
     };
-  }, [material]); // Re-run when material changes
+  }, [groundHeight]); // Re-run when groundHeight changes
 
   if (!geometry) {
     return null;
@@ -161,6 +248,7 @@ export default function YagiAntennaScene({
   const { t } = useTranslation("scene");
   /* ... inside separate component or prop ... */
   const [material, setMaterial] = useState<string>("aluminum");
+  const [groundHeight, setGroundHeight] = useState(0.0);
   const [showWaves, setShowWaves] = useState(true);
   const [showPattern, setShowPattern] = useState(true);
   const [speedMode, setSpeedMode] = useState<"slow" | "medium" | "fast">(
@@ -270,6 +358,26 @@ export default function YagiAntennaScene({
         </RadioGroup>
       </div>
 
+      <div className="pt-3 border-t border-white/10">
+        <div className="mb-2 text-xs md:text-sm font-medium text-zinc-200">
+          {t("common.controls.groundHeight", "Ground Height (λ)")}
+        </div>
+        <div className="flex items-center space-x-4">
+          <input
+            type="range"
+            min="0"
+            max="2"
+            step="0.1"
+            value={groundHeight}
+            onChange={(e) => setGroundHeight(Number.parseFloat(e.target.value))}
+            className="w-full accent-primary-foreground"
+          />
+          <span className="text-xs text-zinc-300 w-8 text-right font-mono">
+            {groundHeight === 0 ? "Free" : groundHeight.toFixed(1)}
+          </span>
+        </div>
+      </div>
+
       <div className="pt-3 border-t border-white/10 md:border-none md:pt-0">
         {/* ... existing visualization toggles ... */}
         <div className="mb-2 text-xs md:text-sm font-medium text-zinc-200">
@@ -369,6 +477,8 @@ export default function YagiAntennaScene({
           {t("common.controls.download")}
         </Button>
       </div>
+
+      <ImpedanceDisplay groundHeight={groundHeight} />
     </div>
   );
 
@@ -402,7 +512,7 @@ export default function YagiAntennaScene({
           />
 
           <YagiAntenna />
-          {showPattern && <RadiationPattern material={material} />}
+          {showPattern && <RadiationPattern groundHeight={groundHeight} />}
           {/* Surface/Field Mode */}
           {showWaves && (
             <ElectricFieldWasm
@@ -410,6 +520,7 @@ export default function YagiAntennaScene({
               polarizationType="horizontal"
               speed={effectiveSpeed}
               amplitudeScale={1.5}
+              groundHeight={groundHeight}
             />
           )}
         </Canvas>

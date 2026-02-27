@@ -14,10 +14,7 @@ import { Button } from "~/components/ui/button";
 import { Label } from "~/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
 import { Switch } from "~/components/ui/switch";
-import {
-  calculateAntennaGainBatch,
-  initAntennaWasm,
-} from "~/utils/antenna-physics-wasm";
+import { initNecWasm, NecContext } from "~/utils/nec-wasm";
 import { ElectricFieldWasm } from "./electric-field-wasm";
 
 interface QuadElementProps {
@@ -144,18 +141,92 @@ function QuadAntenna({
   );
 }
 
-function RadiationPattern({
-  _polarization,
-}: {
-  _polarization: "horizontal" | "vertical";
-}) {
+function ImpedanceDisplay({ groundHeight }: { groundHeight: number }) {
+  const [impedance, setImpedance] = useState<{ re: number; im: number } | null>(
+    null,
+  );
+  const [isCalculating, setIsCalculating] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    const calculate = async () => {
+      setIsCalculating(true);
+      try {
+        await initNecWasm();
+        if (!active) return;
+
+        const ctx = new NecContext();
+        ctx.initialize(1);
+        ctx.set_frequency(150.0); // Size=2, circumference=8. Lambda=2m approx 150MHz
+        if (groundHeight > 0) ctx.set_ground(groundHeight);
+
+        // Standard 2-element Quad: Driven and Reflector
+        // Driven at X=1, Reflector at X=-1. Size=2 (half=1)
+        // Driven loop (Y-Z plane)
+        // Tag 1: Feed point at bottom (0, -1, 0) relative to loop center
+        ctx.add_wire(1, -1, -1, 1, -1, 1, 0.002, 11, 1); // Bottom (with feed)
+        ctx.add_wire(1, -1, 1, 1, 1, 1, 0.002, 11, 2); // Right
+        ctx.add_wire(1, 1, 1, 1, 1, -1, 0.002, 11, 3); // Top
+        ctx.add_wire(1, 1, -1, 1, -1, -1, 0.002, 11, 4); // Left
+
+        // Reflector loop (X=-1) - slightly larger in reality, but here we use 2.1
+        const r_size = 1.05;
+        ctx.add_wire(-1, -r_size, -r_size, -1, -r_size, r_size, 0.002, 11, 5);
+        ctx.add_wire(-1, -r_size, r_size, -1, r_size, r_size, 0.002, 11, 6);
+        ctx.add_wire(-1, r_size, r_size, -1, r_size, -r_size, 0.002, 11, 7);
+        ctx.add_wire(-1, r_size, -r_size, -1, -r_size, -r_size, 0.002, 11, 8);
+
+        ctx.add_voltage_source(1, 6, 1.0, 0.0); // Center of bottom wire
+        ctx.calculate();
+
+        const zArr = ctx.get_impedance(1);
+        if (zArr && zArr.length === 2 && active) {
+          setImpedance({ re: zArr[0], im: zArr[1] });
+        }
+        ctx.free();
+      } catch (err) {
+        console.error("NEC Calculation Error:", err);
+      } finally {
+        if (active) setIsCalculating(false);
+      }
+    };
+
+    const timer = setTimeout(calculate, 300);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [groundHeight]);
+
+  return (
+    <div className="pt-3 border-t border-white/10 mt-3">
+      <div className="mb-2 text-xs md:text-sm font-medium text-zinc-200">
+        Live Impedance (NEC2)
+      </div>
+      <div className="text-xs font-mono bg-black/50 p-2 rounded text-zinc-300">
+        {isCalculating ? (
+          <span className="animate-pulse">Calculating Z...</span>
+        ) : impedance ? (
+          <span>
+            Z = {impedance.re.toFixed(1)} {impedance.im >= 0 ? "+" : "-"} j
+            {Math.abs(impedance.im).toFixed(1)} Ω
+          </span>
+        ) : (
+          <span>--</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function RadiationPattern({ groundHeight }: { groundHeight: number }) {
   const [geometry, setGeometry] = useState<BufferGeometry | null>(null);
 
   useEffect(() => {
     let isMounted = true;
 
     const generateGeometry = async () => {
-      await initAntennaWasm();
+      await initNecWasm();
       if (!isMounted) return;
 
       const geo = new SphereGeometry(1, 60, 40);
@@ -175,18 +246,45 @@ function RadiationPattern({
 
       let wasmGains: number[] = [];
       try {
-        wasmGains = await calculateAntennaGainBatch(
-          "quad",
-          thetas,
-          phis,
-          0.5,
-          1,
-          false,
-          "60",
-          undefined,
-        );
+        const ctx = new NecContext();
+        ctx.initialize(1);
+        ctx.set_frequency(150.0);
+        if (groundHeight > 0) ctx.set_ground(groundHeight);
+
+        // Quad geometry
+        ctx.add_wire(1, -1, -1, 1, -1, 1, 0.002, 11, 1);
+        ctx.add_wire(1, -1, 1, 1, 1, 1, 0.002, 11, 2);
+        ctx.add_wire(1, 1, 1, 1, 1, -1, 0.002, 11, 3);
+        ctx.add_wire(1, 1, -1, 1, -1, -1, 0.002, 11, 4);
+
+        const r_size = 1.05;
+        ctx.add_wire(-1, -r_size, -r_size, -1, -r_size, r_size, 0.002, 11, 5);
+        ctx.add_wire(-1, -r_size, r_size, -1, r_size, r_size, 0.002, 11, 6);
+        ctx.add_wire(-1, r_size, r_size, -1, r_size, -r_size, 0.002, 11, 7);
+        ctx.add_wire(-1, r_size, -r_size, -1, -r_size, -r_size, 0.002, 11, 8);
+
+        ctx.add_voltage_source(1, 6, 1.0, 0.0);
+        ctx.calculate();
+
+        const outArray = new Float64Array(thetas.length);
+        const thetasArray = new Float64Array(thetas);
+        const phisArray = new Float64Array(phis);
+
+        ctx.calculate_far_field_pattern_3d(thetasArray, phisArray, outArray);
+        wasmGains = Array.from(outArray);
+
+        let maxGain = 0;
+        for (let i = 0; i < wasmGains.length; i++) {
+          if (wasmGains[i] > maxGain) maxGain = wasmGains[i];
+        }
+        if (maxGain > 0) {
+          for (let i = 0; i < wasmGains.length; i++) {
+            wasmGains[i] /= maxGain;
+          }
+        }
+        ctx.free();
       } catch (error) {
-        console.warn("WASM batch calculation failed, using fallback", error);
+        console.warn("NEC calculation failed, using fallback", error);
       }
 
       for (let i = 0; i < posAttribute.count; i++) {
@@ -216,7 +314,7 @@ function RadiationPattern({
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [groundHeight]);
 
   useMemo(() => {
     return () => {
@@ -255,6 +353,7 @@ export default function QuadAntennaScene({
   const [polarization, setPolarization] = useState<"horizontal" | "vertical">(
     "horizontal",
   );
+  const [groundHeight, setGroundHeight] = useState(0.0);
   const [speedMode, setSpeedMode] = useState<"slow" | "medium" | "fast">(
     "medium",
   );
@@ -336,6 +435,26 @@ export default function QuadAntennaScene({
           }
           className="data-[state=checked]:bg-primary-foreground/80 data-[state=unchecked]:bg-zinc-700 border-zinc-500"
         />
+      </div>
+
+      <div className="pt-3 border-t border-white/10">
+        <div className="mb-2 text-xs md:text-sm font-medium text-zinc-200">
+          {t("common.controls.groundHeight", "Ground Height (λ)")}
+        </div>
+        <div className="flex items-center space-x-4">
+          <input
+            type="range"
+            min="0"
+            max="2"
+            step="0.1"
+            value={groundHeight}
+            onChange={(e) => setGroundHeight(Number.parseFloat(e.target.value))}
+            className="w-full accent-primary-foreground"
+          />
+          <span className="text-xs text-zinc-300 w-8 text-right font-mono">
+            {groundHeight === 0 ? "Free" : groundHeight.toFixed(1)}
+          </span>
+        </div>
       </div>
 
       <div className="pt-3 border-t border-white/10 md:border-none md:pt-0">
@@ -437,6 +556,8 @@ export default function QuadAntennaScene({
           {t("common.controls.download")}
         </Button>
       </div>
+
+      <ImpedanceDisplay groundHeight={groundHeight} />
     </div>
   );
 
@@ -470,7 +591,7 @@ export default function QuadAntennaScene({
           />
 
           <QuadAntenna polarization={polarization} />
-          {showPattern && <RadiationPattern _polarization={polarization} />}
+          {showPattern && <RadiationPattern groundHeight={groundHeight} />}
           {showWaves && (
             <group position={[1, 2, 0]}>
               {/* Surface/Field Mode - Always On */}
@@ -479,6 +600,7 @@ export default function QuadAntennaScene({
                 polarizationType="horizontal"
                 speed={effectiveSpeed}
                 amplitudeScale={1.5}
+                groundHeight={groundHeight}
               />
             </group>
           )}

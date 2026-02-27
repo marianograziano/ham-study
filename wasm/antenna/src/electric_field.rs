@@ -294,7 +294,17 @@ fn calculate_field_internal(
                         }
                         AntennaType::Yagi | AntennaType::Quad => {
                             let front = cos_dir.max(0.0);
-                            dir_gain = front.powi(2) + 0.1;
+                            let back = (-cos_dir).max(0.0);
+                            // Yagi/Quad usually has better F/B ratio than a simple 1+cos
+                            if antenna_type == AntennaType::Yagi {
+                                dir_gain =
+                                    (front.powi(3) * 1.2 + 0.1 * back.powi(2) + 0.05).min(1.5);
+                            } else {
+                                // Quad
+                                dir_gain =
+                                    (front.powi(2) * 1.1 + 0.2 * back.powi(2) + 0.1).min(1.3);
+                            }
+
                             if polarization_type == PolarizationType::Vertical {
                                 y_scale = 1.0;
                                 h_scale = 0.0;

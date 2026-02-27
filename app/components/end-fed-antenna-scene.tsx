@@ -17,10 +17,7 @@ import { Button } from "~/components/ui/button";
 import { Label } from "~/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
 import { Switch } from "~/components/ui/switch";
-import {
-  calculateAntennaGainBatch,
-  initAntennaWasm,
-} from "~/utils/antenna-physics-wasm";
+import { initNecWasm, NecContext } from "~/utils/nec-wasm";
 import { ElectricFieldWasm } from "./electric-field-wasm";
 
 const wireLength = 8;
@@ -108,6 +105,70 @@ function EndFedAntenna() {
   );
 }
 
+function ImpedanceDisplay({ harmonic }: { harmonic: number }) {
+  const [impedance, setImpedance] = useState<{ re: number; im: number } | null>(
+    null,
+  );
+  const [isCalculating, setIsCalculating] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    const calculate = async () => {
+      setIsCalculating(true);
+      try {
+        await initNecWasm();
+        if (!active) return;
+
+        const ctx = new NecContext();
+        ctx.initialize(1);
+        // wireLength = 8. 0.5 lambda at 18.75 MHz.
+        ctx.set_frequency(18.75 * harmonic);
+
+        // Sloper: (0,0,0) to (-8, 2, 0)
+        ctx.add_wire(0, 0, 0, -8, 2, 0, 0.001, 20 * harmonic, 1);
+        ctx.add_voltage_source(1, 1, 1.0, 0.0); // End-fed
+        ctx.calculate();
+
+        const zArr = ctx.get_impedance(1);
+        if (zArr && zArr.length === 2 && active) {
+          setImpedance({ re: zArr[0], im: zArr[1] });
+        }
+        ctx.free();
+      } catch (err) {
+        console.error("NEC Calculation Error:", err);
+      } finally {
+        if (active) setIsCalculating(false);
+      }
+    };
+
+    const timer = setTimeout(calculate, 300);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [harmonic]);
+
+  return (
+    <div className="pt-3 border-t border-white/10 mt-3">
+      <div className="mb-2 text-xs md:text-sm font-medium text-zinc-200">
+        Live Impedance (NEC2)
+      </div>
+      <div className="text-xs font-mono bg-black/50 p-2 rounded text-zinc-300">
+        {isCalculating ? (
+          <span className="animate-pulse">Calculating Z...</span>
+        ) : impedance ? (
+          <span>
+            Z = {impedance.re.toFixed(1)} {impedance.im >= 0 ? "+" : "-"} j
+            {Math.abs(impedance.im).toFixed(1)} Ω
+          </span>
+        ) : (
+          <span>--</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function RadiationPattern({ harmonic = 1 }: { harmonic?: number }) {
   const [geometry, setGeometry] = useState<BufferGeometry | null>(null);
 
@@ -115,7 +176,7 @@ function RadiationPattern({ harmonic = 1 }: { harmonic?: number }) {
     let isMounted = true;
 
     const generateGeometry = async () => {
-      await initAntennaWasm();
+      await initNecWasm();
       if (!isMounted) return;
 
       const geo = new SphereGeometry(1, 90, 60);
@@ -133,20 +194,35 @@ function RadiationPattern({ harmonic = 1 }: { harmonic?: number }) {
         thetas.push(Math.asin(vertex.y));
       }
 
-      let wasmGains: number[] = [];
+      let gains: number[] = [];
       try {
-        wasmGains = await calculateAntennaGainBatch(
-          "end-fed",
-          thetas,
-          phis,
-          0.5 * harmonic,
-          harmonic,
-          false,
-          "60",
-          undefined,
-        );
+        const ctx = new NecContext();
+        ctx.initialize(1);
+        ctx.set_frequency(18.75 * harmonic);
+
+        ctx.add_wire(0, 0, 0, -8, 2, 0, 0.001, 20 * harmonic, 1);
+        ctx.add_voltage_source(1, 1, 1.0, 0.0);
+        ctx.calculate();
+
+        const outArray = new Float64Array(thetas.length);
+        const thetasArray = new Float64Array(thetas);
+        const phisArray = new Float64Array(phis);
+
+        ctx.calculate_far_field_pattern_3d(thetasArray, phisArray, outArray);
+        gains = Array.from(outArray);
+
+        let maxGain = 0;
+        for (let i = 0; i < gains.length; i++) {
+          if (gains[i] > maxGain) maxGain = gains[i];
+        }
+        if (maxGain > 0) {
+          for (let i = 0; i < gains.length; i++) {
+            gains[i] /= maxGain;
+          }
+        }
+        ctx.free();
       } catch (error) {
-        console.warn("WASM batch calculation failed, using fallback", error);
+        console.warn("NEC calculation failed, using fallback", error);
       }
 
       for (let i = 0; i < posAttribute.count; i++) {
@@ -154,8 +230,8 @@ function RadiationPattern({ harmonic = 1 }: { harmonic?: number }) {
         const originalDir = vertex.clone().normalize();
 
         let gain = 0;
-        if (wasmGains.length > 0) {
-          gain = wasmGains[i];
+        if (gains.length > 0) {
+          gain = gains[i];
         } else {
           // Fallback
           const cosTheta = originalDir.x;
@@ -437,6 +513,8 @@ export default function EndFedAntennaScene({
           {t("common.controls.download")}
         </Button>
       </div>
+
+      <ImpedanceDisplay harmonic={harmonic} />
     </div>
   );
 
