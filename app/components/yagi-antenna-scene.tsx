@@ -316,7 +316,7 @@ export default function YagiAntennaScene({
             <YagiAntenna scale={visualScale} />
             {showPattern && context && <RadiationPattern context={context} />}
             {showWaves && context && (
-              <ElectricFieldNec2 context={context} speed={effectiveSpeed} amplitudeScale={1.2} />
+              <ElectricFieldNec2 context={context} speed={effectiveSpeed} amplitudeScale={1.2} particleScale={0.7} />
             )}
           </group>
         </Canvas>
