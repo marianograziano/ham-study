@@ -166,4 +166,11 @@ export default {
 
     strength: "电场强度",
   },
+  windomAntenna: {
+    title: "温顿天线 (Windom)",
+    desc: "一种离心馈电偶极天线 (OCFD)。多波段谐振，且具有独特的辐射特性。<br/>Off-Center Fed Dipole (OCFD). Multi-band resonance with unique patterns.",
+    wire: "振子 (有源 / Wire)",
+    feed: "馈电点 (Feed Point)",
+    pattern: "辐射方向图 (Pattern)",
+  },
 } satisfies Record<string, unknown>;

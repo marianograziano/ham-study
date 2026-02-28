@@ -166,4 +166,11 @@ export default {
 
     strength: "E-Field Strength",
   },
+  windomAntenna: {
+    title: "Windom Antenna",
+    desc: "Off-Center Fed Dipole (OCFD). Multi-band resonance with unique patterns.<br/>Popular for multi-band HF operations.",
+    wire: "Wire (Active)",
+    feed: "Feed Point",
+    pattern: "Radiation Pattern (Pattern)",
+  },
 } satisfies typeof import("~/locales/zh/scene").default;
