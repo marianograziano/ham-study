@@ -156,6 +156,7 @@ export default function EndFedAntennaScene({
   const { t } = useTranslation("scene");
   const [showWaves, setShowWaves] = useState(true);
   const [showPattern, setShowPattern] = useState(true);
+  const [groundHeight, setGroundHeight] = useState(0.2);
   const [speedMode, setSpeedMode] = useState<"slow" | "medium" | "fast">(
     "medium",
   );
@@ -170,6 +171,8 @@ export default function EndFedAntennaScene({
   const uniqueId = useId();
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
+  const visualScale = 8;
+
   useEffect(() => {
     let active = true;
     const runSimulation = async () => {
@@ -177,10 +180,16 @@ export default function EndFedAntennaScene({
       try {
         const ctx = new Nec2Context();
         ctx.initialize(1);
-        ctx.set_frequency(18.75 * harmonic);
+        const freq = 18.75 * harmonic;
+        ctx.set_frequency(freq);
+
+        const lambda = 299.79 / freq;
+        const h_m = groundHeight * lambda;
+        if (groundHeight > 0) ctx.set_ground(groundHeight);
 
         // Map Visual(X=-8, Y=2, Z=0) to Physical(X=-8, Z=2, Y=0)
-        ctx.add_wire(0, 0, 0, -8, 0, 2, 0.001, 20 * harmonic, 1);
+        // Add h_m to physical Z (Visual Y)
+        ctx.add_wire(0, 0, h_m, -8, 0, h_m + 2, 0.001, 20 * harmonic, 1);
         ctx.add_voltage_source(1, 1, 1.0, 0.0);
 
         await ctx.calculate();
@@ -203,7 +212,7 @@ export default function EndFedAntennaScene({
       active = false;
       clearTimeout(timer);
     };
-  }, [harmonic]);
+  }, [harmonic, groundHeight]);
 
   const handleDownload = () => {
     if (canvasRef.current) {
@@ -218,6 +227,8 @@ export default function EndFedAntennaScene({
     isThumbnail && !isHovered
       ? 0
       : { slow: 0.3, medium: 0.6, fast: 1.0 }[speedMode];
+
+  const gridY = -groundHeight * (wireLength * 2);
 
   const LegendPanel = () => (
     <div className="p-4 bg-black/70 text-white rounded-lg md:max-w-xs h-full border border-white/5">
@@ -318,6 +329,28 @@ export default function EndFedAntennaScene({
 
           <div className="pt-2 border-t border-white/5">
             <div className="mb-2 text-xs font-medium text-zinc-300">
+              {t("common.simulation.groundHeight")}
+            </div>
+            <div className="flex items-center space-x-3">
+              <input
+                type="range"
+                min="0"
+                max="2"
+                step="0.1"
+                value={groundHeight}
+                onChange={(e) => setGroundHeight(parseFloat(e.target.value))}
+                className="w-full accent-blue-500 h-1"
+              />
+              <span className="text-[10px] text-zinc-400 w-8 text-right font-mono">
+                {groundHeight === 0
+                  ? t("common.simulation.freeSpace")
+                  : groundHeight.toFixed(1)}
+              </span>
+            </div>
+          </div>
+
+          <div className="pt-2 border-t border-white/5">
+            <div className="mb-2 text-xs font-medium text-zinc-300">
               {t("common.controls.speed")}
             </div>
             <RadioGroup
@@ -413,7 +446,7 @@ export default function EndFedAntennaScene({
           <axesHelper args={[5]} />
           <gridHelper
             args={[20, 20, 0x333333, 0x222222]}
-            position={[0, -2, 0]}
+            position={[0, gridY, 0]}
           />
 
           <group position={[0, 0, 0]}>
