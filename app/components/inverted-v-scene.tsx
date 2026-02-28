@@ -1,23 +1,25 @@
 import { Camera } from "@phosphor-icons/react";
 import { ArcballControls } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState, lazy, Suspense } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { type BufferGeometry, SphereGeometry, Vector3, DoubleSide } from "three";
 import { Button } from "~/components/ui/button";
 import { Label } from "~/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
 import { Switch } from "~/components/ui/switch";
-import { initNecWasm, NecContext } from "~/utils/nec-wasm";
-import { ElectricFieldWasm } from "./electric-field-wasm";
+import { Nec2Context } from "~/utils/nec2-c-wasm";
+import { ElectricFieldNec2 } from "./electric-field-nec2";
 
 const height = 3; // Mast height base
 
 function ImpedanceDisplay({
   lengthFactor,
+  armAngleRad,
   groundHeight,
 }: {
   lengthFactor: number;
+  armAngleRad: number;
   groundHeight: number;
 }) {
   const [impedance, setImpedance] = useState<{ re: number; im: number } | null>(null);
@@ -28,39 +30,35 @@ function ImpedanceDisplay({
     const calculate = async () => {
       setIsCalculating(true);
       try {
-        await initNecWasm();
-        if (!active) return;
-
-        const ctx = new NecContext();
-        ctx.initialize(1);
-        ctx.set_frequency(300.0); // lambda = 1m
+        const ctx = new Nec2Context();
+        ctx.initialize(3);
+        const freq = 300.0;
+        ctx.set_frequency(freq); // lambda = 1m
         if (groundHeight > 0) ctx.set_ground(groundHeight);
 
-        const armLength = lengthFactor / 2;
-        const angle = Math.PI / 4;
+        const lambda = 299.79 / freq;
+        const armLength = (lengthFactor * lambda) / 2;
         const d = 0.005; // half length of center feed wire
         let armSegments = Math.floor((armLength - d) / 0.02);
         if (armSegments < 1) armSegments = 1;
 
-        const ySign = -1;
-        const xTip = (armLength - d) * Math.sin(angle); // same as cos for 45 deg, keeping matching geometry
-        const yTip = ySign * (armLength - d) * Math.cos(angle);
+        const h_m = groundHeight > 0 ? groundHeight * lambda : height * 0.1; 
+        
+        const yTip = (armLength - d) * Math.sin(armAngleRad); 
+        const zTip = -(armLength - d) * Math.cos(armAngleRad); // Inverted-V droop
 
-        // Center wire (TAG 1)
-        ctx.add_wire(-d, 0, 0, d, 0, 0, 0.001, 1, 1);
-        // Right wire (TAG 2)
-        ctx.add_wire(d, 0, 0, xTip + d, yTip, 0, 0.001, armSegments, 2);
-        // Left wire (TAG 3)
-        ctx.add_wire(-d, 0, 0, -xTip - d, yTip, 0, 0.001, armSegments, 3);
+        // Mapping: Three.js [X, Y, Z] -> NEC [X, Z, Y]
+        ctx.add_wire(0, -d, h_m, 0, d, h_m, 0.001, 1, 1);
+        ctx.add_wire(0, d, h_m, 0, yTip + d, h_m + zTip, 0.001, armSegments, 2);
+        ctx.add_wire(0, -d, h_m, 0, -yTip - d, h_m + zTip, 0.001, armSegments, 3);
 
         ctx.add_voltage_source(1, 1, 1.0, 0.0);
-        ctx.calculate();
+        await ctx.calculate();
 
-        const zArr = ctx.get_impedance(1);
-        if (zArr && zArr.length === 2 && active) {
+        if (active) {
+          const zArr = ctx.get_impedance(1);
           setImpedance({ re: zArr[0], im: zArr[1] });
         }
-        ctx.free();
       } catch (err) {
         console.error("NEC Calculation Error:", err);
       } finally {
@@ -73,7 +71,7 @@ function ImpedanceDisplay({
       active = false;
       clearTimeout(timer);
     };
-  }, [lengthFactor, groundHeight]);
+  }, [lengthFactor, armAngleRad, groundHeight]);
 
   return (
     <div className="pt-3 border-t border-white/10 mt-3">
@@ -96,18 +94,12 @@ function ImpedanceDisplay({
   );
 }
 
-function InvertedVAntenna({ length }: { length: number }) {
-  const angle = Math.PI / 4; // 45 degrees
+function InvertedVAntenna({ length, angle }: { length: number, angle: number }) {
   const armLength = length / 2;
-
   const ySign = -1;
-  const xTip = armLength * Math.sin(angle);
+  const zTip = armLength * Math.sin(angle);
   const yTip = ySign * armLength * Math.cos(angle);
-  
-  // Angle for right leg. Tip is at (xTip, yTip). Base at (0,0).
-  const rightAngle = Math.atan2(yTip, xTip);
-  // Angle for left leg. Tip is at (-xTip, yTip).
-  const leftAngle = Math.atan2(yTip, -xTip);
+  const droopAngle = Math.atan2(yTip, zTip);
 
   return (
     <group position={[0, height, 0]}>
@@ -123,19 +115,18 @@ function InvertedVAntenna({ length }: { length: number }) {
         <meshStandardMaterial color="white" />
       </mesh>
 
-      {/* Left Leg (-X) */}
+      {/* Legs along Z axis */}
       <mesh
-        position={[-xTip / 2, yTip / 2, 0]}
-        rotation={[0, 0, leftAngle - Math.PI / 2]}
+        position={[0, yTip / 2, -zTip / 2]}
+        rotation={[-(droopAngle - Math.PI / 2), 0, 0]}
       >
         <cylinderGeometry args={[0.02, 0.02, armLength, 16]} />
         <meshStandardMaterial color="#ef4444" />
       </mesh>
 
-      {/* Right Leg (+X) */}
       <mesh
-        position={[xTip / 2, yTip / 2, 0]}
-        rotation={[0, 0, rightAngle - Math.PI / 2]}
+        position={[0, yTip / 2, zTip / 2]}
+        rotation={[droopAngle - Math.PI / 2, 0, 0]}
       >
         <cylinderGeometry args={[0.02, 0.02, armLength, 16]} />
         <meshStandardMaterial color="#ef4444" />
@@ -146,111 +137,87 @@ function InvertedVAntenna({ length }: { length: number }) {
 
 function RadiationPattern({
   lengthFactor,
+  armAngleRad,
   groundHeight,
 }: {
   lengthFactor: number;
+  armAngleRad: number;
   groundHeight: number;
 }) {
   const [geometry, setGeometry] = useState<BufferGeometry | null>(null);
+  const [context, setContext] = useState<Nec2Context | null>(null);
 
   useEffect(() => {
     let isMounted = true;
 
-    const generateGeometry = async () => {
-      await initNecWasm();
-      if (!isMounted) return;
+    const runSimulation = async () => {
+      const ctx = new Nec2Context();
+      const freq = 300.0;
+      ctx.set_frequency(freq);
+      if (groundHeight > 0) ctx.set_ground(groundHeight);
 
-      const geo = new SphereGeometry(1, 60, 30);
-      const posAttribute = geo.attributes.position;
-      const vertex = new Vector3();
-      const scale = 5;
+      const lambda = 299.79 / freq;
+      const armLength = (lengthFactor * lambda) / 2;
+      const d = 0.005;
+      let armSegments = Math.floor((armLength - d) / 0.02);
+      if (armSegments < 1) armSegments = 1;
 
-      const thetas: number[] = [];
-      const phis: number[] = [];
+      const h_m = groundHeight > 0 ? groundHeight * lambda : height * 0.1;
+      const yTip = (armLength - d) * Math.sin(armAngleRad); 
+      const zTip = -(armLength - d) * Math.cos(armAngleRad);
 
-      for (let i = 0; i < posAttribute.count; i++) {
-        vertex.fromBufferAttribute(posAttribute, i);
-        vertex.normalize();
-        phis.push(Math.atan2(vertex.z, vertex.x));
-        thetas.push(Math.asin(vertex.y));
-      }
+      ctx.initialize(3);
+      ctx.add_wire(0, -d, h_m, 0, d, h_m, 0.001, 1, 1);
+      ctx.add_wire(0, d, h_m, 0, yTip + d, h_m + zTip, 0.001, armSegments, 2);
+      ctx.add_wire(0, -d, h_m, 0, -yTip - d, h_m + zTip, 0.001, armSegments, 3);
 
-      let gains: number[] = [];
-      try {
-        const ctx = new NecContext();
-        ctx.initialize(1);
-        ctx.set_frequency(300.0);
-        ctx.set_ground(groundHeight);
-
-        const armLength = lengthFactor / 2;
-        const angle = Math.PI / 4;
-        const d = 0.005;
-        let armSegments = Math.floor((armLength - d) / 0.02);
-        if (armSegments < 1) armSegments = 1;
-
-        const ySign = -1;
-        const xTip = (armLength - d) * Math.sin(angle);
-        const yTip = ySign * (armLength - d) * Math.cos(angle);
-
-        ctx.add_wire(-d, 0, 0, d, 0, 0, 0.001, 1, 1);
-        ctx.add_wire(d, 0, 0, xTip + d, yTip, 0, 0.001, armSegments, 2);
-        ctx.add_wire(-d, 0, 0, -xTip - d, yTip, 0, 0.001, armSegments, 3);
-
-        ctx.add_voltage_source(1, 1, 1.0, 0.0);
-        ctx.calculate();
-
-        const outArray = new Float64Array(thetas.length);
-        const thetasArray = new Float64Array(thetas);
-        const phisArray = new Float64Array(phis);
-
-        ctx.calculate_far_field_pattern_3d(thetasArray, phisArray, outArray);
-        gains = Array.from(outArray);
-
-        let maxGain = 0;
-        for (let i = 0; i < gains.length; i++) {
-          if (gains[i] > maxGain) maxGain = gains[i];
-        }
-        if (maxGain > 0) {
-          for (let i = 0; i < gains.length; i++) {
-            gains[i] /= maxGain;
-          }
-        }
-
-        ctx.free();
-      } catch (error) {
-        console.warn("NEC far field calculation failed", error);
-        gains = new Array(posAttribute.count).fill(0);
-      }
-
-      for (let i = 0; i < posAttribute.count; i++) {
-        vertex.fromBufferAttribute(posAttribute, i);
-        vertex.normalize();
-        let gain = gains[i] || 0;
-        vertex.multiplyScalar(gain * scale);
-        posAttribute.setXYZ(i, vertex.x, vertex.y, vertex.z);
-      }
-
-      geo.computeVertexNormals();
+      ctx.add_voltage_source(1, 1, 1.0, 0.0);
+      await ctx.calculate();
 
       if (isMounted) {
+        setContext(ctx);
+        const geo = new SphereGeometry(1, 60, 30);
+        const posAttribute = geo.attributes.position;
+        const vertex = new Vector3();
+        const scale = 5;
+
+        const count = posAttribute.count;
+        const thetas = new Float64Array(count);
+        const phis = new Float64Array(count);
+        const gains = new Float64Array(count);
+
+        for (let i = 0; i < count; i++) {
+          vertex.fromBufferAttribute(posAttribute, i);
+          vertex.normalize();
+          thetas[i] = Math.acos(Math.max(-1, Math.min(1, vertex.y)));
+          let phi = Math.atan2(vertex.z, vertex.x);
+          if (phi < 0) phi += 2 * Math.PI;
+          phis[i] = phi;
+        }
+
+        ctx.calculate_far_field_pattern_3d(thetas, phis, gains);
+
+        let maxG = 0.01;
+        for (let i = 0; i < count; i++) {
+          if (gains[i] > maxG) maxG = gains[i];
+        }
+
+        for (let i = 0; i < count; i++) {
+          vertex.fromBufferAttribute(posAttribute, i);
+          vertex.normalize();
+          const power = gains[i] / maxG;
+          const rad = (0.1 + power * 0.9) * scale;
+          posAttribute.setXYZ(i, vertex.x * rad, vertex.y * rad, vertex.z * rad);
+        }
+
+        geo.computeVertexNormals();
         setGeometry(geo);
       }
     };
 
-    generateGeometry();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [lengthFactor, groundHeight]);
-
-  useMemo(() => {
-    return () => {
-      if (geometry) {
-        geometry.dispose();
-      }
-    };
-  }, [geometry]);
+    runSimulation();
+    return () => { isMounted = false; };
+  }, [lengthFactor, armAngleRad, groundHeight]);
 
   if (!geometry) return null;
 
@@ -265,6 +232,7 @@ function RadiationPattern({
           side={DoubleSide}
         />
       </mesh>
+      {context && <ElectricFieldNec2 context={context} rotation={[0, 0, 0]} />}
     </group>
   );
 }
@@ -282,6 +250,7 @@ export default function InvertedVAntennaScene({
   const [lengthFactor, setLengthFactor] = useState(0.5);
   const [groundHeight, setGroundHeight] = useState(0.0);
   const [speedMode, setSpeedMode] = useState<"slow" | "medium" | "fast">("medium");
+  const [armAngleDeg, setArmAngleDeg] = useState(45);
 
   const uniqueId = useId();
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -304,6 +273,7 @@ export default function InvertedVAntennaScene({
   const effectiveSpeed = isThumbnail && !isHovered ? 0 : speedMultiplier;
   const visualScale = 6;
   const physicalLength = lengthFactor * visualScale;
+  const armAngleRad = (armAngleDeg * Math.PI) / 180;
 
   const LegendContent = () => (
     <>
@@ -437,6 +407,23 @@ export default function InvertedVAntennaScene({
 
       <div className="pt-3 border-t border-white/10">
         <div className="mb-2 text-xs md:text-sm font-medium text-zinc-200">
+          V-Angle: {armAngleDeg}°
+        </div>
+        <div className="flex items-center space-x-4">
+          <input
+            type="range"
+            min="30"
+            max="150"
+            step="5"
+            value={armAngleDeg}
+            onChange={(e) => setArmAngleDeg(Number.parseFloat(e.target.value))}
+            className="w-full accent-primary-foreground"
+          />
+        </div>
+      </div>
+
+      <div className="pt-3 border-t border-white/10">
+        <div className="mb-2 text-xs md:text-sm font-medium text-zinc-200">
           {t("common.controls.groundHeight", "Ground Height (λ)")}
         </div>
         <div className="flex items-center space-x-4">
@@ -519,7 +506,7 @@ export default function InvertedVAntennaScene({
         </Button>
       </div>
 
-      <ImpedanceDisplay lengthFactor={lengthFactor} groundHeight={groundHeight} />
+      <ImpedanceDisplay lengthFactor={lengthFactor} armAngleRad={armAngleRad} groundHeight={groundHeight} />
     </div>
   );
 
@@ -552,22 +539,10 @@ export default function InvertedVAntennaScene({
             position={[0, 0, 0]}
           />
 
-          <InvertedVAntenna length={physicalLength} />
-          {showPattern && <RadiationPattern lengthFactor={lengthFactor} groundHeight={groundHeight} />}
-          
-          {showWaves && (
-            <group position={[0, height, 0]}>
-              <ElectricFieldWasm
-                antennaType="inverted-v"
-                polarizationType="horizontal"
-                speed={effectiveSpeed}
-                amplitudeScale={1.5}
-                antennaLength={lengthFactor}
-                rotation={[0, Math.PI / 2, 0]}
-                groundHeight={groundHeight}
-              />
-            </group>
-          )}
+          <InvertedVAntenna length={physicalLength} angle={armAngleRad} />
+          <Suspense fallback={null}>
+            {showPattern && <RadiationPattern lengthFactor={lengthFactor} armAngleRad={armAngleRad} groundHeight={groundHeight} />}
+          </Suspense>
         </Canvas>
 
         {!isThumbnail && (

@@ -110,10 +110,11 @@ export class Nec2Context {
         if (line.includes("RADIATION PATTERNS")) { section = 'pattern'; continue; }
         if (line.includes("CURRENTS AND LOCATION")) { section = 'current'; continue; }
 
+        const parts = line.split(/\s+/).filter(p => p.length > 0);
+        if (parts.length === 0) continue;
+
         if (section === 'impedance') {
-            const parts = line.split(/\s+/).filter(p => p.length > 0);
-            // 典型行: TAG SEG VOLT_R VOLT_I CURR_R CURR_I IMP_R IMP_I ADM_R ADM_I POWER
-            // 索引:   0   1   2      3      4      5      6     7     8     9     10
+            // Typical line: TAG SEG VOLT_R VOLT_I CURR_R CURR_I IMP_R IMP_I ADM_R ADM_I POWER
             if (parts.length >= 8 && !isNaN(parseInt(parts[0]))) {
                 const tag = parseInt(parts[0]);
                 this.impedanceCache.set(tag, {
@@ -123,7 +124,7 @@ export class Nec2Context {
             }
         }
         if (section === 'current') {
-            const parts = line.split(/\s+/);
+            // Typical line: SEG TAG X Y Z LENGTH ... MAG PHASE
             if (parts.length >= 10 && !isNaN(parseInt(parts[0]))) {
                 const wire = this.wires[currentWireIdx];
                 if (wire) {
@@ -132,7 +133,9 @@ export class Nec2Context {
                     const z = parseFloat(parts[4]);
                     this.currents.push({
                         x, y, z,
-                        length: parseFloat(parts[5]), mag: parseFloat(parts[8]), phase: parseFloat(parts[9]),
+                        length: parseFloat(parts[5]), 
+                        mag: parseFloat(parts[8]), 
+                        phase: parseFloat(parts[9]),
                         ux: wire.ux, uy: wire.uy, uz: wire.uz
                     });
                     sumX += x; sumY += y; sumZ += z;
@@ -145,8 +148,8 @@ export class Nec2Context {
             }
         }
         if (section === 'pattern') {
-            const parts = line.split(/\s+/);
-            if (parts.length >= 5 && !isNaN(parseFloat(parts[0])) && !isNaN(parseFloat(parts[1]))) {
+            // Typical line: THETA PHI VERT_DB HORIZ_DB TOTAL_DB
+            if (parts.length >= 5 && !isNaN(parseFloat(parts[0]))) {
                 const rawGainDbi = parseFloat(parts[4]);
                 if (rawGainDbi > this.maxGainDbi) this.maxGainDbi = rawGainDbi;
                 const gain = Math.pow(10, Math.max(-40, rawGainDbi) / 10);
