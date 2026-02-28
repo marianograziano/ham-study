@@ -9,33 +9,38 @@ import { Label } from "~/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
 import { Switch } from "~/components/ui/switch";
 import { Nec2Context } from "~/utils/nec2-c-wasm";
-import { YagiElectricField } from "./yagi-electric-field";
+import { ElectricFieldNec2 } from "./electric-field-nec2";
 
-function YagiAntenna() {
+function YagiAntenna({ scale = 10 }: { scale?: number }) {
   return (
     <group>
-      <mesh position={[0, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
-        <cylinderGeometry args={[0.05, 0.05, 4, 16]} />
+      {/* Boom */}
+      <mesh position={[-0.17 * scale / 2, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
+        <cylinderGeometry args={[0.05, 0.05, 0.4 * scale, 16]} />
         <meshStandardMaterial color="#666" />
       </mesh>
-      <mesh position={[-1.5, 0, 0]} rotation={[Math.PI / 2, 0, 0]}>
-        <cylinderGeometry args={[0.02, 0.02, 3.2, 16]} />
+      {/* Reflector */}
+      <mesh position={[-0.139 * scale, 0, 0]} rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[0.02, 0.02, 0.348 * scale, 16]} />
         <meshStandardMaterial color="#3b82f6" />
       </mesh>
+      {/* Driven Element */}
       <mesh position={[0, 0, 0]} rotation={[Math.PI / 2, 0, 0]}>
-        <cylinderGeometry args={[0.03, 0.03, 3, 16]} />
+        <cylinderGeometry args={[0.03, 0.03, 0.328 * scale, 16]} />
         <meshStandardMaterial color="#ef4444" />
         <mesh position={[0, 0, 0]}>
           <boxGeometry args={[0.1, 0.1, 0.1]} />
           <meshBasicMaterial color="#fff" />
         </mesh>
       </mesh>
-      <mesh position={[1.5, 0, 0]} rotation={[Math.PI / 2, 0, 0]}>
-        <cylinderGeometry args={[0.02, 0.02, 2.8, 16]} />
+      {/* Director */}
+      <mesh position={[0.105 * scale, 0, 0]} rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[0.02, 0.02, 0.306 * scale, 16]} />
         <meshStandardMaterial color="#3b82f6" />
       </mesh>
-      <mesh position={[0, -2, 0]}>
-        <cylinderGeometry args={[0.08, 0.08, 4, 16]} />
+      {/* Support Pole - fixed height */}
+      <mesh position={[0, -0.2 * scale, 0]}>
+        <cylinderGeometry args={[0.08, 0.08, 0.4 * scale, 16]} />
         <meshStandardMaterial color="#444" />
       </mesh>
     </group>
@@ -52,7 +57,7 @@ function RadiationPattern({ context }: { context: Nec2Context | null }) {
       const geo = new SphereGeometry(1, 60, 40);
       const posAttribute = geo.attributes.position;
       const vertex = new Vector3();
-      const scale = 1.5;
+      const scale = 3.0;
 
       const count = posAttribute.count;
       const thetas = new Float64Array(count);
@@ -71,9 +76,17 @@ function RadiationPattern({ context }: { context: Nec2Context | null }) {
 
       context.calculate_far_field_pattern_3d(thetas, phis, gains);
 
+      let maxLinearG = 0.01;
       for (let i = 0; i < count; i++) {
-        const power = gains[i];
-        const rad = (0.5 + power * 1.0) * scale;
+        if (gains[i] > maxLinearG) maxLinearG = gains[i];
+      }
+
+      const maxDbi = context.get_max_gain();
+      const visualBaseScale = 7.5 + Math.max(0, maxDbi) * 0.7;
+
+      for (let i = 0; i < count; i++) {
+        const power = gains[i] / maxLinearG;
+        const rad = (0.2 + power * 0.8) * visualBaseScale;
         vertex.fromBufferAttribute(posAttribute, i);
         vertex.normalize();
         posAttribute.setXYZ(i, vertex.x * rad, vertex.y * rad, vertex.z * rad);
@@ -118,6 +131,8 @@ export default function YagiAntennaScene({
   const uniqueId = useId();
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
+  const visualScale = 10; 
+
   useEffect(() => {
     let active = true;
     const runSimulation = async () => {
@@ -132,6 +147,7 @@ export default function YagiAntennaScene({
         const h_m = groundHeight * lambda;
         if (groundHeight > 0) ctx.set_ground(groundHeight);
 
+        // Standard 3-element Yagi at 430MHz
         ctx.add_wire(-0.139, -0.174, h_m, -0.139, 0.174, h_m, 0.003, 11, 1);
         ctx.add_wire(0, -0.164, h_m, 0, 0.164, h_m, 0.003, 11, 2);
         ctx.add_wire(0.105, -0.153, h_m, 0.105, 0.153, h_m, 0.003, 11, 3);
@@ -169,6 +185,7 @@ export default function YagiAntennaScene({
   };
 
   const effectiveSpeed = isThumbnail && !isHovered ? 0 : { slow: 0.3, medium: 0.6, fast: 1.0 }[speedMode];
+  const gridY = -groundHeight * visualScale;
 
   const LegendPanel = () => (
     <div className="p-4 bg-black/70 text-white rounded-lg md:max-w-xs h-full border border-white/5">
@@ -192,7 +209,7 @@ export default function YagiAntennaScene({
       </div>
       <div className="mt-4 pt-3 border-t border-gray-600">
         <div className="flex justify-between items-end mb-1.5">
-          <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">{t("yagiAntenna.strength")}</span>
+          <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">{t("common.simulation.strength")}</span>
           <span className="text-[9px] text-zinc-500 italic">Normalized (E·r)</span>
         </div>
         <div className="h-2 w-full rounded-full bg-gradient-to-r from-blue-600 via-green-500 via-yellow-400 to-red-600" />
@@ -204,14 +221,14 @@ export default function YagiAntennaScene({
     <div className="p-4 bg-black/70 text-white rounded-lg w-full h-full border border-white/5">
       <div className="flex flex-col space-y-4">
         <div className="bg-zinc-900/50 p-3 rounded border border-white/5">
-          <div className="mb-2 text-[10px] uppercase font-bold tracking-wider text-zinc-500">{t("yagiAntenna.analysis")}</div>
+          <div className="mb-2 text-[10px] uppercase font-bold tracking-wider text-zinc-500">{t("common.simulation.analysis")}</div>
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <div className="text-[9px] text-zinc-400 mb-0.5">{t("yagiAntenna.peakGain")}</div>
+              <div className="text-[9px] text-zinc-400 mb-0.5">{t("common.simulation.peakGain")}</div>
               <div className="text-xs font-mono text-green-400">{isCalculating ? "..." : `${maxGain.toFixed(2)} dBi`}</div>
             </div>
             <div>
-              <div className="text-[9px] text-zinc-400 mb-0.5">{t("yagiAntenna.impedance")}</div>
+              <div className="text-[9px] text-zinc-400 mb-0.5">{t("common.simulation.impedance")}</div>
               <div className="text-xs font-mono text-zinc-300">{isCalculating ? "..." : impedance ? `${impedance.re.toFixed(1)}Ω` : "--"}</div>
             </div>
           </div>
@@ -219,24 +236,24 @@ export default function YagiAntennaScene({
 
         <div className="space-y-3">
           <div className="pt-1">
-            <div className="mb-2 text-xs font-medium text-zinc-300">{t("yagiAntenna.material")}</div>
+            <div className="mb-2 text-xs font-medium text-zinc-300">{t("common.simulation.material")}</div>
             <RadioGroup value={material} onValueChange={setMaterial} className="flex flex-row md:flex-col gap-3 md:gap-1.5">
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="aluminum" id={`${uniqueId}m-al`} className="peer size-3 border-zinc-500 data-[state=checked]:border-white data-[state=checked]:text-white" />
-                <Label htmlFor={`${uniqueId}m-al`} className="text-[11px] cursor-pointer text-zinc-400 peer-data-[state=checked]:text-white">{t("yagiAntenna.aluminum")}</Label>
+                <Label htmlFor={`${uniqueId}m-al`} className="text-[11px] cursor-pointer text-zinc-400 peer-data-[state=checked]:text-white">{t("common.simulation.aluminum")}</Label>
               </div>
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="stainless_steel" id={`${uniqueId}m-ss`} className="peer size-3 border-zinc-500 data-[state=checked]:border-white data-[state=checked]:text-white" />
-                <Label htmlFor={`${uniqueId}m-ss`} className="text-[11px] cursor-pointer text-zinc-400 peer-data-[state=checked]:text-white">{t("yagiAntenna.stainlessSteel")}</Label>
+                <Label htmlFor={`${uniqueId}m-ss`} className="text-[11px] cursor-pointer text-zinc-400 peer-data-[state=checked]:text-white">{t("common.simulation.stainlessSteel")}</Label>
               </div>
             </RadioGroup>
           </div>
 
           <div className="pt-2 border-t border-white/5">
-            <div className="mb-2 text-xs font-medium text-zinc-300">{t("yagiAntenna.groundHeight")}</div>
+            <div className="mb-2 text-xs font-medium text-zinc-300">{t("common.simulation.groundHeight")}</div>
             <div className="flex items-center space-x-3">
               <input type="range" min="0" max="2" step="0.1" value={groundHeight} onChange={(e) => setGroundHeight(parseFloat(e.target.value))} className="w-full accent-blue-500 h-1" />
-              <span className="text-[10px] text-zinc-400 w-8 text-right font-mono">{groundHeight === 0 ? t("yagiAntenna.freeSpace") : groundHeight.toFixed(1)}</span>
+              <span className="text-[10px] text-zinc-400 w-8 text-right font-mono">{groundHeight === 0 ? t("common.simulation.freeSpace") : groundHeight.toFixed(1)}</span>
             </div>
           </div>
 
@@ -293,13 +310,13 @@ export default function YagiAntennaScene({
           <ambientLight intensity={0.5} color={0x404040} />
           <directionalLight position={[10, 10, 10]} intensity={1} color={0xffffff} />
           <axesHelper args={[5]} />
-          <gridHelper args={[20, 20, 0x333333, 0x222222]} position={[0, -2, 0]} />
+          <gridHelper args={[20, 20, 0x333333, 0x222222]} position={[0, gridY, 0]} />
 
-          <group position={[0, groundHeight > 0 ? -2 + groundHeight * 2 : 0, 0]}>
-            <YagiAntenna />
+          <group position={[0, 0, 0]}>
+            <YagiAntenna scale={visualScale} />
             {showPattern && context && <RadiationPattern context={context} />}
             {showWaves && context && (
-              <YagiElectricField context={context} speed={effectiveSpeed} amplitudeScale={1.5} />
+              <ElectricFieldNec2 context={context} speed={effectiveSpeed} amplitudeScale={1.2} />
             )}
           </group>
         </Canvas>

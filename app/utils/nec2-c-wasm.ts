@@ -11,8 +11,12 @@ export class Nec2Context {
   private material: string = "aluminum";
   private patternCache: Map<string, number> = new Map();
   private impedanceCache: Map<number, {re: number, im: number}> = new Map();
-  private currents: Array<{mag: number, phase: number, x: number, y: number, z: number, length: number}> = [];
+  private currents: Array<{
+    mag: number, phase: number, x: number, y: number, z: number, length: number,
+    ux: number, uy: number, uz: number
+  }> = [];
   private maxGainDbi: number = 0;
+  private center: {x: number, y: number, z: number} = {x: 0, y: 0, z: 0};
 
   constructor() {}
 
@@ -25,7 +29,14 @@ export class Nec2Context {
   }
 
   add_wire(x1: number, y1: number, z1: number, x2: number, y2: number, z2: number, radius: number, segments: number, tag: number) {
-    this.wires.push({ x1, y1, z1, x2, y2, z2, radius, segments, tag });
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const dz = z2 - z1;
+    const len = Math.sqrt(dx*dx + dy*dy + dz*dz) || 1e-6;
+    this.wires.push({ 
+        x1, y1, z1, x2, y2, z2, radius, segments, tag, 
+        ux: dx/len, uy: dy/len, uz: dz/len 
+    });
   }
 
   set_frequency(mhz: number) { this.frequency = mhz; }
@@ -89,6 +100,10 @@ export class Nec2Context {
     const lines = data.split("\n");
     let section: 'none' | 'impedance' | 'pattern' | 'current' = 'none';
 
+    let currentWireIdx = 0;
+    let currentSegInWire = 0;
+    let sumX = 0, sumY = 0, sumZ = 0;
+
     for (let line of lines) {
         line = line.trim();
         if (line.includes("ANTENNA INPUT PARAMETERS")) { section = 'impedance'; continue; }
@@ -96,18 +111,37 @@ export class Nec2Context {
         if (line.includes("CURRENTS AND LOCATION")) { section = 'current'; continue; }
 
         if (section === 'impedance') {
-            const parts = line.split(/\s+/);
-            if (parts.length >= 6 && !isNaN(parseFloat(parts[0]))) {
-                this.impedanceCache.set(this.sources[0]?.tag || 1, {re: parseFloat(parts[parts.length - 2]), im: parseFloat(parts[parts.length - 1])});
+            const parts = line.split(/\s+/).filter(p => p.length > 0);
+            // 典型行: TAG SEG VOLT_R VOLT_I CURR_R CURR_I IMP_R IMP_I ADM_R ADM_I POWER
+            // 索引:   0   1   2      3      4      5      6     7     8     9     10
+            if (parts.length >= 8 && !isNaN(parseInt(parts[0]))) {
+                const tag = parseInt(parts[0]);
+                this.impedanceCache.set(tag, {
+                    re: parseFloat(parts[6]), 
+                    im: parseFloat(parts[7])
+                });
             }
         }
         if (section === 'current') {
             const parts = line.split(/\s+/);
             if (parts.length >= 10 && !isNaN(parseInt(parts[0]))) {
-                this.currents.push({
-                    x: parseFloat(parts[2]), y: parseFloat(parts[3]), z: parseFloat(parts[4]),
-                    length: parseFloat(parts[5]), mag: parseFloat(parts[8]), phase: parseFloat(parts[9])
-                });
+                const wire = this.wires[currentWireIdx];
+                if (wire) {
+                    const x = parseFloat(parts[2]);
+                    const y = parseFloat(parts[3]);
+                    const z = parseFloat(parts[4]);
+                    this.currents.push({
+                        x, y, z,
+                        length: parseFloat(parts[5]), mag: parseFloat(parts[8]), phase: parseFloat(parts[9]),
+                        ux: wire.ux, uy: wire.uy, uz: wire.uz
+                    });
+                    sumX += x; sumY += y; sumZ += z;
+                    currentSegInWire++;
+                    if (currentSegInWire >= wire.segments) {
+                        currentWireIdx++;
+                        currentSegInWire = 0;
+                    }
+                }
             }
         }
         if (section === 'pattern') {
@@ -120,26 +154,39 @@ export class Nec2Context {
             }
         }
     }
+
+    if (this.currents.length > 0) {
+        this.center = {
+            x: sumX / this.currents.length,
+            y: sumY / this.currents.length,
+            z: sumZ / this.currents.length
+        };
+    }
   }
 
   get_impedance(tag: number) { return this.impedanceCache.get(tag) ? [this.impedanceCache.get(tag)!.re, this.impedanceCache.get(tag)!.im] : [50, 0]; }
   get_currents() { return this.currents; }
   get_max_gain() { return this.maxGainDbi; }
+  get_center() { return this.center; }
 
   get_max_field_reference(): number {
     let maxAmp = 0.001;
-    for (let x = -2; x <= 10; x += 1) {
-      for (let y = -5; y <= 5; y += 1) {
-        const { amplitude } = this.calculate_field_and_amplitude(x, y, this.currents[0]?.z / 0.1 || 0, 0);
-        if (amplitude > maxAmp) maxAmp = amplitude;
-      }
+    const r_sample = 10.0;
+    
+    for (let theta = 0; theta <= Math.PI; theta += Math.PI / 12) {
+        for (let phi = 0; phi < Math.PI * 2; phi += Math.PI / 12) {
+            const x = (this.center.x + r_sample * Math.sin(theta) * Math.cos(phi)) / 0.1;
+            const y = (this.center.y + r_sample * Math.sin(theta) * Math.sin(phi)) / 0.1;
+            const z = (this.center.z + r_sample * Math.cos(theta)) / 0.1;
+            const { amplitude } = this.calculate_field_and_amplitude(x, y, z, 0);
+            if (amplitude > maxAmp) maxAmp = amplitude;
+        }
     }
     return maxAmp;
   }
 
   /**
-   * 关键修复：实现距离补偿 (E * r)
-   * 这样显示的就是波束的形状，而不是简单的物理场强
+   * 计算指定坐标点的瞬时场强和振幅
    */
   calculate_field_and_amplitude(x: number, y: number, z: number, time_phase: number): { instantaneous: number, amplitude: number } {
     let real_sum = 0;
@@ -152,35 +199,42 @@ export class Nec2Context {
     const y_m = y * sceneScale;
     const z_m = z * sceneScale;
 
-    // 计算到天线中心的平均距离，用于补偿
-    const distToCenter = Math.sqrt(x_m**2 + y_m**2 + (z_m - (this.currents[0]?.z || 0))**2) + 0.1;
-
     for (const c of this.currents) {
-        const r_dir = Math.sqrt((x_m - c.x)**2 + (y_m - c.y)**2 + (z_m - c.z)**2) + 0.05;
+        const dx = x_m - c.x;
+        const dy = y_m - c.y;
+        const dz = z_m - c.z;
+        const r_dir = Math.sqrt(dx*dx + dy*dy + dz*dz) + 0.01;
+        
+        const crossX = dy * c.uz - dz * c.uy;
+        const crossY = dz * c.ux - dx * c.uz;
+        const crossZ = dx * c.uy - dy * c.ux;
+        const sin_alpha = Math.sqrt(crossX*crossX + crossY*crossY + crossZ*crossZ) / r_dir;
+
         const phase_dir = (c.phase * Math.PI / 180) - (k * r_dir);
-        // E 场
-        const e_mag = (c.mag * c.length) / r_dir;
+        const e_mag = (c.mag * c.length * sin_alpha) / r_dir;
         
         real_sum += e_mag * Math.cos(phase_dir);
         imag_sum += e_mag * Math.sin(phase_dir);
 
         if (hasGround) {
-            const r_img = Math.sqrt((x_m - c.x)**2 + (y_m - c.y)**2 + (z_m + c.z)**2) + 0.05;
+            const dz_img = z_m + c.z;
+            const r_img = Math.sqrt(dx*dx + dy*dy + dz_img*dz_img) + 0.01;
+            const crossX_img = dy * c.uz - dz_img * c.uy;
+            const crossY_img = dz_img * c.ux - dx * c.uz;
+            const crossZ_img = dx * c.uy - dy * c.ux;
+            const sin_alpha_img = Math.sqrt(crossX_img*crossX_img + crossY_img*crossY_img + crossZ_img*crossZ_img) / r_img;
+
             const phase_img = (c.phase * Math.PI / 180) - (k * r_img) + Math.PI; 
-            const e_mag_img = (c.mag * c.length) / r_img;
+            const e_mag_img = (c.mag * c.length * sin_alpha_img) / r_img;
             real_sum += e_mag_img * Math.cos(phase_img);
             imag_sum += e_mag_img * Math.sin(phase_img);
         }
     }
 
     const raw_amplitude = Math.sqrt(real_sum * real_sum + imag_sum * imag_sum);
-    
-    /**
-     * 距离补偿：amplitude = E * r
-     * 这样远处的波束如果能量集中，其值会很大（红色）
-     * 近处如果没有形成波束，值反而小（蓝色）
-     */
-    const amplitude = raw_amplitude * distToCenter;
+    // 距离补偿始终以天线几何中心为准
+    const r_eff = Math.sqrt((x_m - this.center.x)**2 + (y_m - this.center.y)**2 + (z_m - this.center.z)**2) + 0.2;
+    const amplitude = raw_amplitude * r_eff;
     const instantaneous = amplitude * Math.cos(Math.atan2(imag_sum, real_sum) + time_phase);
 
     return { instantaneous, amplitude };
