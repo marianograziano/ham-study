@@ -52,7 +52,10 @@ export function ElectricFieldNec2({
     timeRef.current += delta * 4.0 * speed;
 
     const center = context.get_center();
-    const k_wave = 2.0 * Math.PI;
+    // Use the actual frequency from the context to calculate k_wave
+    const freq = context.get_frequency ? context.get_frequency() : (context as any).frequency || 300.0;
+    const lambda = 299.79 / freq;
+    const k_wave = (2.0 * Math.PI) / lambda;
 
     for (let i = 0; i < gridSize; i++) {
       for (let j = 0; j < gridSize; j++) {
@@ -115,10 +118,10 @@ export function ElectricFieldNec2({
         // 降低底数或调整系数，保留主瓣和副瓣的差距。
         const rawWeight = compensatedAmplitude / (maxFieldRef + 1e-8);
         const visualWeight =
-          rawWeight > 1.0 ? 1.0 + Math.log(rawWeight) * 0.2 : rawWeight;
+          rawWeight > 1.0 ? 1.0 + Math.log(rawWeight) * 0.5 : rawWeight;
         const ampWeight = Math.max(
           0,
-          Math.min(1.2, visualWeight * amplitudeScale),
+          Math.min(1.5, visualWeight * amplitudeScale),
         );
 
         // 相位 (r_dist_m 等同于波长数，因为 300MHz 对应 1m)
@@ -126,9 +129,10 @@ export function ElectricFieldNec2({
         const sinPhase = Math.sin(phase);
 
         // 颜色反馈：越接近天线场越强，颜色越红；远场越弱，颜色变蓝
+        // 增大对比度系数，使得强场能够达到纯红(1.0)
         const displayWeight = Math.min(
           1,
-          ampWeight * (0.3 + 0.7 * Math.abs(sinPhase)),
+          ampWeight * (0.2 + 0.8 * Math.abs(sinPhase)),
         );
 
         if (baseColor) {

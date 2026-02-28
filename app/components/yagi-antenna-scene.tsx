@@ -263,7 +263,7 @@ export default function YagiAntennaScene({
               {["slow", "medium", "fast"].map((s) => (
                 <div key={s} className="flex items-center space-x-1.5">
                   <RadioGroupItem value={s} id={`${uniqueId}r-${s}`} className="peer size-3 border-zinc-500 data-[state=checked]:border-white data-[state=checked]:text-white" />
-                  <Label htmlFor={`${uniqueId}r-${s}`} className="text-[11px] cursor-pointer text-zinc-400 peer-data-[state=checked]:text-white">{t(`common.controls.${s}`)}</Label>
+                  <Label htmlFor={`${uniqueId}r-${s}`} className="text-[11px] cursor-pointer text-zinc-400 peer-data-[state=checked]:text-white">{t(`common.controls.${s}` as any)}</Label>
                 </div>
               ))}
             </RadioGroup>

@@ -171,10 +171,12 @@ export class Nec2Context {
   get_currents() { return this.currents; }
   get_max_gain() { return this.maxGainDbi; }
   get_center() { return this.center; }
+  get_frequency() { return this.frequency; }
 
   get_max_field_reference(): number {
     let maxAmp = 0.001;
-    const r_sample = 1.0; // 1 meter away in physical coordinates
+    const lambda = 299.79 / this.frequency;
+    const r_sample = Math.max(lambda, 10.0); // Ensure far-field sampling
 
     for (let theta = 0; theta <= Math.PI; theta += Math.PI / 12) {
         for (let phi = 0; phi < Math.PI * 2; phi += Math.PI / 12) {
@@ -182,7 +184,8 @@ export class Nec2Context {
             const y = this.center.y + r_sample * Math.sin(theta) * Math.sin(phi);
             const z = this.center.z + r_sample * Math.cos(theta);
             const { amplitude } = this.calculate_field_and_amplitude(x, y, z, 0);
-            if (amplitude > maxAmp) maxAmp = amplitude;
+            const compensated = amplitude * (r_sample + 0.1);
+            if (compensated > maxAmp) maxAmp = compensated;
         }
     }
     return maxAmp;
