@@ -193,47 +193,84 @@ export class Nec2Context {
 
   /**
    * 计算指定坐标点（物理单位米）的瞬时场强和振幅
+   * 使用矢量叠加法，以准确体现干涉和零点（Nulls）
    */
   calculate_field_and_amplitude(x: number, y: number, z: number, time_phase: number): { instantaneous: number, amplitude: number } {
-    let real_sum = 0;
-    let imag_sum = 0;
+    let ex_re = 0, ex_im = 0;
+    let ey_re = 0, ey_im = 0;
+    let ez_re = 0, ez_im = 0;
+
     const k = (2 * Math.PI * this.frequency) / 299.79;
     const hasGround = this.groundHeight !== null && this.groundHeight > 0;
 
     for (const c of this.currents) {
+        // --- 1. 直接场 (Direct Field) ---
         const dx = x - c.x;
         const dy = y - c.y;
         const dz = z - c.z;
-        const r_dir = Math.sqrt(dx*dx + dy*dy + dz*dz) + 0.01;
+        const r_dist = Math.sqrt(dx*dx + dy*dy + dz*dz) + 0.01;
+        const rx = dx / r_dist, ry = dy / r_dist, rz = dz / r_dist;
 
-        const crossX = dy * c.uz - dz * c.uy;
-        const crossY = dz * c.ux - dx * c.uz;
-        const crossZ = dx * c.uy - dy * c.ux;
-        const sin_alpha = Math.sqrt(crossX*crossX + crossY*crossY + crossZ*crossZ) / r_dir;
+        // 远场近似：E ∝ I * [L - (L·R)R]
+        const dot = c.ux * rx + c.uy * ry + c.uz * rz;
+        const lp_x = c.ux - dot * rx;
+        const lp_y = c.uy - dot * ry;
+        const lp_z = c.uz - dot * rz;
 
-        const phase_dir = (c.phase * Math.PI / 180) - (k * r_dir);
-        const e_mag = (c.mag * c.length * sin_alpha) / r_dir;
+        const phase = (c.phase * Math.PI / 180) - (k * r_dist);
+        const factor = (c.mag * c.length) / r_dist;
+        const cosP = Math.cos(phase);
+        const sinP = Math.sin(phase);
 
-        real_sum += e_mag * Math.cos(phase_dir);
-        imag_sum += e_mag * Math.sin(phase_dir);
+        ex_re += factor * lp_x * cosP;
+        ex_im += factor * lp_x * sinP;
+        ey_re += factor * lp_y * cosP;
+        ey_im += factor * lp_y * sinP;
+        ez_re += factor * lp_z * cosP;
+        ez_im += factor * lp_z * sinP;
 
+        // --- 2. 地面反射场 (Ground Reflected Field) ---
         if (hasGround) {
-            const dz_img = z + c.z;
+            const dz_img = z + c.z; // 镜像源在 -c.z，观察点在 z，距离 z - (-c.z) = z+c.z
             const r_img = Math.sqrt(dx*dx + dy*dy + dz_img*dz_img) + 0.01;
-            const crossX_img = dy * c.uz - dz_img * c.uy;
-            const crossY_img = dz_img * c.ux - dx * c.uz;
-            const crossZ_img = dx * c.uy - dy * c.ux;
-            const sin_alpha_img = Math.sqrt(crossX_img*crossX_img + crossY_img*crossY_img + crossZ_img*crossZ_img) / r_img;
+            const rxi = dx / r_img, ryi = dy / r_img, rzi = dz_img / r_img;
+            
+            // 镜像段的电流方向：水平分量反向，垂直分量同向 (Ideal ground)
+            const iux = -c.ux, iuy = -c.uy, iuz = c.uz;
+            const doti = iux * rxi + iuy * ryi + iuz * rzi;
+            const lpix = iux - doti * rxi;
+            const lpiy = iuy - doti * ryi;
+            const lpiz = iuz - doti * rzi;
 
-            const phase_img = (c.phase * Math.PI / 180) - (k * r_img) + Math.PI; 
-            const e_mag_img = (c.mag * c.length * sin_alpha_img) / r_img;
-            real_sum += e_mag_img * Math.cos(phase_img);
-            imag_sum += e_mag_img * Math.sin(phase_img);
+            const phase_i = (c.phase * Math.PI / 180) - (k * r_img);
+            const factor_i = (c.mag * c.length) / r_img;
+            const cosPi = Math.cos(phase_i);
+            const sinPi = Math.sin(phase_i);
+
+            ex_re += factor_i * lpix * cosPi;
+            ex_im += factor_i * lpix * sinPi;
+            ey_re += factor_i * lpiy * cosPi;
+            ey_im += factor_i * lpiy * sinPi;
+            ez_re += factor_i * lpiz * cosPi;
+            ez_im += factor_i * lpiz * sinPi;
         }
     }
 
-    const amplitude = Math.sqrt(real_sum * real_sum + imag_sum * imag_sum);
-    const instantaneous = amplitude * Math.cos(Math.atan2(imag_sum, real_sum) + time_phase);
+    // 计算幅值 (Vector magnitude)
+    const amplitude = Math.sqrt(
+        ex_re*ex_re + ex_im*ex_im + 
+        ey_re*ey_re + ey_im*ey_im + 
+        ez_re*ez_re + ez_im*ez_im
+    );
+
+    // 计算瞬时值：通过实部和虚部的旋转投影得到
+    // 我们取最大主方向的投影来保证波动的视觉效果最强
+    const instX = ex_re * Math.cos(time_phase) - ex_im * Math.sin(time_phase);
+    const instY = ey_re * Math.cos(time_phase) - ey_im * Math.sin(time_phase);
+    const instZ = ez_re * Math.cos(time_phase) - ez_im * Math.sin(time_phase);
+    
+    // 使用代数和来保留波形的相位（正负起伏），不再除以 sqrt(3)
+    const instantaneous = instX + instY + instZ;
 
     return { instantaneous, amplitude };
   }

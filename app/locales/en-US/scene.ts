@@ -24,6 +24,7 @@ export default {
       peakGain: "Peak Gain",
       impedance: "Impedance",
       material: "Material",
+      copper: "Copper",
       aluminum: "Aluminum",
       stainlessSteel: "Stainless Steel",
       groundHeight: "Ground Height (λ)",

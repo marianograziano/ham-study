@@ -60,8 +60,8 @@ export function ElectricFieldNec2({
     for (let i = 0; i < gridSize; i++) {
       for (let j = 0; j < gridSize; j++) {
         const idx = i * gridSize + j;
-        const c1 = (i - gridSize / 2) * spacing;
-        const c2 = (j - gridSize / 2) * spacing;
+        const c1 = (i - (gridSize - 1) / 2) * spacing;
+        const c2 = (j - (gridSize - 1) / 2) * spacing;
 
         // 计算物理米单位的坐标
         let x_m = center.x;
@@ -110,15 +110,13 @@ export function ElectricFieldNec2({
         );
 
         // 补偿距离衰减 (E-field drops as 1/r in far field).
-        // 增加 r_dist_m 的权重，这样远处的波也能看得见。加一个小常数防止除零/过分放大近场。
         const compensatedAmplitude = amplitude * (r_dist_m + 0.1);
 
-        // maxFieldRef 也是在 r=1 米处测得的值。
-        // 我们在这里做一个软截断，使其在视觉上可读。对数映射不能太激进，否则会失去方向性(全变红)。
-        // 降低底数或调整系数，保留主瓣和副瓣的差距。
+        // 使用开方映射 (Square root mapping) 压缩动态范围。
+        // 这会让较弱的区域（如离馈电点较远的顶部）也呈现出较暖的颜色（黄/橙）。
         const rawWeight = compensatedAmplitude / (maxFieldRef + 1e-8);
-        const visualWeight =
-          rawWeight > 1.0 ? 1.0 + Math.log(rawWeight) * 0.5 : rawWeight;
+        const visualWeight = Math.sqrt(Math.max(0, Math.min(1.5, rawWeight)));
+        
         const ampWeight = Math.max(
           0,
           Math.min(1.5, visualWeight * amplitudeScale),
@@ -128,11 +126,10 @@ export function ElectricFieldNec2({
         const phase = timeRef.current - k_wave * r_dist_m;
         const sinPhase = Math.sin(phase);
 
-        // 颜色反馈：越接近天线场越强，颜色越红；远场越弱，颜色变蓝
-        // 增大对比度系数，使得强场能够达到纯红(1.0)
+        // 颜色反馈：热力图映射
         const displayWeight = Math.min(
           1,
-          ampWeight * (0.2 + 0.8 * Math.abs(sinPhase)),
+          ampWeight * (0.3 + 0.7 * Math.abs(sinPhase)),
         );
 
         if (baseColor) {
@@ -141,17 +138,17 @@ export function ElectricFieldNec2({
           dummyColor.getHSL(hsl);
           dummyColor.setHSL(hsl.h, hsl.s, 0.15 + displayWeight * 0.7);
         } else {
-          // 热力图映射：深蓝(0.66) -> 亮蓝 -> 青 -> 绿(0.33) -> 黄(0.16) -> 纯红(0.0)
-          let hue = 0.66;
-          // 我们希望高强度区域是纯红 (0.0)
-          if (displayWeight < 0.2) {
-            hue = 0.66;
-          } else if (displayWeight < 0.5) {
-            hue = 0.66 - ((displayWeight - 0.2) / 0.3) * 0.33; // 蓝(0.66) 到 绿(0.33)
-          } else if (displayWeight < 0.8) {
-            hue = 0.33 - ((displayWeight - 0.5) / 0.3) * 0.17; // 绿(0.33) 到 黄(0.16)
+          // 优化后的热力图映射：让红色和黄色区域更宽
+          let hue = 0.66; // 默认深蓝
+          
+          if (displayWeight < 0.15) {
+            hue = 0.66; // 蓝
+          } else if (displayWeight < 0.4) {
+            hue = 0.66 - ((displayWeight - 0.15) / 0.25) * 0.33; // 蓝 -> 绿
+          } else if (displayWeight < 0.7) {
+            hue = 0.33 - ((displayWeight - 0.4) / 0.3) * 0.17; // 绿 -> 黄
           } else {
-            hue = 0.16 - Math.min(1, (displayWeight - 0.8) / 0.2) * 0.16; // 黄(0.16) 到 红(0.0)
+            hue = 0.16 - Math.min(1, (displayWeight - 0.7) / 0.3) * 0.16; // 黄 -> 红
           }
 
           hue = Math.max(0, Math.min(0.66, hue));

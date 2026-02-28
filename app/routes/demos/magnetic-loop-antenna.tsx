@@ -1,14 +1,15 @@
 import type { TFunction } from "i18next";
 import i18next from "i18next";
-import { Suspense } from "react";
+import { lazy, Suspense } from "react";
 import { initReactI18next, Trans, useTranslation } from "react-i18next";
 import { ClientOnly } from "~/components/client-only";
-import MagneticLoopAntennaScene from "~/components/magnetic-loop-antenna-scene";
 import { BlockMath, InlineMath as M } from "~/components/math";
 import { ScientificCitation } from "~/components/scientific-citation";
 import resources from "~/locales";
 import { getLocale } from "~/middleware/i18next";
 import type { Route } from "./+types/magnetic-loop-antenna";
+
+const MagneticLoopAntennaScene = lazy(() => import("~/components/magnetic-loop-antenna-scene"));
 
 export const loader = async ({ request }: Route.LoaderArgs) => {
   const locale = getLocale(request);

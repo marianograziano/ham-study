@@ -19,6 +19,18 @@ export default {
       download: "下載截圖",
       autoRotate: "自動旋轉 (Auto Rotate)",
     },
+    simulation: {
+      analysis: "仿真分析 (Analysis)",
+      peakGain: "峰值增益",
+      impedance: "輸入阻抗",
+      material: "材質選擇",
+      copper: "銅 (Copper)",
+      aluminum: "鋁 (Aluminum)",
+      stainlessSteel: "不鏽鋼 (Stainless Steel)",
+      groundHeight: "離地高度 (λ)",
+      freeSpace: "自由空間",
+      strength: "電場強度 (強 → 弱)",
+    }
   },
   circularPolarization: {
     title: "圓極化 (Circular Polarization)",

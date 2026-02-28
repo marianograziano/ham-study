@@ -24,6 +24,7 @@ export default {
       peakGain: "峰值增益",
       impedance: "输入阻抗",
       material: "材质选择",
+      copper: "铜 (Copper)",
       aluminum: "铝 (Aluminum)",
       stainlessSteel: "不锈钢 (Stainless Steel)",
       groundHeight: "离地高度 (λ)",
