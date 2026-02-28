@@ -716,65 +716,80 @@ pub fn efld(
     is_self: bool,
     ctx: &Context,
 ) -> (CVec3, CVec3, CVec3) {
-    // Basic implementation of efld
-    // Calculates field at (xi, yi, zi)
-
-    // For now, support only free space (no ground)
-
     if s_idx >= ctx.geometry.n {
         return (CVec3::new(), CVec3::new(), CVec3::new());
     }
 
-    // Load source segment geometry
+    let wlam = ctx.geometry.wlam;
+    if wlam < 1e-20 {
+        return (CVec3::new(), CVec3::new(), CVec3::new());
+    }
+
+    // Source segment center (in meters)
     let xc = (ctx.geometry.x1[s_idx] + ctx.geometry.x2[s_idx]) * 0.5;
     let yc = (ctx.geometry.y1[s_idx] + ctx.geometry.y2[s_idx]) * 0.5;
     let zc = (ctx.geometry.z1[s_idx] + ctx.geometry.z2[s_idx]) * 0.5;
-    let len_s = ctx.geometry.si[s_idx];
-    let cabj = (ctx.geometry.x2[s_idx] - ctx.geometry.x1[s_idx]) / len_s;
-    let sabj = (ctx.geometry.y2[s_idx] - ctx.geometry.y1[s_idx]) / len_s;
-    let salpj = (ctx.geometry.z2[s_idx] - ctx.geometry.z1[s_idx]) / len_s;
 
-    // Coordinate transformation to local system
+    // si is stored in wavelength units (after normalize step in calculate())
+    let len_s_lambda = ctx.geometry.si[s_idx]; // wavelengths
+
+    // Direction cosines: computed from endpoint coordinates (meters) divided by
+    // actual length in meters = len_s_lambda * wlam
+    let len_s_m = len_s_lambda * wlam;
+    let cabj = (ctx.geometry.x2[s_idx] - ctx.geometry.x1[s_idx]) / len_s_m;
+    let sabj = (ctx.geometry.y2[s_idx] - ctx.geometry.y1[s_idx]) / len_s_m;
+    let salpj = (ctx.geometry.z2[s_idx] - ctx.geometry.z1[s_idx]) / len_s_m;
+
+    // Relative position in meters
     let xij = xi - xc;
     let yij = yi - yc;
     let zij = zi - zc;
 
-    let zp = xij * cabj + yij * sabj + zij * salpj;
-    let mut rhox = xij - cabj * zp;
-    let mut rhoy = yij - sabj * zp;
-    let mut rhoz = zij - salpj * zp;
-    let rh = (rhox * rhox + rhoy * rhoy + rhoz * rhoz + ai * ai).sqrt();
+    // Project onto wire axis (in meters), then convert to wavelengths
+    let zp_m = xij * cabj + yij * sabj + zij * salpj;
+    let rhox_m = xij - cabj * zp_m;
+    let rhoy_m = yij - sabj * zp_m;
+    let rhoz_m = zij - salpj * zp_m;
 
-    if rh > 1.0e-10 {
-        rhox = rhox / rh;
-        rhoy = rhoy / rh;
-        rhoz = rhoz / rh;
+    // Transverse distance including wire radius (in meters), then to wavelengths
+    let ai_m = ai * wlam; // ai is already in wavelength units (passed from bi[i])
+    let rh_m = (rhox_m * rhox_m + rhoy_m * rhoy_m + rhoz_m * rhoz_m + ai_m * ai_m).sqrt();
+
+    // Convert to wavelength units for eksc (k = 2π rad/wavelength)
+    let zp = zp_m / wlam;
+    let rh = rh_m / wlam;
+    let ai_lambda = ai; // already in wavelengths
+
+    let mut rhox = rhox_m;
+    let mut rhoy = rhoy_m;
+    let mut rhoz = rhoz_m;
+    if rh_m > 1.0e-10 {
+        rhox = rhox_m / rh_m;
+        rhoy = rhoy_m / rh_m;
+        rhoz = rhoz_m / rh_m;
     } else {
         rhox = 0.0;
         rhoy = 0.0;
         rhoz = 0.0;
     }
 
-    // Call eksc or ekscx
+    // k = 2π in wavelength units (NEC2C convention)
     let k = 2.0 * PI_CONST;
-    let radius_s = ctx.geometry.bi[s_idx];
 
-    // Determine flag for eksc/intx (0 means singular/self)
     let ij_flag = if is_self { 0 } else { 1 };
 
-    // For now always use eksc unless extremely close
-    let use_extended = false; // logic checks ind1/ind2 etc.
+    let use_extended = false;
 
     let (tezs, ters, tezc, terc, tezk, terk) = if !use_extended {
-        eksc(len_s, zp, rh, k, ij_flag)
+        eksc(len_s_lambda, zp, rh, k, ij_flag)
     } else {
+        let radius_s = ctx.geometry.bi[s_idx]; // already in wavelengths
         let inx1 = 0;
         let inx2 = 0;
-        ekscx(radius_s, len_s, zp, rh, k, ij_flag, inx1, inx2)
+        ekscx(radius_s, len_s_lambda, zp, rh, k, ij_flag, inx1, inx2)
     };
 
-    // Transform to cartesian components (Free Space)
-    // txs = tezs * cabj + ters * rhox
+    // Transform to cartesian components
     let mut es = CVec3::new();
     es.x = tezs * cabj + ters * rhox;
     es.y = tezs * sabj + ters * rhoy;

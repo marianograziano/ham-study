@@ -129,7 +129,7 @@ impl NecSimulation {
             return Err("No geometry defined".to_string());
         }
 
-        // 1. Connectivity
+        // 1. Connectivity (also normalises si/bi to wavelength units)
         self.context.geometry.connect(0); // 0 = free space (no ground for now)
 
         // 2. Initialize Solver

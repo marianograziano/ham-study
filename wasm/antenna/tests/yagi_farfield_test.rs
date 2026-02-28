@@ -2,6 +2,30 @@ use antenna::nec::simulation::NecSimulation;
 use std::f64::consts::PI;
 
 #[test]
+fn test_dipole_currents() {
+    let mut sim = NecSimulation::new();
+    sim.initialize(1);
+    sim.set_frequency(300.0);
+    sim.add_wire(0.0, 0.0, -0.25, 0.0, 0.0, 0.25, 0.001, 11, 1);
+    sim.add_voltage_source(1, 6, 1.0, 0.0);
+    sim.calculate().unwrap();
+
+    let n = sim.context.geometry.n;
+    let z = sim.get_input_impedance(1).unwrap();
+    println!("Dipole Impedance: {} + j{}", z.re, z.im);
+    println!("\n=== Dipole Current ===");
+    for i in 0..n {
+        let cur = sim.context.current.cur[i];
+        println!(
+            "  seg[{:2}] z={:+.4} |I|={:.6}",
+            i,
+            sim.context.geometry.z[i],
+            cur.norm()
+        );
+    }
+}
+
+#[test]
 fn yagi_430mhz_far_field_debug() {
     let mut sim = NecSimulation::new();
     sim.initialize(3);
@@ -20,6 +44,8 @@ fn yagi_430mhz_far_field_debug() {
 
     // 1. Dump current distribution
     let n = sim.context.geometry.n;
+    let z = sim.get_input_impedance(2).unwrap();
+    println!("Yagi Impedance: {} + j{}", z.re, z.im);
     println!("\n=== Current Distribution ({} segments) ===", n);
     println!(
         "  Lambda = {:.4}m, k = {:.4}",

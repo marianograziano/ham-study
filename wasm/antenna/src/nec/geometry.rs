@@ -116,9 +116,16 @@ impl GeometryData {
             }
         }
 
-        // TODO: Implement coordinate averaging for connected segments to ensure
-        // they strictly meet (lines 360-528 in geometry.c).
-        // For now, we assume input generators produce matched coordinates.
+        // Normalize si and bi from meters to wavelength units.
+        // All physics functions (tbf, eksc, efld) work in wavelength units.
+        if self.wlam > 1e-20 {
+            for v in self.si.iter_mut() {
+                *v /= self.wlam;
+            }
+            for v in self.bi.iter_mut() {
+                *v /= self.wlam;
+            }
+        }
 
         true
     }

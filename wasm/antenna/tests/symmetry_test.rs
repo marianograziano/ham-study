@@ -9,7 +9,9 @@ fn test_matrix_filling_symmetry() {
                               // 5 segments (odd number)
     sim.add_wire(0.0, 0.0, -0.25, 0.0, 0.0, 0.25, 0.001, 5, 1);
 
-    // CRITICAL: Must connect geometry to initialize icon1/icon2 arrays!
+    // CRITICAL: Must set wlam before connect(), so si/bi get normalized to wavelength units
+    sim.context.geometry.wlam = 299.792458 / 300.0; // ~1.0 m
+                                                    // CRITICAL: Must connect geometry to initialize icon1/icon2 arrays!
     sim.context.geometry.connect(0);
 
     let n = sim.context.geometry.n;

@@ -167,55 +167,50 @@ impl Solver {
     }
 
     /// Fills the interaction matrix for wire-wire interactions.
-    /// This corresponds to `cmss`, `cmsw`, `cmws`, `cmww` logic combined for wire-only.
+    /// Corresponds to `cmww` in matrix.c
     pub fn fill_matrix_wire_wire(&mut self, ctx: &mut Context) {
         let n = self.nrow;
 
-        // Loop over source basis functions (Columns j)
+        // Clear matrix
+        for v in self.matrix.iter_mut() {
+            *v = Complex64::new(0.0, 0.0);
+        }
+
+        // Outer loop: source segment j (0-based)
         for j in 0..n {
-            // Calculate basis function coefficients for column j
-            // Output stored in ctx.segj
+            // tbf(j) expands basis function for source segment j.
+            // Stores: jco (signed 1-based), ax/bx/cx basis coefficients.
             crate::nec::physics::tbf(j, 1, ctx);
 
-            // Loop over observation segments (Rows i)
+            // Inner loop: observation segment i
             for i in 0..n {
-                let mut sum_term = Complex64::new(0.0, 0.0);
-
                 let xi = ctx.geometry.x[i];
                 let yi = ctx.geometry.y[i];
                 let zi = ctx.geometry.z[i];
-                let ai = ctx.geometry.bi[i];
+                let ai = ctx.geometry.bi[i]; // wavelength units
                 let cabi = ctx.geometry.cab[i];
                 let sabi = ctx.geometry.sab[i];
                 let salpi = ctx.geometry.salp[i];
 
-                // Sum contributions from segments supporting basis function j
+                // E-field at observation point i due to source segment j
+                use crate::nec::physics::efld;
+                let (es, ec, ek) = efld(xi, yi, zi, ai, j, i == j, ctx);
+
+                // Project onto observation segment i axis
+                let etk = ek.x * cabi + ek.y * sabi + ek.z * salpi;
+                let ets = es.x * cabi + es.y * sabi + es.z * salpi;
+                let etc = ec.x * cabi + ec.y * sabi + ec.z * salpi;
+
+                // Scatter to columns given by jco (always positive from trio)
+                // cm[row=i, col=jco[k]-1] += etk*ax[k] + ets*bx[k] + etc*cx[k]
                 for k in 0..ctx.segj.jsno {
-                    // Segment index from jco (1-based, signed)
-                    let jx_raw = ctx.segj.jco[k];
-                    let ssnx = if jx_raw < 0 { -1.0 } else { 1.0 };
-                    let jx = (jx_raw.abs() - 1) as usize;
-
-                    // Calculate field at i due to segment jx
-                    // Pass is_self = (i == jx)
-                    use crate::nec::physics::efld;
-                    let (es, ec, ek) = efld(xi, yi, zi, ai, jx, i == jx, ctx);
-
-                    // Project field onto segment i orientation
-                    let etk = ek.x * cabi + ek.y * sabi + ek.z * salpi;
-                    let ets = es.x * cabi + es.y * sabi + es.z * salpi;
-                    let etc = ec.x * cabi + ec.y * sabi + ec.z * salpi;
-
-                    // Accumulate weighted by basis function coeff
-                    let term = etk * ctx.segj.ax[k] * ssnx
-                        + ets * ctx.segj.bx[k]
-                        + etc * ctx.segj.cx[k] * ssnx;
-                    sum_term = sum_term + term;
+                    let jx = (ctx.segj.jco[k].abs() - 1) as usize;
+                    if jx < n {
+                        let term =
+                            etk * ctx.segj.ax[k] + ets * ctx.segj.bx[k] + etc * ctx.segj.cx[k];
+                        self.matrix[i + jx * n] += term;
+                    }
                 }
-
-                // Store in column-major matrix
-                // matrix[row + col * nrow]
-                self.matrix[i + j * n] = sum_term;
             }
         }
     }
