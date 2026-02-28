@@ -174,13 +174,13 @@ export class Nec2Context {
 
   get_max_field_reference(): number {
     let maxAmp = 0.001;
-    const r_sample = 10.0;
-    
+    const r_sample = 1.0; // 1 meter away in physical coordinates
+
     for (let theta = 0; theta <= Math.PI; theta += Math.PI / 12) {
         for (let phi = 0; phi < Math.PI * 2; phi += Math.PI / 12) {
-            const x = (this.center.x + r_sample * Math.sin(theta) * Math.cos(phi)) / 0.1;
-            const y = (this.center.y + r_sample * Math.sin(theta) * Math.sin(phi)) / 0.1;
-            const z = (this.center.z + r_sample * Math.cos(theta)) / 0.1;
+            const x = this.center.x + r_sample * Math.sin(theta) * Math.cos(phi);
+            const y = this.center.y + r_sample * Math.sin(theta) * Math.sin(phi);
+            const z = this.center.z + r_sample * Math.cos(theta);
             const { amplitude } = this.calculate_field_and_amplitude(x, y, z, 0);
             if (amplitude > maxAmp) maxAmp = amplitude;
         }
@@ -189,25 +189,20 @@ export class Nec2Context {
   }
 
   /**
-   * 计算指定坐标点的瞬时场强和振幅
+   * 计算指定坐标点（物理单位米）的瞬时场强和振幅
    */
   calculate_field_and_amplitude(x: number, y: number, z: number, time_phase: number): { instantaneous: number, amplitude: number } {
     let real_sum = 0;
     let imag_sum = 0;
-    const sceneScale = 0.1; 
     const k = (2 * Math.PI * this.frequency) / 299.79;
     const hasGround = this.groundHeight !== null && this.groundHeight > 0;
 
-    const x_m = x * sceneScale;
-    const y_m = y * sceneScale;
-    const z_m = z * sceneScale;
-
     for (const c of this.currents) {
-        const dx = x_m - c.x;
-        const dy = y_m - c.y;
-        const dz = z_m - c.z;
+        const dx = x - c.x;
+        const dy = y - c.y;
+        const dz = z - c.z;
         const r_dir = Math.sqrt(dx*dx + dy*dy + dz*dz) + 0.01;
-        
+
         const crossX = dy * c.uz - dz * c.uy;
         const crossY = dz * c.ux - dx * c.uz;
         const crossZ = dx * c.uy - dy * c.ux;
@@ -215,12 +210,12 @@ export class Nec2Context {
 
         const phase_dir = (c.phase * Math.PI / 180) - (k * r_dir);
         const e_mag = (c.mag * c.length * sin_alpha) / r_dir;
-        
+
         real_sum += e_mag * Math.cos(phase_dir);
         imag_sum += e_mag * Math.sin(phase_dir);
 
         if (hasGround) {
-            const dz_img = z_m + c.z;
+            const dz_img = z + c.z;
             const r_img = Math.sqrt(dx*dx + dy*dy + dz_img*dz_img) + 0.01;
             const crossX_img = dy * c.uz - dz_img * c.uy;
             const crossY_img = dz_img * c.ux - dx * c.uz;
@@ -234,15 +229,11 @@ export class Nec2Context {
         }
     }
 
-    const raw_amplitude = Math.sqrt(real_sum * real_sum + imag_sum * imag_sum);
-    // 距离补偿始终以天线几何中心为准
-    const r_eff = Math.sqrt((x_m - this.center.x)**2 + (y_m - this.center.y)**2 + (z_m - this.center.z)**2) + 0.2;
-    const amplitude = raw_amplitude * r_eff;
+    const amplitude = Math.sqrt(real_sum * real_sum + imag_sum * imag_sum);
     const instantaneous = amplitude * Math.cos(Math.atan2(imag_sum, real_sum) + time_phase);
 
     return { instantaneous, amplitude };
   }
-
   calculate_far_field_pattern_3d(thetas: Float64Array, phis: Float64Array, output: Float64Array) {
     for (let i = 0; i < thetas.length; i++) {
         const t = Math.min(180, Math.max(0, Math.round(thetas[i] * 180 / Math.PI / 5) * 5));

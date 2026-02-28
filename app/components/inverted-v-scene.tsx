@@ -1,7 +1,7 @@
 import { Camera } from "@phosphor-icons/react";
 import { ArcballControls } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
-import { useEffect, useId, useMemo, useRef, useState, lazy, Suspense } from "react";
+import { useEffect, useId, useMemo, useRef, useState, Suspense } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { type BufferGeometry, SphereGeometry, Vector3, DoubleSide } from "three";
 import { Button } from "~/components/ui/button";
@@ -11,101 +11,19 @@ import { Switch } from "~/components/ui/switch";
 import { Nec2Context } from "~/utils/nec2-c-wasm";
 import { ElectricFieldNec2 } from "./electric-field-nec2";
 
-const height = 3; // Mast height base
+const mastHeight = 3; // Mast height base
 
-function ImpedanceDisplay({
-  lengthFactor,
-  armAngleRad,
-  groundHeight,
-}: {
-  lengthFactor: number;
-  armAngleRad: number;
-  groundHeight: number;
-}) {
-  const [impedance, setImpedance] = useState<{ re: number; im: number } | null>(null);
-  const [isCalculating, setIsCalculating] = useState(false);
-
-  useEffect(() => {
-    let active = true;
-    const calculate = async () => {
-      setIsCalculating(true);
-      try {
-        const ctx = new Nec2Context();
-        ctx.initialize(3);
-        const freq = 300.0;
-        ctx.set_frequency(freq); // lambda = 1m
-        if (groundHeight > 0) ctx.set_ground(groundHeight);
-
-        const lambda = 299.79 / freq;
-        const armLength = (lengthFactor * lambda) / 2;
-        const d = 0.005; // half length of center feed wire
-        let armSegments = Math.floor((armLength - d) / 0.02);
-        if (armSegments < 1) armSegments = 1;
-
-        const h_m = groundHeight > 0 ? groundHeight * lambda : height * 0.1; 
-        
-        const yTip = (armLength - d) * Math.sin(armAngleRad); 
-        const zTip = -(armLength - d) * Math.cos(armAngleRad); // Inverted-V droop
-
-        // Mapping: Three.js [X, Y, Z] -> NEC [X, Z, Y]
-        ctx.add_wire(0, -d, h_m, 0, d, h_m, 0.001, 1, 1);
-        ctx.add_wire(0, d, h_m, 0, yTip + d, h_m + zTip, 0.001, armSegments, 2);
-        ctx.add_wire(0, -d, h_m, 0, -yTip - d, h_m + zTip, 0.001, armSegments, 3);
-
-        ctx.add_voltage_source(1, 1, 1.0, 0.0);
-        await ctx.calculate();
-
-        if (active) {
-          const zArr = ctx.get_impedance(1);
-          setImpedance({ re: zArr[0], im: zArr[1] });
-        }
-      } catch (err) {
-        console.error("NEC Calculation Error:", err);
-      } finally {
-        if (active) setIsCalculating(false);
-      }
-    };
-
-    const timer = setTimeout(calculate, 300);
-    return () => {
-      active = false;
-      clearTimeout(timer);
-    };
-  }, [lengthFactor, armAngleRad, groundHeight]);
-
-  return (
-    <div className="pt-3 border-t border-white/10 mt-3">
-      <div className="mb-2 text-xs md:text-sm font-medium text-zinc-200">
-        Live Impedance (NEC2)
-      </div>
-      <div className="text-xs font-mono bg-black/50 p-2 rounded text-zinc-300">
-        {isCalculating ? (
-          <span className="animate-pulse">Calculating Z...</span>
-        ) : impedance ? (
-          <span>
-            Z = {impedance.re.toFixed(1)} {impedance.im >= 0 ? "+" : "-"} j
-            {Math.abs(impedance.im).toFixed(1)} Ω
-          </span>
-        ) : (
-          <span>--</span>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function InvertedVAntenna({ length, angle }: { length: number, angle: number }) {
+function InvertedVAntenna({ length, angle, mastHeight }: { length: number, angle: number, mastHeight: number }) {
   const armLength = length / 2;
-  const ySign = -1;
-  const zTip = armLength * Math.sin(angle);
-  const yTip = ySign * armLength * Math.cos(angle);
-  const droopAngle = Math.atan2(yTip, zTip);
+  // 计算末端坐标 (左右伸展 X，向下垂 Y)
+  const xTip = armLength * Math.sin(angle);
+  const yTip = -armLength * Math.cos(angle); 
 
   return (
-    <group position={[0, height, 0]}>
+    <group position={[0, mastHeight, 0]}>
       {/* Mast */}
-      <mesh position={[0, -height / 2, 0]}>
-        <cylinderGeometry args={[0.05, 0.05, height, 16]} />
+      <mesh position={[0, -mastHeight / 2, 0]}>
+        <cylinderGeometry args={[0.05, 0.05, mastHeight, 16]} />
         <meshStandardMaterial color="#666" />
       </mesh>
 
@@ -115,18 +33,19 @@ function InvertedVAntenna({ length, angle }: { length: number, angle: number }) 
         <meshStandardMaterial color="white" />
       </mesh>
 
-      {/* Legs along Z axis */}
+      {/* Left Leg */}
       <mesh
-        position={[0, yTip / 2, -zTip / 2]}
-        rotation={[-(droopAngle - Math.PI / 2), 0, 0]}
+        position={[-xTip / 2, yTip / 2, 0]}
+        rotation={[0, 0, -angle]}
       >
         <cylinderGeometry args={[0.02, 0.02, armLength, 16]} />
         <meshStandardMaterial color="#ef4444" />
       </mesh>
 
+      {/* Right Leg */}
       <mesh
-        position={[0, yTip / 2, zTip / 2]}
-        rotation={[droopAngle - Math.PI / 2, 0, 0]}
+        position={[xTip / 2, yTip / 2, 0]}
+        rotation={[0, 0, angle]}
       >
         <cylinderGeometry args={[0.02, 0.02, armLength, 16]} />
         <meshStandardMaterial color="#ef4444" />
@@ -135,94 +54,59 @@ function InvertedVAntenna({ length, angle }: { length: number, angle: number }) 
   );
 }
 
-function RadiationPattern({
-  lengthFactor,
-  armAngleRad,
-  groundHeight,
-}: {
-  lengthFactor: number;
-  armAngleRad: number;
-  groundHeight: number;
-}) {
+function RadiationPattern({ context, mastHeight }: { context: Nec2Context | null, mastHeight: number }) {
   const [geometry, setGeometry] = useState<BufferGeometry | null>(null);
-  const [context, setContext] = useState<Nec2Context | null>(null);
 
   useEffect(() => {
-    let isMounted = true;
+    if (!context) return;
 
-    const runSimulation = async () => {
-      const ctx = new Nec2Context();
-      const freq = 300.0;
-      ctx.set_frequency(freq);
-      if (groundHeight > 0) ctx.set_ground(groundHeight);
+    const generateGeometry = () => {
+      const geo = new SphereGeometry(1, 60, 30);
+      const posAttribute = geo.attributes.position;
+      const vertex = new Vector3();
+      const scale = 5;
 
-      const lambda = 299.79 / freq;
-      const armLength = (lengthFactor * lambda) / 2;
-      const d = 0.005;
-      let armSegments = Math.floor((armLength - d) / 0.02);
-      if (armSegments < 1) armSegments = 1;
+      const count = posAttribute.count;
+      const thetas = new Float64Array(count);
+      const phis = new Float64Array(count);
+      const gains = new Float64Array(count);
 
-      const h_m = groundHeight > 0 ? groundHeight * lambda : height * 0.1;
-      const yTip = (armLength - d) * Math.sin(armAngleRad); 
-      const zTip = -(armLength - d) * Math.cos(armAngleRad);
-
-      ctx.initialize(3);
-      ctx.add_wire(0, -d, h_m, 0, d, h_m, 0.001, 1, 1);
-      ctx.add_wire(0, d, h_m, 0, yTip + d, h_m + zTip, 0.001, armSegments, 2);
-      ctx.add_wire(0, -d, h_m, 0, -yTip - d, h_m + zTip, 0.001, armSegments, 3);
-
-      ctx.add_voltage_source(1, 1, 1.0, 0.0);
-      await ctx.calculate();
-
-      if (isMounted) {
-        setContext(ctx);
-        const geo = new SphereGeometry(1, 60, 30);
-        const posAttribute = geo.attributes.position;
-        const vertex = new Vector3();
-        const scale = 5;
-
-        const count = posAttribute.count;
-        const thetas = new Float64Array(count);
-        const phis = new Float64Array(count);
-        const gains = new Float64Array(count);
-
-        for (let i = 0; i < count; i++) {
-          vertex.fromBufferAttribute(posAttribute, i);
-          vertex.normalize();
-          thetas[i] = Math.acos(Math.max(-1, Math.min(1, vertex.y)));
-          let phi = Math.atan2(vertex.z, vertex.x);
-          if (phi < 0) phi += 2 * Math.PI;
-          phis[i] = phi;
-        }
-
-        ctx.calculate_far_field_pattern_3d(thetas, phis, gains);
-
-        let maxG = 0.01;
-        for (let i = 0; i < count; i++) {
-          if (gains[i] > maxG) maxG = gains[i];
-        }
-
-        for (let i = 0; i < count; i++) {
-          vertex.fromBufferAttribute(posAttribute, i);
-          vertex.normalize();
-          const power = gains[i] / maxG;
-          const rad = (0.1 + power * 0.9) * scale;
-          posAttribute.setXYZ(i, vertex.x * rad, vertex.y * rad, vertex.z * rad);
-        }
-
-        geo.computeVertexNormals();
-        setGeometry(geo);
+      for (let i = 0; i < count; i++) {
+        vertex.fromBufferAttribute(posAttribute, i);
+        vertex.normalize();
+        // Theta 从 Y 轴起算 (Three.js 垂直轴)
+        thetas[i] = Math.acos(Math.max(-1, Math.min(1, vertex.y)));
+        let phi = Math.atan2(vertex.z, vertex.x);
+        if (phi < 0) phi += 2 * Math.PI;
+        phis[i] = phi;
       }
+
+      context.calculate_far_field_pattern_3d(thetas, phis, gains);
+
+      let maxG = 0.01;
+      for (let i = 0; i < count; i++) {
+        if (gains[i] > maxG) maxG = gains[i];
+      }
+
+      for (let i = 0; i < count; i++) {
+        vertex.fromBufferAttribute(posAttribute, i);
+        vertex.normalize();
+        const power = gains[i] / maxG;
+        const rad = (0.1 + power * 0.9) * scale;
+        posAttribute.setXYZ(i, vertex.x * rad, vertex.y * rad, vertex.z * rad);
+      }
+
+      geo.computeVertexNormals();
+      setGeometry(geo);
     };
 
-    runSimulation();
-    return () => { isMounted = false; };
-  }, [lengthFactor, armAngleRad, groundHeight]);
+    generateGeometry();
+  }, [context]);
 
   if (!geometry) return null;
 
   return (
-    <group position={[0, height, 0]}>
+    <group position={[0, mastHeight, 0]}>
       <mesh geometry={geometry}>
         <meshBasicMaterial
           color="#22c55e"
@@ -232,7 +116,6 @@ function RadiationPattern({
           side={DoubleSide}
         />
       </mesh>
-      {context && <ElectricFieldNec2 context={context} rotation={[0, 0, 0]} />}
     </group>
   );
 }
@@ -251,9 +134,84 @@ export default function InvertedVAntennaScene({
   const [groundHeight, setGroundHeight] = useState(0.0);
   const [speedMode, setSpeedMode] = useState<"slow" | "medium" | "fast">("medium");
   const [armAngleDeg, setArmAngleDeg] = useState(45);
+  
+  const [context, setContext] = useState<Nec2Context | null>(null);
+  const [isCalculating, setIsCalculating] = useState(false);
+  const [impedance, setImpedance] = useState<{ re: number; im: number } | null>(null);
+  const [maxGain, setMaxGain] = useState<number>(0);
 
   const uniqueId = useId();
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  const visualScale = 4;
+  const armAngleRad = (armAngleDeg * Math.PI) / 180;
+  const frequency = 300.0;
+  const lambda = 299.79 / frequency;
+
+  // Use groundHeight if > 0, otherwise default to 0.3 lambda for visualization
+  const effectiveHeightLambda = groundHeight > 0 ? groundHeight : 0.3;
+
+  // 视觉天线高度固定为 3，配合 visualScale=4 确保天线振子末端不会穿透地面
+  const visualMastHeight = 3;
+
+  const physicalLength = lengthFactor * visualScale;
+  // Logic to prevent antenna tips from going below ground
+  // h_m + yTip >= 0.01*lambda => h_m - armLength * cos(angle) >= 0.01*lambda
+  // cos(angle) <= (h_m - 0.01*lambda) / armLength
+  const simArmLength = (lengthFactor * lambda) / 2;
+  const d_sim = 0.005;
+  const maxCos = groundHeight > 0 ? (effectiveHeightLambda - 0.01) / (simArmLength - d_sim) : 1.0;
+  
+  const effectiveAngleRad = Math.cos(armAngleRad) > maxCos 
+    ? Math.acos(Math.max(-1, Math.min(1, maxCos)))
+    : armAngleRad;
+
+  useEffect(() => {
+    let active = true;
+    const runSimulation = async () => {
+      setIsCalculating(true);
+      try {
+        const ctx = new Nec2Context();
+        ctx.initialize(3);
+        ctx.set_frequency(frequency);
+        if (groundHeight > 0) ctx.set_ground(groundHeight);
+
+        const armLength = (lengthFactor * lambda) / 2;
+        const d = 0.005; 
+        let armSegments = Math.floor((armLength - d) / 0.02);
+        if (armSegments < 1) armSegments = 1;
+
+        const h_m = groundHeight > 0 ? groundHeight * lambda : 0.3 * lambda; 
+        
+        const xTip = (armLength - d) * Math.sin(effectiveAngleRad); 
+        const yTip = -(armLength - d) * Math.cos(effectiveAngleRad);
+
+        ctx.add_wire(-d, 0, h_m, d, 0, h_m, 0.001, 1, 1);
+        ctx.add_wire(d, 0, h_m, xTip + d, 0, h_m + yTip, 0.001, armSegments, 2);
+        ctx.add_wire(-d, 0, h_m, -xTip - d, 0, h_m + yTip, 0.001, armSegments, 3);
+
+        ctx.add_voltage_source(1, 1, 1.0, 0.0);
+        await ctx.calculate();
+
+        if (active) {
+          const zArr = ctx.get_impedance(1);
+          setImpedance({ re: zArr[0], im: zArr[1] });
+          setMaxGain(ctx.get_max_gain());
+          setContext(ctx);
+        }
+      } catch (err) {
+        console.error("NEC Simulation Error:", err);
+      } finally {
+        if (active) setIsCalculating(false);
+      }
+    };
+
+    const timer = setTimeout(runSimulation, 300);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [lengthFactor, effectiveAngleRad, groundHeight]);
 
   const handleDownload = () => {
     if (canvasRef.current) {
@@ -271,24 +229,18 @@ export default function InvertedVAntennaScene({
   }[speedMode];
 
   const effectiveSpeed = isThumbnail && !isHovered ? 0 : speedMultiplier;
-  const visualScale = 6;
-  const physicalLength = lengthFactor * visualScale;
-  const armAngleRad = (armAngleDeg * Math.PI) / 180;
 
-  const LegendContent = () => (
-    <>
-      <h2 className="text-lg md:text-xl font-bold mb-2">
-        {t("invertedVAntenna.title")}
-      </h2>
-      <p className="text-xs md:text-sm text-muted-foreground mb-2">
+  const LegendPanel = () => (
+    <div className="p-4 bg-black/70 text-white rounded-lg md:max-w-xs h-full border border-white/5">
+      <h2 className="text-lg font-bold mb-2">{t("invertedVAntenna.title")}</h2>
+      <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
         <Trans
           ns="scene"
           i18nKey="invertedVAntenna.desc"
           components={{ br: <br /> }}
         />
       </p>
-
-      <div className="mt-3 mb-2 space-y-1.5 text-xs border-t border-gray-600 pt-2">
+      <div className="space-y-1.5 text-xs border-t border-gray-600 pt-2">
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 bg-red-500 rounded-sm" />
           <span>{t("invertedVAntenna.active")}</span>
@@ -301,212 +253,164 @@ export default function InvertedVAntennaScene({
           <div className="w-3 h-3 border-2 border-green-500 rounded-sm" />
           <span>{t("invertedVAntenna.pattern")}</span>
         </div>
-        <div className="flex items-center gap-2">
-          <div
-            className="w-16 h-3 rounded-sm"
-            style={{
-              background:
-                "linear-gradient(to right, #ef4444, #eab308, #22c55e, #3b82f6)",
-            }}
-          />
-          <span>{t("invertedVAntenna.strength")}</span>
-        </div>
       </div>
-    </>
+      <div className="mt-4 pt-3 border-t border-gray-600">
+        <div className="flex justify-between items-end mb-1.5">
+          <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">{t("common.simulation.strength")}</span>
+          <span className="text-[9px] text-zinc-500 italic">Normalized (E·r)</span>
+        </div>
+        <div className="h-2 w-full rounded-full bg-blue-500" />
+      </div>
+    </div>
   );
 
-  const ControlsContent = () => (
-    <div className="flex flex-col space-y-3">
-      <div className="pt-3 border-t border-white/10 md:border-none md:pt-0">
-        <div className="mb-2 text-xs md:text-sm font-medium text-zinc-200">
-          {t("common.controls.visualization")}
-        </div>
-        <div className="flex flex-col space-y-2">
-          <div className="flex items-center space-x-2">
-            <Switch
-              id={`${uniqueId}wave-mode`}
-              checked={showWaves}
-              onCheckedChange={setShowWaves}
-              className="data-[state=checked]:bg-primary-foreground/80 data-[state=unchecked]:bg-zinc-700 border-zinc-500"
-            />
-            <Label
-              htmlFor={`${uniqueId}wave-mode`}
-              className="text-xs md:text-sm text-zinc-300"
-            >
-              {t("common.controls.showWaves")}
-            </Label>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Switch
-              id={`${uniqueId}pattern-mode`}
-              checked={showPattern}
-              onCheckedChange={setShowPattern}
-              className="data-[state=checked]:bg-primary-foreground/80 data-[state=unchecked]:bg-zinc-700 border-zinc-500"
-            />
-            <Label
-              htmlFor={`${uniqueId}pattern-mode`}
-              className="text-xs md:text-sm text-zinc-300"
-            >
-              {t("common.controls.showPattern")}
-            </Label>
+  const ControlsPanel = () => (
+    <div className="p-4 bg-black/70 text-white rounded-lg w-full h-full border border-white/5">
+      <div className="flex flex-col space-y-4">
+        <div className="bg-zinc-900/50 p-3 rounded border border-white/5">
+          <div className="mb-2 text-[10px] uppercase font-bold tracking-wider text-zinc-500">{t("common.simulation.analysis")}</div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <div className="text-[9px] text-zinc-400 mb-0.5">{t("common.simulation.peakGain")}</div>
+              <div className="text-xs font-mono text-green-400">{isCalculating ? "..." : `${maxGain.toFixed(2)} dBi`}</div>
+            </div>
+            <div>
+              <div className="text-[9px] text-zinc-400 mb-0.5">{t("common.simulation.impedance")}</div>
+              <div className="text-xs font-mono text-zinc-300">
+                {isCalculating ? "..." : impedance ? `${impedance.re.toFixed(1)}Ω` : "--"}
+              </div>
+            </div>
           </div>
         </div>
-      </div>
 
-      <div className="pt-3 border-t border-white/10">
-        <div className="mb-2 text-xs md:text-sm font-medium text-zinc-200">
-          {t("common.controls.length")}
-        </div>
-        <RadioGroup
-          defaultValue="0.5"
-          value={lengthFactor.toString()}
-          onValueChange={(v) => setLengthFactor(Number.parseFloat(v))}
-          className="flex gap-4"
-        >
-          <div className="flex items-center space-x-2">
-            <RadioGroupItem
-              value="0.5"
-              id={`${uniqueId}l-half`}
-              className="border-zinc-400 text-primary-foreground data-[state=checked]:bg-transparent data-[state=checked]:border-primary-foreground data-[state=checked]:text-input"
-            />
-            <Label
-              htmlFor={`${uniqueId}l-half`}
-              className="text-xs cursor-pointer text-zinc-300"
+        <div className="space-y-3">
+          <div className="pt-1">
+            <div className="mb-2 text-xs font-medium text-zinc-300">{t("common.controls.length")}</div>
+            <RadioGroup
+              value={lengthFactor.toString()}
+              onValueChange={(v) => setLengthFactor(Number.parseFloat(v))}
+              className="flex flex-row md:flex-col gap-3 md:gap-1.5"
             >
-              0.5λ
-            </Label>
+              {[0.5, 1.0, 1.5].map((val) => (
+                <div key={val} className="flex items-center space-x-2">
+                  <RadioGroupItem
+                    value={val.toString()}
+                    id={`${uniqueId}l-${val}`}
+                    className="peer size-3 border-zinc-500 data-[state=checked]:border-white data-[state=checked]:text-white"
+                  />
+                  <Label
+                    htmlFor={`${uniqueId}l-${val}`}
+                    className="text-[11px] cursor-pointer text-zinc-400 peer-data-[state=checked]:text-white"
+                  >
+                    {val}λ
+                  </Label>
+                </div>
+              ))}
+            </RadioGroup>
           </div>
-          <div className="flex items-center space-x-2">
-            <RadioGroupItem
-              value="1.0"
-              id={`${uniqueId}l-full`}
-              className="border-zinc-400 text-primary-foreground data-[state=checked]:bg-transparent data-[state=checked]:border-primary-foreground data-[state=checked]:text-input"
-            />
-            <Label
-              htmlFor={`${uniqueId}l-full`}
-              className="text-xs cursor-pointer text-zinc-300"
-            >
-              1.0λ
-            </Label>
-          </div>
-          <div className="flex items-center space-x-2">
-            <RadioGroupItem
-              value="1.5"
-              id={`${uniqueId}l-1.5`}
-              className="border-zinc-400 text-primary-foreground data-[state=checked]:bg-transparent data-[state=checked]:border-primary-foreground data-[state=checked]:text-input"
-            />
-            <Label
-              htmlFor={`${uniqueId}l-1.5`}
-              className="text-xs cursor-pointer text-zinc-300"
-            >
-              1.5λ
-            </Label>
-          </div>
-        </RadioGroup>
-      </div>
 
-      <div className="pt-3 border-t border-white/10">
-        <div className="mb-2 text-xs md:text-sm font-medium text-zinc-200">
-          V-Angle: {armAngleDeg}°
-        </div>
-        <div className="flex items-center space-x-4">
-          <input
-            type="range"
-            min="30"
-            max="150"
-            step="5"
-            value={armAngleDeg}
-            onChange={(e) => setArmAngleDeg(Number.parseFloat(e.target.value))}
-            className="w-full accent-primary-foreground"
-          />
-        </div>
-      </div>
-
-      <div className="pt-3 border-t border-white/10">
-        <div className="mb-2 text-xs md:text-sm font-medium text-zinc-200">
-          {t("common.controls.groundHeight", "Ground Height (λ)")}
-        </div>
-        <div className="flex items-center space-x-4">
-          <input
-            type="range"
-            min="0"
-            max="2"
-            step="0.1"
-            value={groundHeight}
-            onChange={(e) => setGroundHeight(Number.parseFloat(e.target.value))}
-            className="w-full accent-primary-foreground"
-          />
-          <span className="text-xs text-zinc-300 w-8 text-right font-mono">
-            {groundHeight === 0 ? "Free" : groundHeight.toFixed(1)}
-          </span>
-        </div>
-      </div>
-
-      <div className="pt-3 border-t border-white/10">
-        <div className="mb-2 text-xs md:text-sm font-medium text-zinc-200">
-          {t("common.controls.speed")}
-        </div>
-        <RadioGroup
-          defaultValue="medium"
-          value={speedMode}
-          onValueChange={(v) => setSpeedMode(v as "slow" | "medium" | "fast")}
-          className="flex gap-4"
-        >
-          <div className="flex items-center space-x-2">
-            <RadioGroupItem
-              value="slow"
-              id={`${uniqueId}r-slow`}
-              className="border-zinc-400 text-primary-foreground data-[state=checked]:bg-transparent data-[state=checked]:border-primary-foreground data-[state=checked]:text-input"
-            />
-            <Label
-              htmlFor={`${uniqueId}r-slow`}
-              className="text-xs cursor-pointer text-zinc-300"
-            >
-              {t("common.controls.slow")}
-            </Label>
+          <div className="pt-2 border-t border-white/5">
+            <div className="mb-2 text-xs font-medium text-zinc-300">V-Angle: {armAngleDeg}°</div>
+            <div className="flex items-center space-x-3">
+              <input
+                type="range"
+                min="30"
+                max="150"
+                step="5"
+                value={armAngleDeg}
+                onChange={(e) => setArmAngleDeg(Number.parseFloat(e.target.value))}
+                className="w-full accent-blue-500 h-1"
+              />
+            </div>
           </div>
-          <div className="flex items-center space-x-2">
-            <RadioGroupItem
-              value="medium"
-              id={`${uniqueId}r-medium`}
-              className="border-zinc-400 text-primary-foreground data-[state=checked]:bg-transparent data-[state=checked]:border-primary-foreground data-[state=checked]:text-input"
-            />
-            <Label
-              htmlFor={`${uniqueId}r-medium`}
-              className="text-xs cursor-pointer text-zinc-300"
-            >
-              {t("common.controls.medium")}
-            </Label>
-          </div>
-          <div className="flex items-center space-x-2">
-            <RadioGroupItem
-              value="fast"
-              id={`${uniqueId}r-fast`}
-              className="border-zinc-400 text-primary-foreground data-[state=checked]:bg-transparent data-[state=checked]:border-primary-foreground data-[state=checked]:text-input"
-            />
-            <Label
-              htmlFor={`${uniqueId}r-fast`}
-              className="text-xs cursor-pointer text-zinc-300"
-            >
-              {t("common.controls.fast")}
-            </Label>
-          </div>
-        </RadioGroup>
-      </div>
 
-      <div className="pt-3 border-t border-white/10">
+          <div className="pt-2 border-t border-white/5">
+            <div className="mb-2 text-xs font-medium text-zinc-300">{t("common.simulation.groundHeight")}</div>
+            <div className="flex items-center space-x-3">
+              <input
+                type="range"
+                min="0"
+                max="2"
+                step="0.1"
+                value={groundHeight}
+                onChange={(e) => setGroundHeight(Number.parseFloat(e.target.value))}
+                className="w-full accent-blue-500 h-1"
+              />
+              <span className="text-[10px] text-zinc-400 w-8 text-right font-mono">
+                {groundHeight === 0 ? t("common.simulation.freeSpace") : groundHeight.toFixed(1)}
+              </span>
+            </div>
+          </div>
+
+          <div className="pt-2 border-t border-white/5">
+            <div className="mb-2 text-xs font-medium text-zinc-300">{t("common.controls.speed")}</div>
+            <RadioGroup
+              value={speedMode}
+              onValueChange={(v) => setSpeedMode(v as any)}
+              className="flex gap-3"
+            >
+              {["slow", "medium", "fast"].map((s) => (
+                <div key={s} className="flex items-center space-x-1.5">
+                  <RadioGroupItem
+                    value={s}
+                    id={`${uniqueId}r-${s}`}
+                    className="peer size-3 border-zinc-500 data-[state=checked]:border-white data-[state=checked]:text-white"
+                  />
+                  <Label
+                    htmlFor={`${uniqueId}r-${s}`}
+                    className="text-[11px] cursor-pointer text-zinc-400 peer-data-[state=checked]:text-white"
+                  >
+                    {t(`common.controls.${s}`)}
+                  </Label>
+                </div>
+              ))}
+            </RadioGroup>
+          </div>
+
+          <div className="pt-2 border-t border-white/5">
+            <div className="flex flex-col space-y-2">
+              <div className="flex items-center justify-between group">
+                <Label
+                  htmlFor={`${uniqueId}wave-mode`}
+                  className="text-[11px] text-zinc-400 cursor-pointer peer-data-[state=checked]:text-white order-first"
+                >
+                  {t("common.controls.showWaves")}
+                </Label>
+                <Switch
+                  id={`${uniqueId}wave-mode`}
+                  checked={showWaves}
+                  onCheckedChange={setShowWaves}
+                  className="peer scale-75 data-[state=unchecked]:bg-zinc-700 data-[state=checked]:bg-blue-500"
+                />
+              </div>
+              <div className="flex items-center justify-between group">
+                <Label
+                  htmlFor={`${uniqueId}pattern-mode`}
+                  className="text-[11px] text-zinc-400 cursor-pointer peer-data-[state=checked]:text-white order-first"
+                >
+                  {t("common.controls.showPattern")}
+                </Label>
+                <Switch
+                  id={`${uniqueId}pattern-mode`}
+                  checked={showPattern}
+                  onCheckedChange={setShowPattern}
+                  className="peer scale-75 data-[state=unchecked]:bg-zinc-700 data-[state=checked]:bg-blue-500"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
         <Button
           variant="secondary"
           size="sm"
-          className="w-full"
+          className="w-full h-8 text-[11px] bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border-none"
           onClick={handleDownload}
         >
-          <Camera className="mr-2 size-4" />
+          <Camera className="mr-2 size-3.5" />
           {t("common.controls.download")}
         </Button>
       </div>
-
-      <ImpedanceDisplay lengthFactor={lengthFactor} armAngleRad={armAngleRad} groundHeight={groundHeight} />
     </div>
   );
 
@@ -518,13 +422,13 @@ export default function InvertedVAntennaScene({
         <Canvas
           ref={canvasRef}
           gl={{ preserveDrawingBuffer: true }}
-          camera={{ position: [10, 8, 10], fov: 45 }}
+          camera={{ position: [8, 5, 8], fov: 45 }}
           frameloop={isThumbnail && !isHovered ? "demand" : "always"}
         >
           <color attach="background" args={["#111111"]} />
           <fog attach="fog" args={["#111111", 10, 50]} />
 
-          {!isThumbnail && <ArcballControls target={[0, 0, 0]} makeDefault />}
+          {!isThumbnail && <ArcballControls target={[0, 1.5, 0]} makeDefault />}
 
           <ambientLight intensity={0.5} color={0x404040} />
           <directionalLight
@@ -539,37 +443,42 @@ export default function InvertedVAntennaScene({
             position={[0, 0, 0]}
           />
 
-          <InvertedVAntenna length={physicalLength} angle={armAngleRad} />
+          <InvertedVAntenna length={physicalLength} angle={effectiveAngleRad} mastHeight={visualMastHeight} />
           <Suspense fallback={null}>
-            {showPattern && <RadiationPattern lengthFactor={lengthFactor} armAngleRad={armAngleRad} groundHeight={groundHeight} />}
-          </Suspense>
+            {showPattern && <RadiationPattern context={context} mastHeight={visualMastHeight} />}
+            {showWaves && context && (
+              <group position={[0, visualMastHeight, 0]}>
+                <ElectricFieldNec2
+                  context={context}
+                  plane="XY"
+                  visualScale={visualScale}
+                  amplitudeScale={1.8}
+                  speed={effectiveSpeed}
+                  particleScale={0.6}
+                />
+              </group>
+            )}          </Suspense>
         </Canvas>
 
         {!isThumbnail && (
-          <>
-            <div className="hidden md:block absolute top-4 left-4 right-4 md:right-auto md:w-auto p-3 md:p-4 bg-black/70 text-white rounded-lg max-w-full md:max-w-xs pointer-events-none select-none">
-              <LegendContent />
+          <div className="hidden md:block">
+            <div className="absolute top-4 left-4 pointer-events-none select-none">
+              <LegendPanel />
             </div>
-
-            <div className="hidden md:block absolute bottom-4 right-4 p-4 bg-black/70 text-white rounded-lg pointer-events-auto">
-              <ControlsContent />
+            <div className="absolute bottom-4 right-4 pointer-events-auto w-64 max-h-[85%] overflow-y-auto">
+              <ControlsPanel />
             </div>
-
             <div className="absolute bottom-4 left-4 text-gray-400 text-xs pointer-events-none select-none">
               {t("common.created")}
             </div>
-          </>
+          </div>
         )}
       </div>
 
       {!isThumbnail && (
         <div className="flex flex-col gap-4 md:hidden">
-          <div className="bg-zinc-900 border rounded-lg p-4">
-            <ControlsContent />
-          </div>
-          <div className="bg-zinc-50 dark:bg-zinc-900 border rounded-lg p-4">
-            <LegendContent />
-          </div>
+          <LegendPanel />
+          <ControlsPanel />
         </div>
       )}
     </div>

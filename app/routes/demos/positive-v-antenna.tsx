@@ -148,8 +148,6 @@ export default function PositiveVAntennaPage() {
             </table>
           </div>
 
-          <h3>{t("positiveVAntenna.polarizationTitle")}</h3>
-
           <div className="bg-zinc-50 dark:bg-zinc-900 border rounded-lg p-4 md:p-6 mb-8 text-sm md:text-base leading-relaxed">
             <ScientificCitation
               title={t("physicsValidation")}
