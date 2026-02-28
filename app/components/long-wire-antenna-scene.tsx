@@ -11,24 +11,20 @@ import { Switch } from "~/components/ui/switch";
 import { Nec2Context } from "~/utils/nec2-c-wasm";
 import { ElectricFieldNec2 } from "./electric-field-nec2";
 
-function LongWireAntenna({
-  lengthFactor,
-  visualScale = 10,
-}: {
-  lengthFactor: number;
-  visualScale?: number;
-}) {
-  const vLength = lengthFactor * visualScale;
+// The red antenna stick will always be 10 units long in the 3D scene
+const VISUAL_ANTENNA_LENGTH = 10;
+
+function LongWireAntenna() {
   return (
     <group>
-      {/* Radiator */}
-      <mesh position={[vLength / 2, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
-        <cylinderGeometry args={[0.03, 0.03, vLength, 32]} />
+      {/* Radiator - Fixed visual length */}
+      <mesh position={[VISUAL_ANTENNA_LENGTH / 2, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
+        <cylinderGeometry args={[0.04, 0.04, VISUAL_ANTENNA_LENGTH, 32]} />
         <meshStandardMaterial color="#ef4444" />
       </mesh>
-      {/* Feedpoint */}
+      {/* Feedpoint - At origin */}
       <mesh position={[0, 0, 0]}>
-        <boxGeometry args={[0.15, 0.15, 0.15]} />
+        <boxGeometry args={[0.18, 0.18, 0.18]} />
         <meshStandardMaterial color="#fff" />
       </mesh>
     </group>
@@ -42,7 +38,7 @@ function RadiationPattern({ context }: { context: Nec2Context | null }) {
     if (!context) return;
 
     const generateGeometry = () => {
-      const geo = new SphereGeometry(1, 100, 60);
+      const geo = new SphereGeometry(1, 120, 80);
       const posAttribute = geo.attributes.position;
       const vertex = new Vector3();
       const count = posAttribute.count;
@@ -53,8 +49,6 @@ function RadiationPattern({ context }: { context: Nec2Context | null }) {
       for (let i = 0; i < count; i++) {
         vertex.fromBufferAttribute(posAttribute, i);
         vertex.normalize();
-        // Calculate angles for NEC2 (theta from Z, phi from X)
-        // In our scene, antenna is along X axis.
         let theta = Math.acos(Math.max(-1, Math.min(1, vertex.y))); 
         let phi = Math.atan2(vertex.z, vertex.x); 
         if (phi < 0) phi += 2 * Math.PI;
@@ -69,12 +63,12 @@ function RadiationPattern({ context }: { context: Nec2Context | null }) {
         if (gains[i] > maxLinearG) maxLinearG = gains[i];
       }
 
-      const maxDbi = context.get_max_gain();
-      const visualBaseScale = 7.5 + Math.max(0, maxDbi) * 0.7;
+      // Normalized scale: keep the pattern within a fixed size regardless of gain
+      const visualBaseScale = 8.5; 
 
       for (let i = 0; i < count; i++) {
         const power = gains[i] / maxLinearG;
-        const rad = (0.1 + power * 0.9) * visualBaseScale;
+        const rad = (0.05 + power * 0.95) * visualBaseScale;
         vertex.fromBufferAttribute(posAttribute, i);
         vertex.normalize();
         posAttribute.setXYZ(i, vertex.x * rad, vertex.y * rad, vertex.z * rad);
@@ -107,7 +101,7 @@ export default function LongWireAntennaScene({
 }) {
   const { t } = useTranslation("scene");
   const [groundHeight, setGroundHeight] = useState(0.0);
-  const [lengthFactor, setLengthFactor] = useState(2.0); 
+  const [lengthFactor, setLengthFactor] = useState(2.5); 
   const [material, setMaterial] = useState<string>("aluminum");
   const [showWaves, setShowWaves] = useState(true);
   const [showPattern, setShowPattern] = useState(true);
@@ -120,7 +114,8 @@ export default function LongWireAntennaScene({
   const uniqueId = useId();
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  const visualScale = 10; 
+  // Map the fixed 10-unit visual stick to the actual physical lengthFactor
+  const mappingScale = VISUAL_ANTENNA_LENGTH / lengthFactor;
 
   useEffect(() => {
     let active = true;
@@ -129,7 +124,7 @@ export default function LongWireAntennaScene({
       try {
         const ctx = new Nec2Context();
         ctx.initialize(1);
-        const freq = 430.0; 
+        const freq = 299.79; // lambda = 1.0m
         ctx.set_frequency(freq);
         ctx.set_material(material);
         
@@ -138,8 +133,8 @@ export default function LongWireAntennaScene({
         if (groundHeight > 0) ctx.set_ground(groundHeight);
 
         const totalLength = lengthFactor * lambda;
-        // Long Wire along X axis
-        const segments = Math.max(11, Math.floor(lengthFactor * 20));
+        const segments = Math.max(21, Math.floor(lengthFactor * 25));
+        // Physics feed point at [0,0,0]
         ctx.add_wire(0, 0, h_m, totalLength, 0, h_m, 0.001, segments, 1);
         ctx.add_voltage_source(1, 1, 1.0, 0.0);
 
@@ -175,7 +170,8 @@ export default function LongWireAntennaScene({
   };
 
   const effectiveSpeed = isThumbnail && !isHovered ? 0 : { slow: 0.3, medium: 0.6, fast: 1.0 }[speedMode];
-  const gridY = -groundHeight * visualScale;
+  // Standard background scale
+  const gridY = -groundHeight * 10;
 
   const LegendPanel = () => (
     <div className="p-4 bg-black/70 text-white rounded-lg md:max-w-xs h-full border border-white/5">
@@ -224,7 +220,7 @@ export default function LongWireAntennaScene({
           <div className="pt-1">
             <div className="mb-2 text-xs font-medium text-zinc-300">{t("common.controls.length")}</div>
             <RadioGroup value={lengthFactor.toString()} onValueChange={(v) => setLengthFactor(parseFloat(v))} className="flex gap-4">
-              {[2, 4, 8].map((l) => (
+              {[2.5, 5, 10].map((l) => (
                 <div key={l} className="flex items-center space-x-1.5">
                   <RadioGroupItem value={l.toString()} id={`${uniqueId}l-${l}`} className="peer size-3 border-zinc-500 data-[state=checked]:border-white data-[state=checked]:text-white" />
                   <Label htmlFor={`${uniqueId}l-${l}`} className="text-[11px] cursor-pointer text-zinc-400 peer-data-[state=checked]:text-white">{l}λ</Label>
@@ -301,20 +297,26 @@ export default function LongWireAntennaScene({
   return (
     <div className="flex flex-col gap-4">
       <div className={`relative w-full ${isThumbnail ? "h-full" : "h-[450px] md:h-[600px]"} border rounded-lg overflow-hidden bg-black touch-none`}>
-        <Canvas ref={canvasRef} gl={{ preserveDrawingBuffer: true }} camera={{ position: [5, 10, 15], fov: 45 }} frameloop={isThumbnail && !isHovered ? "demand" : "always"}>
+        <Canvas ref={canvasRef} gl={{ preserveDrawingBuffer: true }} camera={{ position: [5, 10, 20], fov: 45 }} frameloop={isThumbnail && !isHovered ? "demand" : "always"}>
           <color attach="background" args={["#111111"]} />
-          <fog attach="fog" args={["#111111", 10, 50]} />
-          {!isThumbnail && <ArcballControls target={[lengthFactor * 5, 0, 0]} makeDefault />}
+          <fog attach="fog" args={["#111111", 10, 60]} />
+          {!isThumbnail && <ArcballControls target={[0, 0, 0]} makeDefault />}
           <ambientLight intensity={0.5} color={0x404040} />
           <directionalLight position={[10, 10, 10]} intensity={1} color={0xffffff} />
           <axesHelper args={[5]} />
           <gridHelper args={[200, 200, 0x333333, 0x222222]} position={[0, gridY, 0]} />
 
-          <group position={[0, 0, 0]}>
-            <LongWireAntenna lengthFactor={lengthFactor} visualScale={visualScale} />
+          <group position={[-VISUAL_ANTENNA_LENGTH / 2, 0, 0]}>
+            <LongWireAntenna />
             {showPattern && context && <RadiationPattern context={context} />}
             {showWaves && context && (
-              <ElectricFieldNec2 context={context} speed={effectiveSpeed} amplitudeScale={1.5} />
+              <ElectricFieldNec2 
+                context={context} 
+                speed={effectiveSpeed} 
+                amplitudeScale={1.5} 
+                visualScale={mappingScale} 
+                particleScale={0.6}
+              />
             )}
           </group>
         </Canvas>
