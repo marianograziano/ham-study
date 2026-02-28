@@ -259,7 +259,7 @@ export default function InvertedVAntennaScene({
           <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">{t("common.simulation.strength")}</span>
           <span className="text-[9px] text-zinc-500 italic">Normalized (E·r)</span>
         </div>
-        <div className="h-2 w-full rounded-full bg-blue-500" />
+        <div className="h-2 w-full rounded-full" style={{ background: "linear-gradient(to right, #3b82f6, #10b981, #eab308, #ef4444)" }} />
       </div>
     </div>
   );
