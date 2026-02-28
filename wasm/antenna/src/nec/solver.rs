@@ -108,23 +108,18 @@ impl Solver {
             self.ip[r] = pivot_row;
 
             // Swap pivot to diagonal position in scratch
-            // Step 5: Pivot row swap was missing for previous columns in matrix!
-            // But since this is LU, we need only to store it in current column.
-            // Wait, let's re-verify C code. c[r+r*ndim]=scm[pr]; scm[pr]=scm[r];
-            // This is actually what we have.
-            // Let's check Step 5: Divide by pivot.
             let pr = pivot_row;
             self.matrix[r + r * n] = col_k_cache[pr];
             col_k_cache[pr] = col_k_cache[r];
 
-            // Check for singularity
-            let diag = self.matrix[r + r * n];
-            if diag.norm_sqr() < 1e-40 {
-                return Err("Zero pivot encountered".to_string());
-            }
-            let inv_diag = Complex64::new(1.0, 0.0) / diag;
-
+            // Step 5: Divide by pivot
             if r + 1 < n {
+                let diag = self.matrix[r + r * n];
+                if diag.norm_sqr() < 1e-40 {
+                    return Err("Zero pivot encountered".to_string());
+                }
+                let inv_diag = Complex64::new(1.0, 0.0) / diag;
+
                 for i in (r + 1)..n {
                     self.matrix[i + r * n] = col_k_cache[i] * inv_diag;
                 }
@@ -218,18 +213,15 @@ impl Solver {
                     sum_term = sum_term + term;
                 }
 
-                // Apply EXACT physical dimension mapping:
-                // sum_term_nec = lambda^2 * sum_term_my
-                // I_true = lambda * I_nec
-                // I_nec = [sum_term_nec]^-1 * (-V / si_m)
-                // => I_true = [lambda^2 * sum_term_my]^-1 * (-V / si_m) * lambda
-                // => I_true = [sum_term_my]^-1 * (-V / (lambda * si_m))
+                // Store in column-major matrix
+                // matrix[row + col * nrow]
                 self.matrix[i + j * n] = sum_term;
             }
         }
     }
 
-    /// Fill right-hand side (excitation)
+    /// Fills the excitation vector (RHS) for voltage sources.
+    /// Corresponds to `etmns` logic for voltage sources (ipr=0).
     pub fn fill_excitation(&self, ctx: &Context, rhs: &mut [Complex64]) {
         // Clear rhs
         for x in rhs.iter_mut() {
@@ -246,10 +238,13 @@ impl Solver {
             let volt = ctx.vsorc.vsant[i];
 
             if seg_idx < rhs.len() {
+                // NEC2C: e[is]= -vsorc.vsant[i]/( data.si[is]* data.wlam);
+                // We assume stored vsant is already complex if needed, or V + j0.
+
                 let len = ctx.geometry.si[seg_idx];
                 let wlam = ctx.geometry.wlam;
 
-                if len.abs() > 1e-20 {
+                if wlam.abs() > 1e-20 && len.abs() > 1e-20 {
                     rhs[seg_idx] = -volt / (len * wlam);
                 }
             }

@@ -62,7 +62,7 @@ impl GeometryData {
                         + (yi1 - self.y1[idx]).abs()
                         + (zi1 - self.z1[idx]).abs();
                     if sep1 <= slen {
-                        self.icon1[i] = (idx + 1) as i32; // Positive if connecting to end 1
+                        self.icon1[i] = -((idx + 1) as i32); // Connected to end 1 of seg j
                         break;
                     }
 
@@ -71,7 +71,7 @@ impl GeometryData {
                         + (yi1 - self.y2[idx]).abs()
                         + (zi1 - self.z2[idx]).abs();
                     if sep2 <= slen {
-                        self.icon1[i] = -((idx + 1) as i32); // Negative if connecting to end 2
+                        self.icon1[i] = (idx + 1) as i32; // Connected to end 2 of seg j
                         break;
                     }
                 }
@@ -80,6 +80,10 @@ impl GeometryData {
             // End 2 connection
             if ignd > 0 {
                 if zi2.abs() <= slen {
+                    if self.icon1[i] == (i + 1) as i32 {
+                        // Error: Lying on ground plane
+                        // panic!("Segment {} lies in ground plane", i+1);
+                    }
                     self.icon2[i] = (i + 1) as i32;
                     self.z2[i] = 0.0;
                     continue;
@@ -97,7 +101,7 @@ impl GeometryData {
                     + (yi2 - self.y1[idx]).abs()
                     + (zi2 - self.z1[idx]).abs();
                 if sep1 <= slen {
-                    self.icon2[i] = -((idx + 1) as i32); // Negative if connecting to end 1
+                    self.icon2[i] = -((idx + 1) as i32); // Correct sign: negative for end 1
                     break;
                 }
 
@@ -106,23 +110,15 @@ impl GeometryData {
                     + (yi2 - self.y2[idx]).abs()
                     + (zi2 - self.z2[idx]).abs();
                 if sep2 <= slen {
-                    self.icon2[i] = (idx + 1) as i32; // Positive if connecting to end 2
+                    self.icon2[i] = (idx + 1) as i32; // Correct sign: positive for end 2
                     break;
                 }
             }
         }
 
-        // NEC2 MAGIC: If an end is open, icon1 is set to the segment number!
-        // This causes the `tbf` function path tracing to "reflect" back along the wire,
-        // correctly visiting every segment twice to build the zero-current boundary standing wave!
-        for i in 0..self.n {
-            if self.icon1[i] == 0 {
-                self.icon1[i] = (i + 1) as i32;
-            }
-            if self.icon2[i] == 0 {
-                self.icon2[i] = -((i + 1) as i32);
-            }
-        }
+        // TODO: Implement coordinate averaging for connected segments to ensure
+        // they strictly meet (lines 360-528 in geometry.c).
+        // For now, we assume input generators produce matched coordinates.
 
         true
     }
@@ -155,17 +151,16 @@ mod tests {
         // So geo.icon2[0] should be -(2).
         // Indices are 1-based in icon arrays.
 
-        assert_eq!(geo.icon1[0], 1, "Seg 1 start should be open (self 1)");
-        assert_eq!(
-            geo.icon2[0], -2,
-            "Seg 1 end should connect to Seg 2 start (-2)"
-        );
+        assert_eq!(geo.icon1[0], 0, "Seg 1 start should be open");
+        assert_eq!(geo.icon2[0], -2, "Seg 1 end should connect to Seg 2 start");
 
-        assert_eq!(
-            geo.icon1[1], -1,
-            "Seg 2 start should connect to Seg 1 end (-1)"
-        );
-        assert_eq!(geo.icon2[1], -2, "Seg 2 end should be open (self -2)");
+        // Check seg 2 connectivity
+        // Seg 2 start connects to Seg 1 end.
+        // Seg 1 end is end 2.
+        // So geo.icon1[1] should be 1.
+
+        assert_eq!(geo.icon1[1], 1, "Seg 2 start should connect to Seg 1 end");
+        assert_eq!(geo.icon2[1], 0, "Seg 2 end should be open");
     }
 }
 
