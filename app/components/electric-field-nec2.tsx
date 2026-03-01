@@ -28,7 +28,7 @@ export function ElectricFieldNec2({
   plane = "XZ",
   visualScale = 10,
   color,
-  particleScale = 1.0,
+  particleScale = 0.5,
   powerExponent = 0.5,
   lowCutoff = 0.15,
   followMainLobe = false,
@@ -52,7 +52,7 @@ export function ElectricFieldNec2({
     };
   }, [context]);
 
-  const geometry = useMemo(() => new SphereGeometry(0.12, 8, 8), []);
+  const geometry = useMemo(() => new SphereGeometry(0.08, 8, 8), []);
   const dummyMatrix = useMemo(() => new Matrix4(), []);
   const dummyColor = new Color();
   const baseColor = useMemo(() => (color ? new Color(color) : null), [color]);

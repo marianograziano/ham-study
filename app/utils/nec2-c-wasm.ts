@@ -1,6 +1,29 @@
 import createNec2Module from "../../public/wasm/nec2c.js";
 
 /**
+ * Global cache for the NEC2 WASM binary to avoid multiple network requests.
+ */
+let cachedWasmBinary: Uint8Array | null = null;
+let wasmFetchPromise: Promise<Uint8Array> | null = null;
+
+async function ensureWasmBinary(): Promise<Uint8Array> {
+  if (cachedWasmBinary) return cachedWasmBinary;
+  if (wasmFetchPromise) return wasmFetchPromise;
+
+  wasmFetchPromise = fetch("/wasm/nec2c.wasm")
+    .then((response) => {
+      if (!response.ok) throw new Error(`Failed to fetch nec2c.wasm: ${response.statusText}`);
+      return response.arrayBuffer();
+    })
+    .then((buffer) => {
+      cachedWasmBinary = new Uint8Array(buffer);
+      return cachedWasmBinary;
+    });
+
+  return wasmFetchPromise;
+}
+
+/**
  * NEC2 Context API Wrapper
  */
 export class Nec2Context {
@@ -56,7 +79,11 @@ export class Nec2Context {
   }
 
   async calculate() {
+    // Use the cached WASM binary if available to avoid re-fetching over the network
+    const wasmBinary = await ensureWasmBinary();
+
     const Module = await (createNec2Module as any)({
+      wasmBinary,
       locateFile: (path: string) => `/wasm/${path}`,
       print: () => {}, 
       printErr: () => {}, 

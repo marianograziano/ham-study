@@ -355,6 +355,7 @@ export default function DipoleAntennaScene({
                 speed={effectiveSpeed}
                 amplitudeScale={1.2}
                 visualScale={visualScale}
+                particleScale={0.6}
               />
             )}
           </group>

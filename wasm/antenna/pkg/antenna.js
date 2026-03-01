@@ -1,139 +1,6 @@
 /* @ts-self-types="./antenna.d.ts" */
 
 /**
- * WASM wrapper for NEC simulation
- */
-export class NecContext {
-    __destroy_into_raw() {
-        const ptr = this.__wbg_ptr;
-        this.__wbg_ptr = 0;
-        NecContextFinalization.unregister(this);
-        return ptr;
-    }
-    free() {
-        const ptr = this.__destroy_into_raw();
-        wasm.__wbg_neccontext_free(ptr, 0);
-    }
-    /**
-     * @param {number} tag
-     * @param {number} seg_on_wire
-     * @param {number} real
-     * @param {number} imag
-     */
-    add_voltage_source(tag, seg_on_wire, real, imag) {
-        wasm.neccontext_add_voltage_source(this.__wbg_ptr, tag, seg_on_wire, real, imag);
-    }
-    /**
-     * @param {number} x1
-     * @param {number} y1
-     * @param {number} z1
-     * @param {number} x2
-     * @param {number} y2
-     * @param {number} z2
-     * @param {number} radius
-     * @param {number} segments
-     * @param {number} tag
-     */
-    add_wire(x1, y1, z1, x2, y2, z2, radius, segments, tag) {
-        wasm.neccontext_add_wire(this.__wbg_ptr, x1, y1, z1, x2, y2, z2, radius, segments, tag);
-    }
-    calculate() {
-        const ret = wasm.neccontext_calculate(this.__wbg_ptr);
-        if (ret[1]) {
-            throw takeFromExternrefTable0(ret[0]);
-        }
-    }
-    /**
-     * @param {number} theta
-     * @param {number} phi
-     * @returns {number}
-     */
-    calculate_far_field(theta, phi) {
-        const ret = wasm.neccontext_calculate_far_field(this.__wbg_ptr, theta, phi);
-        return ret;
-    }
-    /**
-     * @param {number} num_points
-     * @param {number} phi
-     * @returns {Float64Array}
-     */
-    calculate_far_field_pattern(num_points, phi) {
-        const ret = wasm.neccontext_calculate_far_field_pattern(this.__wbg_ptr, num_points, phi);
-        var v1 = getArrayF64FromWasm0(ret[0], ret[1]).slice();
-        wasm.__wbindgen_free(ret[0], ret[1] * 8, 8);
-        return v1;
-    }
-    /**
-     * Calculate 3D far field pattern (batch) with normalization
-     * `thetas` and `phis` must be of same length. `output` must be at least that length.
-     * @param {Float64Array} thetas
-     * @param {Float64Array} phis
-     * @param {Float64Array} output
-     */
-    calculate_far_field_pattern_3d(thetas, phis, output) {
-        const ptr0 = passArrayF64ToWasm0(thetas, wasm.__wbindgen_malloc);
-        const len0 = WASM_VECTOR_LEN;
-        const ptr1 = passArrayF64ToWasm0(phis, wasm.__wbindgen_malloc);
-        const len1 = WASM_VECTOR_LEN;
-        var ptr2 = passArrayF64ToWasm0(output, wasm.__wbindgen_malloc);
-        var len2 = WASM_VECTOR_LEN;
-        wasm.neccontext_calculate_far_field_pattern_3d(this.__wbg_ptr, ptr0, len0, ptr1, len1, ptr2, len2, output);
-    }
-    /**
-     * @param {number} index
-     * @returns {number}
-     */
-    get_current_magnitude(index) {
-        const ret = wasm.neccontext_get_current_magnitude(this.__wbg_ptr, index);
-        return ret;
-    }
-    /**
-     * @param {number} index
-     * @returns {number}
-     */
-    get_current_phase(index) {
-        const ret = wasm.neccontext_get_current_phase(this.__wbg_ptr, index);
-        return ret;
-    }
-    /**
-     * @param {number} tag
-     * @returns {Float64Array}
-     */
-    get_impedance(tag) {
-        const ret = wasm.neccontext_get_impedance(this.__wbg_ptr, tag);
-        var v1 = getArrayF64FromWasm0(ret[0], ret[1]).slice();
-        wasm.__wbindgen_free(ret[0], ret[1] * 8, 8);
-        return v1;
-    }
-    /**
-     * @param {number} num_wires
-     */
-    initialize(num_wires) {
-        wasm.neccontext_initialize(this.__wbg_ptr, num_wires);
-    }
-    constructor() {
-        const ret = wasm.neccontext_new();
-        this.__wbg_ptr = ret >>> 0;
-        NecContextFinalization.register(this, this.__wbg_ptr, this);
-        return this;
-    }
-    /**
-     * @param {number} mhz
-     */
-    set_frequency(mhz) {
-        wasm.neccontext_set_frequency(this.__wbg_ptr, mhz);
-    }
-    /**
-     * Set ground height in wavelengths. Use negative or `None` equivalent (by not calling this) for free-space
-     * @param {number} height_lambda
-     */
-    set_ground(height_lambda) {
-        wasm.neccontext_set_ground(this.__wbg_ptr, height_lambda);
-    }
-}
-if (Symbol.dispose) NecContext.prototype[Symbol.dispose] = NecContext.prototype.free;
-
-/**
  * 信号路径点
  */
 export class PathPoint {
@@ -490,115 +357,6 @@ export class SphericalSurfaceParams {
 if (Symbol.dispose) SphericalSurfaceParams.prototype[Symbol.dispose] = SphericalSurfaceParams.prototype.free;
 
 /**
- * Calculate antenna gain at a specific angle
- *
- * # Arguments
- * * `antenna_type` - Type of antenna ("vertical", "gp", "dp", "yagi", etc.)
- * * `theta` - Elevation angle in radians (0 = horizontal plane, π/2 = vertical)
- * * `phi` - Azimuth angle in radians (0 = forward direction)
- * * `antenna_length` - Antenna length in wavelengths (used for some antenna types)
- * * `active_harmonic` - Active harmonic number (used for EndFed, Windom)
- * * `is_inverted_v` - Inverted V flag (used for Windom)
- * * `radial_angle` - Radial angle string ("60", "135") for GP antennas
- *
- * # Returns
- * Normalized gain value (0.0 to 1.0+)
- * @param {string} antenna_type
- * @param {number} theta
- * @param {number} phi
- * @param {number} antenna_length
- * @param {number} active_harmonic
- * @param {boolean} is_inverted_v
- * @param {string} radial_angle
- * @param {string | null} [material]
- * @returns {number}
- */
-export function calculate_antenna_gain(antenna_type, theta, phi, antenna_length, active_harmonic, is_inverted_v, radial_angle, material) {
-    const ptr0 = passStringToWasm0(antenna_type, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ptr1 = passStringToWasm0(radial_angle, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len1 = WASM_VECTOR_LEN;
-    var ptr2 = isLikeNone(material) ? 0 : passStringToWasm0(material, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    var len2 = WASM_VECTOR_LEN;
-    const ret = wasm.calculate_antenna_gain(ptr0, len0, theta, phi, antenna_length, active_harmonic, is_inverted_v, ptr1, len1, ptr2, len2);
-    return ret;
-}
-
-/**
- * Calculate antenna gain for multiple angles in batch
- *
- * # Arguments
- * * `antenna_type` - Type of antenna
- * * `angles_theta` - Array of elevation angles in radians
- * * `angles_phi` - Array of azimuth angles in radians (same length as angles_theta)
- * * `antenna_length` - Antenna length in wavelengths
- * * `active_harmonic` - Active harmonic number
- * * `is_inverted_v` - Inverted V flag
- * * `radial_angle` - Radial angle string
- * * `material` - Antenna material (optional)
- * * `output` - Output buffer for gain values (must be same length as angles_theta)
- * @param {string} antenna_type
- * @param {Float64Array} angles_theta
- * @param {Float64Array} angles_phi
- * @param {number} antenna_length
- * @param {number} active_harmonic
- * @param {boolean} is_inverted_v
- * @param {string} radial_angle
- * @param {string | null | undefined} material
- * @param {Float64Array} output
- */
-export function calculate_antenna_gain_batch(antenna_type, angles_theta, angles_phi, antenna_length, active_harmonic, is_inverted_v, radial_angle, material, output) {
-    const ptr0 = passStringToWasm0(antenna_type, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ptr1 = passArrayF64ToWasm0(angles_theta, wasm.__wbindgen_malloc);
-    const len1 = WASM_VECTOR_LEN;
-    const ptr2 = passArrayF64ToWasm0(angles_phi, wasm.__wbindgen_malloc);
-    const len2 = WASM_VECTOR_LEN;
-    const ptr3 = passStringToWasm0(radial_angle, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len3 = WASM_VECTOR_LEN;
-    var ptr4 = isLikeNone(material) ? 0 : passStringToWasm0(material, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    var len4 = WASM_VECTOR_LEN;
-    var ptr5 = passArrayF64ToWasm0(output, wasm.__wbindgen_malloc);
-    var len5 = WASM_VECTOR_LEN;
-    wasm.calculate_antenna_gain_batch(ptr0, len0, ptr1, len1, ptr2, len2, antenna_length, active_harmonic, is_inverted_v, ptr3, len3, ptr4, len4, ptr5, len5, output);
-}
-
-/**
- * Calculate antenna radiation pattern (360 degrees in azimuth)
- *
- * # Arguments
- * * `antenna_type` - Type of antenna
- * * `theta` - Fixed elevation angle in radians
- * * `antenna_length` - Antenna length in wavelengths
- * * `active_harmonic` - Active harmonic number
- * * `is_inverted_v` - Inverted V flag
- * * `radial_angle` - Radial angle string
- * * `material` - Antenna material (optional)
- * * `num_points` - Number of azimuth points to calculate (default 360)
- * * `output` - Output buffer for gain values (must have length >= num_points)
- * @param {string} antenna_type
- * @param {number} theta
- * @param {number} antenna_length
- * @param {number} active_harmonic
- * @param {boolean} is_inverted_v
- * @param {string} radial_angle
- * @param {string | null | undefined} material
- * @param {number} num_points
- * @param {Float64Array} output
- */
-export function calculate_antenna_radiation_pattern(antenna_type, theta, antenna_length, active_harmonic, is_inverted_v, radial_angle, material, num_points, output) {
-    const ptr0 = passStringToWasm0(antenna_type, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ptr1 = passStringToWasm0(radial_angle, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len1 = WASM_VECTOR_LEN;
-    var ptr2 = isLikeNone(material) ? 0 : passStringToWasm0(material, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    var len2 = WASM_VECTOR_LEN;
-    var ptr3 = passArrayF64ToWasm0(output, wasm.__wbindgen_malloc);
-    var len3 = WASM_VECTOR_LEN;
-    wasm.calculate_antenna_radiation_pattern(ptr0, len0, theta, antenna_length, active_harmonic, is_inverted_v, ptr1, len1, ptr2, len2, num_points, ptr3, len3, output);
-}
-
-/**
  * Calculate boom correction factor and amount
  *
  * # Arguments
@@ -675,56 +433,6 @@ export function calculate_electric_field(antenna_type, polarization_type, speed,
     var ptr4 = passArrayF32ToWasm0(color_buffer, wasm.__wbindgen_malloc);
     var len4 = WASM_VECTOR_LEN;
     wasm.calculate_electric_field(ptr0, len0, ptr1, len1, speed, amplitude_scale, is_rhcp, antenna_length, ptr2, len2, active_harmonic, is_inverted_v, time, ground_height, grid_size, spacing, ptr3, len3, matrix_buffer, ptr4, len4, color_buffer);
-}
-
-/**
- * Calculate electric field intensity for a single angle
- *
- * Uses numerical integration method, logic consistent with Balanis Antenna Theory.
- *
- * # Arguments
- * * `theta` - Angle off the axis (radians)
- * * `length` - Antenna length (in wavelengths lambda)
- * * `wave_type` - "traveling" or "standing"
- *
- * # Returns
- * Normalized electric field magnitude
- * @param {number} theta
- * @param {number} length
- * @param {string} wave_type
- * @returns {number}
- */
-export function calculate_field(theta, length, wave_type) {
-    const ptr0 = passStringToWasm0(wave_type, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ret = wasm.calculate_field(theta, length, ptr0, len0);
-    return ret;
-}
-
-/**
- * Calculate electric field intensity for multiple angles in batch
- *
- * This is more efficient than calling calculate_field multiple times
- * as it reduces JS<->WASM call overhead.
- *
- * # Arguments
- * * `angles` - Array of angles in radians
- * * `length` - Antenna length (in wavelengths lambda)
- * * `wave_type` - "traveling" or "standing"
- * * `output` - Output buffer for field magnitudes (must be same length as angles)
- * @param {Float64Array} angles
- * @param {number} length
- * @param {string} wave_type
- * @param {Float64Array} output
- */
-export function calculate_field_batch(angles, length, wave_type, output) {
-    const ptr0 = passArrayF64ToWasm0(angles, wasm.__wbindgen_malloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ptr1 = passStringToWasm0(wave_type, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len1 = WASM_VECTOR_LEN;
-    var ptr2 = passArrayF64ToWasm0(output, wasm.__wbindgen_malloc);
-    var len2 = WASM_VECTOR_LEN;
-    wasm.calculate_field_batch(ptr0, len0, length, ptr1, len1, ptr2, len2, output);
 }
 
 /**
@@ -915,29 +623,6 @@ export function calculate_propagation_stats(params) {
     _assertClass(params, PropagationParams);
     const ret = wasm.calculate_propagation_stats(params.__wbg_ptr);
     return PropagationStats.__wrap(ret);
-}
-
-/**
- * Calculate antenna radiation pattern (360 degrees)
- *
- * Returns normalized field magnitudes for angles 0 to 2π.
- *
- * # Arguments
- * * `length` - Antenna length (in wavelengths lambda)
- * * `wave_type` - "traveling" or "standing"
- * * `num_points` - Number of points to calculate (default 360)
- * * `output` - Output buffer for field magnitudes (must have length >= num_points)
- * @param {number} length
- * @param {string} wave_type
- * @param {number} num_points
- * @param {Float64Array} output
- */
-export function calculate_radiation_pattern(length, wave_type, num_points, output) {
-    const ptr0 = passStringToWasm0(wave_type, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len0 = WASM_VECTOR_LEN;
-    var ptr1 = passArrayF64ToWasm0(output, wasm.__wbindgen_malloc);
-    var len1 = WASM_VECTOR_LEN;
-    wasm.calculate_radiation_pattern(length, ptr0, len0, num_points, ptr1, len1, output);
 }
 
 /**
@@ -1179,11 +864,6 @@ function __wbg_get_imports() {
         __wbg___wbindgen_throw_be289d5034ed271b: function(arg0, arg1) {
             throw new Error(getStringFromWasm0(arg0, arg1));
         },
-        __wbindgen_cast_0000000000000001: function(arg0, arg1) {
-            // Cast intrinsic for `Ref(String) -> Externref`.
-            const ret = getStringFromWasm0(arg0, arg1);
-            return ret;
-        },
         __wbindgen_init_externref_table: function() {
             const table = wasm.__wbindgen_externrefs;
             const offset = table.grow(4);
@@ -1200,9 +880,6 @@ function __wbg_get_imports() {
     };
 }
 
-const NecContextFinalization = (typeof FinalizationRegistry === 'undefined')
-    ? { register: () => {}, unregister: () => {} }
-    : new FinalizationRegistry(ptr => wasm.__wbg_neccontext_free(ptr >>> 0, 1));
 const PathPointFinalization = (typeof FinalizationRegistry === 'undefined')
     ? { register: () => {}, unregister: () => {} }
     : new FinalizationRegistry(ptr => wasm.__wbg_pathpoint_free(ptr >>> 0, 1));
@@ -1220,11 +897,6 @@ function _assertClass(instance, klass) {
     if (!(instance instanceof klass)) {
         throw new Error(`expected instance of ${klass.name}`);
     }
-}
-
-function getArrayF64FromWasm0(ptr, len) {
-    ptr = ptr >>> 0;
-    return getFloat64ArrayMemory0().subarray(ptr / 8, ptr / 8 + len);
 }
 
 function getArrayU8FromWasm0(ptr, len) {
@@ -1267,10 +939,6 @@ function getUint8ArrayMemory0() {
         cachedUint8ArrayMemory0 = new Uint8Array(wasm.memory.buffer);
     }
     return cachedUint8ArrayMemory0;
-}
-
-function isLikeNone(x) {
-    return x === undefined || x === null;
 }
 
 function passArray32ToWasm0(arg, malloc) {
@@ -1336,12 +1004,6 @@ function passStringToWasm0(arg, malloc, realloc) {
 
     WASM_VECTOR_LEN = offset;
     return ptr;
-}
-
-function takeFromExternrefTable0(idx) {
-    const value = wasm.__wbindgen_externrefs.get(idx);
-    wasm.__externref_table_dealloc(idx);
-    return value;
 }
 
 let cachedTextDecoder = new TextDecoder('utf-8', { ignoreBOM: true, fatal: true });
