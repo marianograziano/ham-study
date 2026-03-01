@@ -465,6 +465,8 @@ export default {
     },
     copyright: "© {{year}} BG8ROM. All rights reserved.",
     credits: "Special Thanks",
+    acknowledgements: "Acknowledgements",
+    authorKJ7LNW: "NEC2 engine powered by KJ7LNW/nec2c",
   },
 
   meta: {

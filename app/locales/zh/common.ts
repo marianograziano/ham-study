@@ -446,6 +446,8 @@ export default {
     },
     copyright: "© {{year}} BG8ROM. All rights reserved.",
     credits: "特别感谢",
+    acknowledgements: "鸣谢",
+    authorKJ7LNW: "NEC2 仿真引擎基于 KJ7LNW/nec2c",
   },
 
   meta: {

@@ -70,6 +70,21 @@ export function Footer() {
             {t("footer.copyright", { year: new Date().getFullYear() })}
           </p>
         </div>
+
+        {/* Acknowledgements */}
+        <div className="mt-4 pt-4 border-t border-zinc-100 dark:border-zinc-900 flex flex-col items-center gap-2">
+          <p className="text-[10px] text-zinc-400 dark:text-zinc-700 italic flex items-center gap-1">
+            <span>{t("footer.acknowledgements")}:</span>
+            <a
+              href="https://github.com/KJ7LNW/nec2c"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-zinc-600 dark:hover:text-zinc-400 underline decoration-dotted"
+            >
+              {t("footer.authorKJ7LNW")}
+            </a>
+          </p>
+        </div>
       </div>
     </footer>
   );

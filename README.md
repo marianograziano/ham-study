@@ -113,6 +113,11 @@ bun start
 
 MIT License
 
+### 🤝 Acknowledgements
+
+Special thanks to the following projects and authors:
+- **[nec2c](https://github.com/KJ7LNW/nec2c)**: The NEC2 antenna simulation engine used in this project is based on the C port by **KJ7LNW**.
+
 <div align="right">
     <a href="#ham-radio-study--visualization">⬆️ Back to Top</a>
 </div>
@@ -122,6 +127,8 @@ MIT License
 <div id="chinese"></div>
 
 ## 📖 简体中文
+
+... (rest of the file remains same, will apply to Chinese section too)
 
 ### 项目简介 (Overview)
 
@@ -218,6 +225,11 @@ bun start
 ### 📄 许可证 (License)
 
 MIT License
+
+### 🤝 鸣谢 (Acknowledgements)
+
+特别感谢以下项目及作者：
+- **[nec2c](https://github.com/KJ7LNW/nec2c)**: 本项目使用的 NEC2 天线仿真引擎基于 **KJ7LNW** 的 C 语言移植版本。
 
 <div align="right">
     <a href="#ham-radio-study--visualization">⬆️ 回到顶部</a>
