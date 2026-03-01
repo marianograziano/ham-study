@@ -357,104 +357,6 @@ export class SphericalSurfaceParams {
 if (Symbol.dispose) SphericalSurfaceParams.prototype[Symbol.dispose] = SphericalSurfaceParams.prototype.free;
 
 /**
- * Calculate antenna gain at a specific angle
- *
- * # Arguments
- * * `antenna_type` - Type of antenna ("vertical", "gp", "dp", "yagi", etc.)
- * * `theta` - Elevation angle in radians (0 = horizontal plane, π/2 = vertical)
- * * `phi` - Azimuth angle in radians (0 = forward direction)
- * * `antenna_length` - Antenna length in wavelengths (used for some antenna types)
- * * `active_harmonic` - Active harmonic number (used for EndFed, Windom)
- * * `is_inverted_v` - Inverted V flag (used for Windom)
- * * `radial_angle` - Radial angle string ("60", "135") for GP antennas
- *
- * # Returns
- * Normalized gain value (0.0 to 1.0+)
- * @param {string} antenna_type
- * @param {number} theta
- * @param {number} phi
- * @param {number} antenna_length
- * @param {number} active_harmonic
- * @param {boolean} is_inverted_v
- * @param {string} radial_angle
- * @returns {number}
- */
-export function calculate_antenna_gain(antenna_type, theta, phi, antenna_length, active_harmonic, is_inverted_v, radial_angle) {
-    const ptr0 = passStringToWasm0(antenna_type, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ptr1 = passStringToWasm0(radial_angle, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len1 = WASM_VECTOR_LEN;
-    const ret = wasm.calculate_antenna_gain(ptr0, len0, theta, phi, antenna_length, active_harmonic, is_inverted_v, ptr1, len1);
-    return ret;
-}
-
-/**
- * Calculate antenna gain for multiple angles in batch
- *
- * # Arguments
- * * `antenna_type` - Type of antenna
- * * `angles_theta` - Array of elevation angles in radians
- * * `angles_phi` - Array of azimuth angles in radians (same length as angles_theta)
- * * `antenna_length` - Antenna length in wavelengths
- * * `active_harmonic` - Active harmonic number
- * * `is_inverted_v` - Inverted V flag
- * * `radial_angle` - Radial angle string
- * * `output` - Output buffer for gain values (must be same length as angles_theta)
- * @param {string} antenna_type
- * @param {Float64Array} angles_theta
- * @param {Float64Array} angles_phi
- * @param {number} antenna_length
- * @param {number} active_harmonic
- * @param {boolean} is_inverted_v
- * @param {string} radial_angle
- * @param {Float64Array} output
- */
-export function calculate_antenna_gain_batch(antenna_type, angles_theta, angles_phi, antenna_length, active_harmonic, is_inverted_v, radial_angle, output) {
-    const ptr0 = passStringToWasm0(antenna_type, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ptr1 = passArrayF64ToWasm0(angles_theta, wasm.__wbindgen_malloc);
-    const len1 = WASM_VECTOR_LEN;
-    const ptr2 = passArrayF64ToWasm0(angles_phi, wasm.__wbindgen_malloc);
-    const len2 = WASM_VECTOR_LEN;
-    const ptr3 = passStringToWasm0(radial_angle, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len3 = WASM_VECTOR_LEN;
-    var ptr4 = passArrayF64ToWasm0(output, wasm.__wbindgen_malloc);
-    var len4 = WASM_VECTOR_LEN;
-    wasm.calculate_antenna_gain_batch(ptr0, len0, ptr1, len1, ptr2, len2, antenna_length, active_harmonic, is_inverted_v, ptr3, len3, ptr4, len4, output);
-}
-
-/**
- * Calculate antenna radiation pattern (360 degrees in azimuth)
- *
- * # Arguments
- * * `antenna_type` - Type of antenna
- * * `theta` - Fixed elevation angle in radians
- * * `antenna_length` - Antenna length in wavelengths
- * * `active_harmonic` - Active harmonic number
- * * `is_inverted_v` - Inverted V flag
- * * `radial_angle` - Radial angle string
- * * `num_points` - Number of azimuth points to calculate (default 360)
- * * `output` - Output buffer for gain values (must have length >= num_points)
- * @param {string} antenna_type
- * @param {number} theta
- * @param {number} antenna_length
- * @param {number} active_harmonic
- * @param {boolean} is_inverted_v
- * @param {string} radial_angle
- * @param {number} num_points
- * @param {Float64Array} output
- */
-export function calculate_antenna_radiation_pattern(antenna_type, theta, antenna_length, active_harmonic, is_inverted_v, radial_angle, num_points, output) {
-    const ptr0 = passStringToWasm0(antenna_type, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ptr1 = passStringToWasm0(radial_angle, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len1 = WASM_VECTOR_LEN;
-    var ptr2 = passArrayF64ToWasm0(output, wasm.__wbindgen_malloc);
-    var len2 = WASM_VECTOR_LEN;
-    wasm.calculate_antenna_radiation_pattern(ptr0, len0, theta, antenna_length, active_harmonic, is_inverted_v, ptr1, len1, num_points, ptr2, len2, output);
-}
-
-/**
  * Calculate boom correction factor and amount
  *
  * # Arguments
@@ -498,6 +400,7 @@ export function calculate_boom_correction_json(element_diameter, boom_diameter, 
  * * `active_harmonic` - Active harmonic number
  * * `is_inverted_v` - Inverted V flag for Windom antenna
  * * `time` - Current time for animation
+ * * `ground_height` - Antenna height above ground in wavelengths (0.0 = free space)
  * * `grid_size` - Size of the grid (grid_size x grid_size)
  * * `spacing` - Spacing between grid points
  * * `matrix_buffer` - Output buffer for instance matrices (16 floats per instance)
@@ -512,12 +415,13 @@ export function calculate_boom_correction_json(element_diameter, boom_diameter, 
  * @param {number} active_harmonic
  * @param {boolean} is_inverted_v
  * @param {number} time
+ * @param {number} ground_height
  * @param {number} grid_size
  * @param {number} spacing
  * @param {Float32Array} matrix_buffer
  * @param {Float32Array} color_buffer
  */
-export function calculate_electric_field(antenna_type, polarization_type, speed, amplitude_scale, is_rhcp, antenna_length, radial_angle, active_harmonic, is_inverted_v, time, grid_size, spacing, matrix_buffer, color_buffer) {
+export function calculate_electric_field(antenna_type, polarization_type, speed, amplitude_scale, is_rhcp, antenna_length, radial_angle, active_harmonic, is_inverted_v, time, ground_height, grid_size, spacing, matrix_buffer, color_buffer) {
     const ptr0 = passStringToWasm0(antenna_type, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
     const len0 = WASM_VECTOR_LEN;
     const ptr1 = passStringToWasm0(polarization_type, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
@@ -528,57 +432,7 @@ export function calculate_electric_field(antenna_type, polarization_type, speed,
     var len3 = WASM_VECTOR_LEN;
     var ptr4 = passArrayF32ToWasm0(color_buffer, wasm.__wbindgen_malloc);
     var len4 = WASM_VECTOR_LEN;
-    wasm.calculate_electric_field(ptr0, len0, ptr1, len1, speed, amplitude_scale, is_rhcp, antenna_length, ptr2, len2, active_harmonic, is_inverted_v, time, grid_size, spacing, ptr3, len3, matrix_buffer, ptr4, len4, color_buffer);
-}
-
-/**
- * Calculate electric field intensity for a single angle
- *
- * Uses numerical integration method, logic consistent with Balanis Antenna Theory.
- *
- * # Arguments
- * * `theta` - Angle off the axis (radians)
- * * `length` - Antenna length (in wavelengths lambda)
- * * `wave_type` - "traveling" or "standing"
- *
- * # Returns
- * Normalized electric field magnitude
- * @param {number} theta
- * @param {number} length
- * @param {string} wave_type
- * @returns {number}
- */
-export function calculate_field(theta, length, wave_type) {
-    const ptr0 = passStringToWasm0(wave_type, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ret = wasm.calculate_field(theta, length, ptr0, len0);
-    return ret;
-}
-
-/**
- * Calculate electric field intensity for multiple angles in batch
- *
- * This is more efficient than calling calculate_field multiple times
- * as it reduces JS<->WASM call overhead.
- *
- * # Arguments
- * * `angles` - Array of angles in radians
- * * `length` - Antenna length (in wavelengths lambda)
- * * `wave_type` - "traveling" or "standing"
- * * `output` - Output buffer for field magnitudes (must be same length as angles)
- * @param {Float64Array} angles
- * @param {number} length
- * @param {string} wave_type
- * @param {Float64Array} output
- */
-export function calculate_field_batch(angles, length, wave_type, output) {
-    const ptr0 = passArrayF64ToWasm0(angles, wasm.__wbindgen_malloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ptr1 = passStringToWasm0(wave_type, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len1 = WASM_VECTOR_LEN;
-    var ptr2 = passArrayF64ToWasm0(output, wasm.__wbindgen_malloc);
-    var len2 = WASM_VECTOR_LEN;
-    wasm.calculate_field_batch(ptr0, len0, length, ptr1, len1, ptr2, len2, output);
+    wasm.calculate_electric_field(ptr0, len0, ptr1, len1, speed, amplitude_scale, is_rhcp, antenna_length, ptr2, len2, active_harmonic, is_inverted_v, time, ground_height, grid_size, spacing, ptr3, len3, matrix_buffer, ptr4, len4, color_buffer);
 }
 
 /**
@@ -772,29 +626,6 @@ export function calculate_propagation_stats(params) {
 }
 
 /**
- * Calculate antenna radiation pattern (360 degrees)
- *
- * Returns normalized field magnitudes for angles 0 to 2π.
- *
- * # Arguments
- * * `length` - Antenna length (in wavelengths lambda)
- * * `wave_type` - "traveling" or "standing"
- * * `num_points` - Number of points to calculate (default 360)
- * * `output` - Output buffer for field magnitudes (must have length >= num_points)
- * @param {number} length
- * @param {string} wave_type
- * @param {number} num_points
- * @param {Float64Array} output
- */
-export function calculate_radiation_pattern(length, wave_type, num_points, output) {
-    const ptr0 = passStringToWasm0(wave_type, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len0 = WASM_VECTOR_LEN;
-    var ptr1 = passArrayF64ToWasm0(output, wasm.__wbindgen_malloc);
-    var len1 = WASM_VECTOR_LEN;
-    wasm.calculate_radiation_pattern(length, ptr0, len0, num_points, ptr1, len1, output);
-}
-
-/**
  * 计算信号路径
  *
  * 根据传播参数计算射线路径点
@@ -893,14 +724,17 @@ export function estimate_moxon_gain() {
 }
 
 /**
- * Calculate estimated gain based on element count
+ * Calculate estimated gain based on element count and material
  *
- * Simple estimation formula: gain = element_count * 1.2 + 2.15 dBi
+ * Simple estimation formula: gain = element_count * 1.2 + 2.15 dBi - material_loss
  * @param {number} element_count
+ * @param {string} material
  * @returns {number}
  */
-export function estimate_yagi_gain(element_count) {
-    const ret = wasm.estimate_yagi_gain(element_count);
+export function estimate_yagi_gain(element_count, material) {
+    const ptr0 = passStringToWasm0(material, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ret = wasm.estimate_yagi_gain(element_count, ptr0, len0);
     return ret;
 }
 

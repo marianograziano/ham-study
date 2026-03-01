@@ -1,0 +1,12 @@
+--- wasm/antenna/src/nec/physics.rs
++++ wasm/antenna/src/nec/physics.rs
+@@ -133,9 +133,7 @@
+     // ---------------------------------------------------------
+ 
+     jcox = ctx.geometry.icon2[ix];
+-    sig = 1.0; // Corrected to 1.0 to ensure Positive Ax (Symmetric Basis).
+-               // Original -1.0 led to Negative Ax for Right Arm (Asymmetry).
++    sig = -1.0;
+ 
+     loop_idx = 0;
+ 

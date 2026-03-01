@@ -1,9 +1,10 @@
 /* tslint:disable */
 /* eslint-disable */
 export const memory: WebAssembly.Memory;
-export const calculate_field: (a: number, b: number, c: number, d: number) => number;
-export const calculate_field_batch: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: any) => void;
-export const calculate_radiation_pattern: (a: number, b: number, c: number, d: number, e: number, f: number, g: any) => void;
+export const calculate_boom_correction_json: (a: number, b: number, c: number, d: number) => [number, number];
+export const calculate_yagi_element_lengths: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number];
+export const calculate_yagi_json: (a: number, b: number) => [number, number];
+export const estimate_yagi_gain: (a: number, b: number, c: number) => number;
 export const __wbg_get_pathpoint_is_impact: (a: number) => number;
 export const __wbg_get_pathpoint_x: (a: number) => number;
 export const __wbg_get_pathpoint_y: (a: number) => number;
@@ -46,20 +47,13 @@ export const __wbg_get_propagationstats_muf: (a: number) => number;
 export const calculate_moxon_factors_json: (a: number, b: number) => [number, number];
 export const calculate_moxon_json: (a: number, b: number) => [number, number];
 export const calculate_moxon_simple_json: (a: number, b: number) => [number, number];
-export const estimate_moxon_gain: () => number;
-export const calculate_boom_correction_json: (a: number, b: number, c: number, d: number) => [number, number];
-export const calculate_yagi_element_lengths: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number];
-export const calculate_yagi_json: (a: number, b: number) => [number, number];
-export const estimate_yagi_gain: (a: number) => number;
 export const calculate_pattern_gain: (a: number, b: number, c: number, d: number, e: number) => number;
 export const calculate_pattern_gain_grid: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: any) => void;
 export const calculate_pattern_radiation: (a: number, b: number, c: number, d: number, e: number, f: number, g: any) => void;
+export const estimate_moxon_gain: () => number;
 export const get_pattern_antenna_info: (a: number, b: number, c: number, d: number, e: any, f: number, g: number, h: any) => void;
 export const list_pattern_antenna_types: () => [number, number];
-export const calculate_antenna_gain: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => number;
-export const calculate_antenna_gain_batch: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: any) => void;
-export const calculate_antenna_radiation_pattern: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: any) => void;
-export const calculate_electric_field: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number, q: number, r: any, s: number, t: number, u: any) => void;
+export const calculate_electric_field: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number, q: number, r: number, s: any, t: number, u: number, v: any) => void;
 export const __wbg_get_sphericalsurfaceparams_max_angle: (a: number) => number;
 export const __wbg_get_sphericalsurfaceparams_radius: (a: number) => number;
 export const __wbg_get_sphericalsurfaceparams_segments_r: (a: number) => number;

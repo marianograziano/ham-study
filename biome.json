@@ -12,7 +12,9 @@
       "!**/node_modules",
       "!**/build",
       "!**/.react-router",
-      "!yargi.html"
+      "!yargi.html",
+      "!public/wasm",
+      "!wasm/antenna/pkg"
     ]
   },
   "formatter": {
@@ -24,7 +26,10 @@
   "linter": {
     "enabled": true,
     "rules": {
-      "recommended": true
+      "recommended": true,
+      "suspicious": {
+        "noExplicitAny": "off"
+      }
     }
   },
   "css": {

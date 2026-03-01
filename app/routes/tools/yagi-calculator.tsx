@@ -19,9 +19,9 @@ import { YagiSvgRenderer } from "~/components/tools/yagi-calculator/YagiSvgRende
 import { Button } from "~/components/ui/button";
 import { TooltipProvider } from "~/components/ui/tooltip";
 import {
+  type AntennaMaterial,
   type BoomShape,
   calculateYagi,
-  calculateYagiJs,
   type DrivenElementType,
   type MountMethod,
   type SpacingType,
@@ -85,6 +85,7 @@ export default function YagiCalculator() {
   const [proManualBCFactor, setProManualBCFactor] = useState<
     number | undefined
   >();
+  const [proMaterial, setProMaterial] = useState<AntennaMaterial>("aluminum");
 
   // --- Derived Config ---
   const config: YagiConfig = useMemo(() => {
@@ -134,6 +135,7 @@ export default function YagiCalculator() {
         spacingType: proSpacingType,
         manualSpacing: proManualSpacing,
         manualBCFactor: proManualBCFactor,
+        material: proMaterial,
       };
     }
   }, [
@@ -150,6 +152,7 @@ export default function YagiCalculator() {
     proSpacingType,
     proManualSpacing,
     proManualBCFactor,
+    proMaterial,
   ]);
 
   // --- Design State ---
@@ -205,8 +208,8 @@ export default function YagiCalculator() {
 
   const downloadPng = () => {
     console.log("[YagiDownload] Starting download process...");
-    if (!svgRef.current) {
-      console.error("[YagiDownload] svgRef.current is null!");
+    if (!svgRef.current || !design) {
+      console.error("[YagiDownload] svgRef.current or design is null!");
       alert(t("tools.yagiCalculator.ui.downloadError"));
       return;
     }
@@ -223,7 +226,7 @@ export default function YagiCalculator() {
       const rowHeight = 30;
       const headerHeight = 80;
       const footerHeight = 50;
-      const tableH = design!.elements.length * rowHeight;
+      const tableH = design.elements.length * rowHeight;
       const totalH = h_svg + headerHeight + tableH + footerHeight;
 
       canvas.width = w * scale;
@@ -286,7 +289,7 @@ export default function YagiCalculator() {
         ctx.font = "12px monospace";
         y += 10;
 
-        design!.elements.forEach((el) => {
+        design.elements.forEach((el) => {
           y += rowHeight;
           const isDE = el.type === "DE";
           ctx.fillStyle = isDE ? "#38bdf8" : "#cbd5e1";
@@ -336,7 +339,7 @@ export default function YagiCalculator() {
 
         console.log("[YagiDownload] Triggering download click...");
         const a = document.createElement("a");
-        a.download = `yagi_design_${design!.config.frequency}MHz.png`;
+        a.download = `yagi_design_${design.config.frequency}MHz.png`;
         a.href = canvas.toDataURL("image/png");
         a.click();
         console.log("[YagiDownload] Download complete.");
@@ -445,6 +448,8 @@ export default function YagiCalculator() {
                 setProSpacingType={setProSpacingType}
                 proManualSpacing={proManualSpacing}
                 setProManualSpacing={setProManualSpacing}
+                proMaterial={proMaterial}
+                setProMaterial={setProMaterial}
               />
             )}
           </div>

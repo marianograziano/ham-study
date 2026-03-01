@@ -43,6 +43,7 @@ export interface YagiConfig {
   spacingType: "dl6wu" | "uniform";
   manualSpacing: number; // in lambda
   manualBCFactor?: number;
+  material?: string;
 }
 
 export interface YagiElement {
@@ -85,6 +86,7 @@ export async function calculateYagi(config: YagiConfig): Promise<YagiDesign> {
     spacing_type: config.spacingType,
     manual_spacing: config.manualSpacing,
     manual_bc_factor: config.manualBCFactor ?? null,
+    material: config.material ?? null,
   });
 
   const resultJson = calculate_yagi_json(configJson);
@@ -156,5 +158,5 @@ export async function calculateBoomCorrection(
 
 export async function estimateYagiGain(elementCount: number): Promise<number> {
   await ensureInitialized();
-  return estimate_yagi_gain(elementCount);
+  return estimate_yagi_gain(elementCount, "aluminum");
 }

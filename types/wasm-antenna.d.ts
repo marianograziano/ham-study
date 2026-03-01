@@ -89,6 +89,7 @@ declare module "wasm/antenna/pkg/antenna?init" {
     active_harmonic: number,
     is_inverted_v: boolean,
     time: number,
+    ground_height: number,
     grid_size: number,
     spacing: number,
     matrix_buffer: Float32Array,

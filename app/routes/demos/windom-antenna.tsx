@@ -28,8 +28,8 @@ export const loader = async ({ request }: Route.LoaderArgs) => {
   };
 };
 
-export const meta: Route.MetaFunction = ({ loaderData }) => {
-  const { title, description, keywords } = loaderData || {};
+export const meta = ({ loaderData }: Route.MetaArgs) => {
+  const { title, description, keywords } = loaderData;
   return [
     { title },
     { name: "description", content: description },
@@ -43,11 +43,12 @@ export const meta: Route.MetaFunction = ({ loaderData }) => {
 
 export default function WindomAntennaPage() {
   const { t } = useTranslation("demos");
+  const windom = "windomAntenna";
 
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-2xl font-bold">{t("windomAntenna.title")}</h1>
+        <h1 className="text-2xl font-bold">{t(`${windom}.title`)}</h1>
         <p className="text-muted-foreground">{t("subtitle")}</p>
       </div>
 
@@ -72,11 +73,11 @@ export default function WindomAntennaPage() {
 
         <div className="prose dark:prose-invert max-w-none">
           {/* Overview */}
-          <h3>{t("windomAntenna.overviewTitle")}</h3>
+          <h3>{t(`${windom}.overviewTitle`)}</h3>
           <p>
             <Trans
               ns="demos"
-              i18nKey={"windomAntenna.overview"}
+              i18nKey={`${windom}.overview`}
               components={{ strong: <strong />, M: <InlineMath /> }}
             />
           </p>
@@ -84,18 +85,18 @@ export default function WindomAntennaPage() {
             <li>
               <Trans
                 ns="demos"
-                i18nKey={"windomAntenna.structure"}
+                i18nKey={`${windom}.structure`}
                 components={{ strong: <strong /> }}
               />
             </li>
           </ul>
 
           {/* Principle / Why 1/3? */}
-          <h3>{t("windomAntenna.principleTitle")}</h3>
+          <h3>{t(`${windom}.principleTitle`)}</h3>
           <p>
             <Trans
               ns="demos"
-              i18nKey={"windomAntenna.principleIntro"}
+              i18nKey={`${windom}.principleIntro`}
               components={{ strong: <strong /> }}
             />
           </p>
@@ -103,21 +104,21 @@ export default function WindomAntennaPage() {
             <li>
               <Trans
                 ns="demos"
-                i18nKey={"windomAntenna.principlePoints.fundamental"}
+                i18nKey={`${windom}.principlePoints.fundamental`}
                 components={{ strong: <strong /> }}
               />
             </li>
             <li>
               <Trans
                 ns="demos"
-                i18nKey={"windomAntenna.principlePoints.harmonics2"}
+                i18nKey={`${windom}.principlePoints.harmonics2`}
                 components={{ strong: <strong /> }}
               />
             </li>
             <li>
               <Trans
                 ns="demos"
-                i18nKey={"windomAntenna.principlePoints.harmonics4"}
+                i18nKey={`${windom}.principlePoints.harmonics4`}
                 components={{ strong: <strong /> }}
               />
             </li>
@@ -125,17 +126,17 @@ export default function WindomAntennaPage() {
           <p>
             <Trans
               ns="demos"
-              i18nKey={"windomAntenna.principleConclusion"}
+              i18nKey={`${windom}.principleConclusion`}
               components={{ strong: <strong /> }}
             />
           </p>
 
           {/* Matching System */}
-          <h3>{t("windomAntenna.matchingTitle")}</h3>
+          <h3>{t(`${windom}.matchingTitle`)}</h3>
           <p>
             <Trans
               ns="demos"
-              i18nKey={"windomAntenna.matchingIntro"}
+              i18nKey={`${windom}.matchingIntro`}
               components={{ strong: <strong />, M: <InlineMath /> }}
             />
           </p>
@@ -143,17 +144,17 @@ export default function WindomAntennaPage() {
           <p>
             <Trans
               ns="demos"
-              i18nKey={"windomAntenna.matchingConclusion"}
+              i18nKey={`${windom}.matchingConclusion`}
               components={{ strong: <strong /> }}
             />
           </p>
 
           {/* Radiation Pattern */}
-          <h3>{t("windomAntenna.patternTitle")}</h3>
+          <h3>{t(`${windom}.patternTitle`)}</h3>
           <p>
             <Trans
               ns="demos"
-              i18nKey={"windomAntenna.patternIntro"}
+              i18nKey={`${windom}.patternIntro`}
               components={{ strong: <strong /> }}
             />
           </p>
@@ -161,101 +162,87 @@ export default function WindomAntennaPage() {
             <li>
               <Trans
                 ns="demos"
-                i18nKey={"windomAntenna.patternPoints.fundamental"}
+                i18nKey={`${windom}.patternPoints.fundamental`}
                 components={{ strong: <strong /> }}
               />
             </li>
             <li>
               <Trans
                 ns="demos"
-                i18nKey={"windomAntenna.patternPoints.harmonic"}
+                i18nKey={`${windom}.patternPoints.harmonic`}
                 components={{ strong: <strong /> }}
               />
             </li>
           </ul>
 
           {/* Comparison Table */}
-          <h3>{t("windomAntenna.comparisonTitle")}</h3>
+          <h3>{t(`${windom}.comparisonTitle`)}</h3>
           <div className="overflow-x-auto">
             <table className="min-w-full text-left text-sm whitespace-nowrap">
               <thead>
                 <tr>
                   <th className="p-4 border-b dark:border-zinc-700 font-semibold">
-                    {t("windomAntenna.tableHead.feature")}
+                    {t(`${windom}.tableHead.feature`)}
                   </th>
                   <th className="p-4 border-b dark:border-zinc-700 font-semibold">
-                    {t("windomAntenna.tableHead.dipole")}
+                    {t(`${windom}.tableHead.dipole`)}
                   </th>
                   <th className="p-4 border-b dark:border-zinc-700 font-semibold">
-                    {t("windomAntenna.tableHead.windom")}
+                    {t(`${windom}.tableHead.windom`)}
                   </th>
                   <th className="p-4 border-b dark:border-zinc-700 font-semibold">
-                    {t("windomAntenna.tableHead.efhw")}
+                    {t(`${windom}.tableHead.efhw`)}
                   </th>
                 </tr>
               </thead>
               <tbody>
                 <tr className="border-b dark:border-zinc-800">
-                  <td className="p-4">{t("windomAntenna.tableRow.feedPos")}</td>
-                  <td className="p-4">
-                    {t("windomAntenna.tableCell.dipoleFeed")}
+                  <td className="p-4">{t(`${windom}.tableRow.feedPos`)}</td>
+                  <td className="p-4">{t(`${windom}.tableCell.dipoleFeed`)}</td>
+                  <td className="p-4 font-semibold text-primary">
+                    {t(`${windom}.tableCell.windomFeed`)}
+                  </td>
+                  <td className="p-4">{t(`${windom}.tableCell.efhwFeed`)}</td>
+                </tr>
+                <tr className="border-b dark:border-zinc-800">
+                  <td className="p-4">{t(`${windom}.tableRow.multiBand`)}</td>
+                  <td className="p-4">{t(`${windom}.tableCell.dipoleBand`)}</td>
+                  <td className="p-4 font-semibold text-primary">
+                    {t(`${windom}.tableCell.windomBand`)}
                   </td>
                   <td className="p-4 font-semibold text-primary">
-                    {t("windomAntenna.tableCell.windomFeed")}
-                  </td>
-                  <td className="p-4">
-                    {t("windomAntenna.tableCell.efhwFeed")}
+                    {t(`${windom}.tableCell.efhwBand`)}
                   </td>
                 </tr>
                 <tr className="border-b dark:border-zinc-800">
+                  <td className="p-4">{t(`${windom}.tableRow.match`)}</td>
                   <td className="p-4">
-                    {t("windomAntenna.tableRow.multiBand")}
-                  </td>
-                  <td className="p-4">
-                    {t("windomAntenna.tableCell.dipoleBand")}
+                    {t(`${windom}.tableCell.dipoleMatch`)}
                   </td>
                   <td className="p-4 font-semibold text-primary">
-                    {t("windomAntenna.tableCell.windomBand")}
+                    {t(`${windom}.tableCell.windomMatch`)}
                   </td>
                   <td className="p-4 font-semibold text-primary">
-                    {t("windomAntenna.tableCell.efhwBand")}
+                    {t(`${windom}.tableCell.efhwMatch`)}
                   </td>
                 </tr>
                 <tr className="border-b dark:border-zinc-800">
-                  <td className="p-4">{t("windomAntenna.tableRow.match")}</td>
+                  <td className="p-4">{t(`${windom}.tableRow.ground`)}</td>
                   <td className="p-4">
-                    {t("windomAntenna.tableCell.dipoleMatch")}
-                  </td>
-                  <td className="p-4 font-semibold text-primary">
-                    {t("windomAntenna.tableCell.windomMatch")}
-                  </td>
-                  <td className="p-4 font-semibold text-primary">
-                    {t("windomAntenna.tableCell.efhwMatch")}
-                  </td>
-                </tr>
-                <tr className="border-b dark:border-zinc-800">
-                  <td className="p-4">{t("windomAntenna.tableRow.ground")}</td>
-                  <td className="p-4">
-                    {t("windomAntenna.tableCell.dipoleGround")}
+                    {t(`${windom}.tableCell.dipoleGround`)}
                   </td>
                   <td className="p-4">
-                    {t("windomAntenna.tableCell.windomGround")}
+                    {t(`${windom}.tableCell.windomGround`)}
                   </td>
                   <td className="p-4 font-semibold text-primary">
-                    {t("windomAntenna.tableCell.efhwGround")}
+                    {t(`${windom}.tableCell.efhwGround`)}
                   </td>
                 </tr>
                 <tr>
-                  <td className="p-4">{t("windomAntenna.tableRow.cons")}</td>
-                  <td className="p-4">
-                    {t("windomAntenna.tableCell.dipoleCons")}
-                  </td>
-                  <td className="p-4">
-                    {t("windomAntenna.tableCell.windomCons")}
-                  </td>
-                  <td className="p-4">
-                    {t("windomAntenna.tableCell.efhwCons")}
-                  </td>
+                  <td className="p-4">{t(`${windom}.tableRow.cons`)}</td>
+                  <td className="p-4">{t(`${windom}.tableCell.dipoleCons`)}</td>
+                  <td className="p-4">{t(`${windom}.tableCell.windomCons`)}</td>
+                  <td className="p-4">{t(`${windom}.tableCell.efhwCons`)}</td>
                 </tr>
               </tbody>
             </table>
@@ -263,98 +250,98 @@ export default function WindomAntennaPage() {
           <p>
             <Trans
               ns="demos"
-              i18nKey={"windomAntenna.comparisonSummary"}
+              i18nKey={`${windom}.comparisonSummary`}
               components={{ strong: <strong /> }}
             />
           </p>
 
           {/* Misconception */}
-          <h3>{t("windomAntenna.misconceptionTitle")}</h3>
+          <h3>{t(`${windom}.misconceptionTitle`)}</h3>
           <p>
             <Trans
               ns="demos"
-              i18nKey={"windomAntenna.misconceptionIntro"}
+              i18nKey={`${windom}.misconceptionIntro`}
               components={{ strong: <strong /> }}
             />
           </p>
-          <h4>{t("windomAntenna.misconceptionPhysicsTitle")}</h4>
+          <h4>{t(`${windom}.misconceptionPhysicsTitle`)}</h4>
           <p>
             <Trans
               ns="demos"
-              i18nKey={"windomAntenna.misconceptionPhysics"}
+              i18nKey={`${windom}.misconceptionPhysics`}
               components={{ strong: <strong /> }}
             />
           </p>
-          <h4>{t("windomAntenna.misconceptionFeedTitle")}</h4>
+          <h4>{t(`${windom}.misconceptionFeedTitle`)}</h4>
           <p>
             <Trans
               ns="demos"
-              i18nKey={"windomAntenna.misconceptionFeed"}
+              i18nKey={`${windom}.misconceptionFeed`}
               components={{ strong: <strong /> }}
             />
           </p>
           <ul>
-            <li>{t("windomAntenna.misconceptionFeedLow")}</li>
-            <li>{t("windomAntenna.misconceptionFeedHigh")}</li>
-            <li>{t("windomAntenna.misconceptionFeedMid")}</li>
+            <li>{t(`${windom}.misconceptionFeedLow`)}</li>
+            <li>{t(`${windom}.misconceptionFeedHigh`)}</li>
+            <li>{t(`${windom}.misconceptionFeedMid`)}</li>
           </ul>
           <p>
             <strong className="text-primary">
-              {t("windomAntenna.misconceptionConclusion")}
+              {t(`${windom}.misconceptionConclusion`)}
             </strong>
           </p>
-          <h4>{t("windomAntenna.misconceptionExTitle")}</h4>
+          <h4>{t(`${windom}.misconceptionExTitle`)}</h4>
           <p>
             <Trans
               ns="demos"
-              i18nKey={"windomAntenna.misconceptionEx"}
+              i18nKey={`${windom}.misconceptionEx`}
               components={{ strong: <strong /> }}
             />
           </p>
 
           {/* Polarization */}
-          <h3>{t("windomAntenna.polarizationTitle")}</h3>
+          <h3>{t(`${windom}.polarizationTitle`)}</h3>
           <p>
             <Trans
               ns="demos"
-              i18nKey={"windomAntenna.polarizationIntro"}
+              i18nKey={`${windom}.polarizationIntro`}
               components={{ strong: <strong /> }}
             />
           </p>
 
-          <h4>{t("windomAntenna.polarizationReason1Title")}</h4>
-          <p>{t("windomAntenna.polarizationReason1")}</p>
+          <h4>{t(`${windom}.polarizationReason1Title`)}</h4>
+          <p>{t(`${windom}.polarizationReason1`)}</p>
 
-          <h4>{t("windomAntenna.polarizationReason2Title")}</h4>
+          <h4>{t(`${windom}.polarizationReason2Title`)}</h4>
           <ul>
             <li>
               <Trans
                 ns="demos"
-                i18nKey={"windomAntenna.polarizationReason2List.horizontal"}
+                i18nKey={`${windom}.polarizationReason2List.horizontal`}
                 components={{ strong: <strong /> }}
               />
             </li>
             <li>
               <Trans
                 ns="demos"
-                i18nKey={"windomAntenna.polarizationReason2List.invertedV"}
+                i18nKey={`${windom}.polarizationReason2List.invertedV`}
                 components={{ strong: <strong /> }}
               />
             </li>
             <li>
               <Trans
                 ns="demos"
-                i18nKey={"windomAntenna.polarizationReason2List.sloper"}
+                i18nKey={`${windom}.polarizationReason2List.sloper`}
                 components={{ strong: <strong /> }}
               />
             </li>
           </ul>
 
-          <h4>{t("windomAntenna.polarizationExceptionTitle")}</h4>
+          <h4>{t(`${windom}.polarizationExceptionTitle`)}</h4>
           <p>
             <Trans
               ns="demos"
-              i18nKey={"windomAntenna.polarizationException"}
+              i18nKey={`${windom}.polarizationException`}
               components={{ strong: <strong /> }}
             />
           </p>
@@ -366,7 +353,7 @@ export default function WindomAntennaPage() {
                 <p className="mb-2">
                   <Trans
                     ns="demos"
-                    i18nKey={"windomAntenna.physicsContent"}
+                    i18nKey={`${windom}.physicsContent`}
                     components={{ strong: <strong /> }}
                   />
                 </p>

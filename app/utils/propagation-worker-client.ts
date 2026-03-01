@@ -80,7 +80,7 @@ export class PropagationWorkerClient {
     this.worker.onerror = (error) => {
       console.error("Propagation worker error:", error);
       // Reject all pending requests
-      for (const [id, request] of this.pendingRequests) {
+      for (const [_id, request] of this.pendingRequests) {
         request.reject(new Error(`Worker error: ${error.message}`));
         clearTimeout(request.timeoutId);
       }
@@ -96,7 +96,7 @@ export class PropagationWorkerClient {
   terminate(): void {
     if (this.worker) {
       // Reject all pending requests
-      for (const [id, request] of this.pendingRequests) {
+      for (const [_id, request] of this.pendingRequests) {
         request.reject(new Error("Worker terminated"));
         clearTimeout(request.timeoutId);
       }

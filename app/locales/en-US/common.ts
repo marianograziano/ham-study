@@ -238,6 +238,18 @@ export default {
           uniform: "Uniform Spacing (Custom)",
         },
         fixedSpacing: "Fixed Spacing (λ)",
+        material: "Material",
+        materialTooltip: {
+          title: "Boom Material",
+          content:
+            "Selected material conductivity affects element design slightly.",
+        },
+        materials: {
+          aluminum: "Aluminum - Standard",
+          copper: "Copper - High Conductivity",
+          stainless_steel: "Stainless Steel - High Resistance",
+          fiberglass: "Fiberglass - Insulator",
+        },
       },
       results: {
         title: "Cut List",

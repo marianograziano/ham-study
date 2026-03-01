@@ -19,6 +19,18 @@ export default {
       download: "下載截圖",
       autoRotate: "自動旋轉 (Auto Rotate)",
     },
+    simulation: {
+      analysis: "仿真分析 (Analysis)",
+      peakGain: "峰值增益",
+      impedance: "輸入阻抗",
+      material: "材質選擇",
+      copper: "銅 (Copper)",
+      aluminum: "鋁 (Aluminum)",
+      stainlessSteel: "不鏽鋼 (Stainless Steel)",
+      groundHeight: "離地高度 (λ)",
+      freeSpace: "自由空間",
+      strength: "電場強度 (強 → 弱)",
+    },
   },
   circularPolarization: {
     title: "圓極化 (Circular Polarization)",
@@ -147,5 +159,18 @@ export default {
     capacitor: "調諧電容 (Capacitor)",
     pattern: "輻射方向圖 (軸向零點)",
     strength: "電場強度",
+  },
+  dipoleAntenna: {
+    title: "偶極子天線 (Dipole)",
+    desc: "最基礎的天線。由兩個等長的振子組成，中心饋電。是研究其他複雜天線的基礎。<br/>The fundamental antenna. Two equal-length elements, center-fed.",
+    active: "振子 (有源 / Active)",
+    pattern: "輻射方向圖 (Pattern)",
+  },
+  windomAntenna: {
+    title: "溫頓天線 (Windom)",
+    desc: "一種離心饋電偶極天線 (OCFD)。多波段諧振，且具有獨特的輻射特性。<br/>Off-Center Fed Dipole (OCFD). Multi-band resonance with unique patterns.",
+    wire: "振子 (有源 / Wire)",
+    feed: "饋電點 (Feed Point)",
+    pattern: "輻射方向圖 (Pattern)",
   },
 } satisfies typeof import("~/locales/zh/scene").default;

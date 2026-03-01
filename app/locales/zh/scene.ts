@@ -19,6 +19,18 @@ export default {
       download: "下载截图",
       autoRotate: "自动旋转 (Auto Rotate)",
     },
+    simulation: {
+      analysis: "仿真分析 (Analysis)",
+      peakGain: "峰值增益",
+      impedance: "输入阻抗",
+      material: "材质选择",
+      copper: "铜 (Copper)",
+      aluminum: "铝 (Aluminum)",
+      stainlessSteel: "不锈钢 (Stainless Steel)",
+      groundHeight: "离地高度 (λ)",
+      freeSpace: "自由空间",
+      strength: "电场强度 (强 → 弱)",
+    },
   },
   circularPolarization: {
     title: "圆极化 (Circular Polarization)",
@@ -113,6 +125,12 @@ export default {
     pattern: "辐射方向图 (Pattern)",
     strength: "电场强度 (强 → 弱)",
   },
+  dipoleAntenna: {
+    title: "偶极子天线 (Dipole)",
+    desc: "最基础的天线。由两个等长的振子组成，中心馈电。是研究其他复杂天线的基础。<br/>The fundamental antenna. Two equal-length elements, center-fed.",
+    active: "振子 (有源 / Active)",
+    pattern: "辐射方向图 (Pattern)",
+  },
   endFedAntenna: {
     title: "端馈半波 (EFHW)",
     desc: "使用 49:1 巴伦的末端馈电半波天线。<br/>End-Fed Half Wave with 49:1 Unun.",
@@ -148,5 +166,12 @@ export default {
     pattern: "辐射方向图 (轴向零点)",
 
     strength: "电场强度",
+  },
+  windomAntenna: {
+    title: "温顿天线 (Windom)",
+    desc: "一种离心馈电偶极天线 (OCFD)。多波段谐振，且具有独特的辐射特性。<br/>Off-Center Fed Dipole (OCFD). Multi-band resonance with unique patterns.",
+    wire: "振子 (有源 / Wire)",
+    feed: "馈电点 (Feed Point)",
+    pattern: "辐射方向图 (Pattern)",
   },
 } satisfies Record<string, unknown>;

@@ -171,6 +171,18 @@ export default {
           content: "金屬動臂相當於寄生電感，會「縮短」穿過它的振子的電氣長度。",
         },
         mount: "安裝結構",
+        material: "動臂材質",
+        materialTooltip: {
+          title: "表皮效應 & 導電率",
+          content:
+            "不同金屬的導電率和磁導率不同，會影響高頻電流的分佈深度（趨膚效應）。這會微調等效電氣長度。",
+        },
+        materials: {
+          aluminum: "鋁 (Aluminum) - 標準",
+          copper: "銅 (Copper) - 高導電",
+          stainless_steel: "不鏽鋼 (Stainless) - 高阻",
+          fiberglass: "玻璃鋼 (Fiberglass) - 絕緣",
+        },
         mountTooltip: {
           title: "修正係數參考 (k)",
           item1: "非金屬: k ≈ 0",

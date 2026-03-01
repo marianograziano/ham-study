@@ -1,132 +1,115 @@
 import { Camera } from "@phosphor-icons/react";
 import { ArcballControls } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { type BufferGeometry, SphereGeometry, Vector3 } from "three";
 import { Button } from "~/components/ui/button";
 import { Label } from "~/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
 import { Switch } from "~/components/ui/switch";
-import {
-  calculateAntennaGain,
-  initAntennaWasm,
-} from "~/utils/antenna-physics-wasm";
-import { ElectricFieldWasm } from "./electric-field-wasm";
+import { Nec2Context } from "~/utils/nec2-c-wasm";
+import { ElectricFieldNec2 } from "./electric-field-nec2";
 
-function YagiAntenna() {
+function YagiAntenna({ scale = 10 }: { scale?: number }) {
   return (
     <group>
       {/* Boom */}
-      <mesh position={[0, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
-        <cylinderGeometry args={[0.05, 0.05, 4, 16]} />
+      <mesh
+        position={[(-0.17 * scale) / 2, 0, 0]}
+        rotation={[0, 0, Math.PI / 2]}
+      >
+        <cylinderGeometry args={[0.05, 0.05, 0.4 * scale, 16]} />
         <meshStandardMaterial color="#666" />
       </mesh>
-
-      {/* Reflector (Back, Longest) */}
-      <mesh position={[-1.5, 0, 0]} rotation={[Math.PI / 2, 0, 0]}>
-        <cylinderGeometry args={[0.02, 0.02, 3.2, 16]} />
+      {/* Reflector */}
+      <mesh position={[-0.139 * scale, 0, 0]} rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[0.02, 0.02, 0.348 * scale, 16]} />
         <meshStandardMaterial color="#3b82f6" />
       </mesh>
-
-      {/* Driven Element (Middle) */}
+      {/* Driven Element */}
       <mesh position={[0, 0, 0]} rotation={[Math.PI / 2, 0, 0]}>
-        <cylinderGeometry args={[0.03, 0.03, 3, 16]} />
+        <cylinderGeometry args={[0.03, 0.03, 0.328 * scale, 16]} />
         <meshStandardMaterial color="#ef4444" />
-        {/* Feedpoint */}
         <mesh position={[0, 0, 0]}>
           <boxGeometry args={[0.1, 0.1, 0.1]} />
           <meshBasicMaterial color="#fff" />
         </mesh>
       </mesh>
-
-      {/* Director (Front, Shortest) */}
-      <mesh position={[1.5, 0, 0]} rotation={[Math.PI / 2, 0, 0]}>
-        <cylinderGeometry args={[0.02, 0.02, 2.8, 16]} />
+      {/* Director */}
+      <mesh position={[0.105 * scale, 0, 0]} rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[0.02, 0.02, 0.306 * scale, 16]} />
         <meshStandardMaterial color="#3b82f6" />
       </mesh>
-
-      {/* Mast */}
-      <mesh position={[0, -2, 0]}>
-        <cylinderGeometry args={[0.08, 0.08, 4, 16]} />
+      {/* Support Pole - fixed height */}
+      <mesh position={[0, -0.2 * scale, 0]}>
+        <cylinderGeometry args={[0.08, 0.08, 0.4 * scale, 16]} />
         <meshStandardMaterial color="#444" />
       </mesh>
     </group>
   );
 }
 
-function RadiationPattern() {
+function RadiationPattern({
+  context,
+  powerExponent = 1.0,
+  baseOffset = 0.2,
+}: {
+  context: Nec2Context | null;
+  powerExponent?: number;
+  baseOffset?: number;
+}) {
   const [geometry, setGeometry] = useState<BufferGeometry | null>(null);
 
   useEffect(() => {
-    let isMounted = true;
+    if (!context) return;
 
-    const generateGeometry = async () => {
-      // Initialize WASM first
-      await initAntennaWasm();
-
-      if (!isMounted) return;
-
+    const generateGeometry = () => {
       const geo = new SphereGeometry(1, 60, 40);
       const posAttribute = geo.attributes.position;
       const vertex = new Vector3();
-      const scale = 10;
 
-      for (let i = 0; i < posAttribute.count; i++) {
+      const count = posAttribute.count;
+      const thetas = new Float64Array(count);
+      const phis = new Float64Array(count);
+      const gains = new Float64Array(count);
+
+      for (let i = 0; i < count; i++) {
         vertex.fromBufferAttribute(posAttribute, i);
         vertex.normalize();
-
-        // Convert vertex direction to spherical coordinates
-        // phi: azimuth angle (0 = forward direction +X)
-        // theta: elevation angle (0 = horizontal plane, π/2 = vertical)
-        const phi = Math.atan2(vertex.z, vertex.x); // azimuth around Y axis
-        const theta = Math.PI / 2; // assume horizontal pattern (elevation = 90 deg)
-
-        // Calculate gain using WASM
-        let gain = 0.1; // Base/noise floor
-        try {
-          const wasmGain = await calculateAntennaGain(
-            "yagi",
-            theta,
-            phi,
-            0.5,
-            1,
-            false,
-            "60",
-          );
-          gain += wasmGain * 1.5;
-        } catch (error) {
-          console.warn("WASM calculation failed, using fallback", error);
-          // Fallback to simplified model
-          const cosAngle = vertex.x;
-          if (cosAngle > 0) {
-            gain += cosAngle ** 3 * 1.5;
-          }
-          if (cosAngle < -0.5) {
-            gain += 0.2 * Math.abs(Math.cos(cosAngle * 5));
-          }
-        }
-
-        vertex.multiplyScalar(gain * scale);
-        posAttribute.setXYZ(i, vertex.x, vertex.y, vertex.z);
+        const theta = Math.acos(Math.max(-1, Math.min(1, vertex.y)));
+        let phi = Math.atan2(vertex.z, vertex.x);
+        if (phi < 0) phi += 2 * Math.PI;
+        thetas[i] = theta;
+        phis[i] = phi;
       }
+
+      context.calculate_far_field_pattern_3d(thetas, phis, gains);
+
+      let maxLinearG = 0.01;
+      for (let i = 0; i < count; i++) {
+        if (gains[i] > maxLinearG) maxLinearG = gains[i];
+      }
+
+      const maxDbi = context.get_max_gain();
+      const visualBaseScale = 7.5 + Math.max(0, maxDbi) * 0.7;
+
+      for (let i = 0; i < count; i++) {
+        const power = (gains[i] / maxLinearG) ** powerExponent;
+        const rad = (baseOffset + power * (1 - baseOffset)) * visualBaseScale;
+        vertex.fromBufferAttribute(posAttribute, i);
+        vertex.normalize();
+        posAttribute.setXYZ(i, vertex.x * rad, vertex.y * rad, vertex.z * rad);
+      }
+
       geo.computeVertexNormals();
-
-      if (isMounted) {
-        setGeometry(geo);
-      }
+      setGeometry(geo);
     };
 
     generateGeometry();
+  }, [context, powerExponent, baseOffset]);
 
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  if (!geometry) {
-    return null;
-  }
+  if (!geometry) return null;
 
   return (
     <group>
@@ -150,14 +133,66 @@ export default function YagiAntennaScene({
   isHovered?: boolean;
 }) {
   const { t } = useTranslation("scene");
+  const [groundHeight, setGroundHeight] = useState(0.0);
+  const [material, setMaterial] = useState<string>("aluminum");
   const [showWaves, setShowWaves] = useState(true);
   const [showPattern, setShowPattern] = useState(true);
   const [speedMode, setSpeedMode] = useState<"slow" | "medium" | "fast">(
     "medium",
   );
+  const [context, setContext] = useState<Nec2Context | null>(null);
+  const [isCalculating, setIsCalculating] = useState(false);
+  const [impedance, setImpedance] = useState<{ re: number; im: number } | null>(
+    null,
+  );
+  const [maxGain, setMaxGain] = useState<number>(0);
 
   const uniqueId = useId();
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  const visualScale = 10;
+
+  useEffect(() => {
+    let active = true;
+    const runSimulation = async () => {
+      setIsCalculating(true);
+      try {
+        const ctx = new Nec2Context();
+        ctx.initialize(1);
+        const freq = 430.0;
+        ctx.set_frequency(freq);
+        ctx.set_material(material);
+        const lambda = 299.79 / freq;
+        const h_m = groundHeight * lambda;
+        if (groundHeight > 0) ctx.set_ground(groundHeight);
+
+        // Standard 3-element Yagi at 430MHz
+        ctx.add_wire(-0.139, -0.174, h_m, -0.139, 0.174, h_m, 0.003, 11, 1);
+        ctx.add_wire(0, -0.164, h_m, 0, 0.164, h_m, 0.003, 11, 2);
+        ctx.add_wire(0.105, -0.153, h_m, 0.105, 0.153, h_m, 0.003, 11, 3);
+        ctx.add_voltage_source(2, 6, 1.0, 0.0);
+
+        await ctx.calculate();
+
+        if (active) {
+          const zArr = ctx.get_impedance(2);
+          setImpedance({ re: zArr[0], im: zArr[1] });
+          setMaxGain(ctx.get_max_gain());
+          setContext(ctx);
+        }
+      } catch (err) {
+        console.error("NEC Simulation Error:", err);
+      } finally {
+        if (active) setIsCalculating(false);
+      }
+    };
+
+    const timer = setTimeout(runSimulation, 300);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [groundHeight, material]);
 
   const handleDownload = () => {
     if (canvasRef.current) {
@@ -168,28 +203,23 @@ export default function YagiAntennaScene({
     }
   };
 
-  const speedMultiplier = {
-    slow: 0.3,
-    medium: 0.6,
-    fast: 1.0,
-  }[speedMode];
+  const effectiveSpeed =
+    isThumbnail && !isHovered
+      ? 0
+      : { slow: 0.3, medium: 0.6, fast: 1.0 }[speedMode];
+  const gridY = -groundHeight * visualScale;
 
-  const effectiveSpeed = isThumbnail && !isHovered ? 0 : speedMultiplier;
-
-  const LegendContent = () => (
-    <>
-      <h2 className="text-lg md:text-xl font-bold mb-2">
-        {t("yagiAntenna.title")}
-      </h2>
-      <p className="text-xs md:text-sm text-muted-foreground mb-2">
+  const LegendPanel = () => (
+    <div className="p-4 bg-black/70 text-white rounded-lg md:max-w-xs h-full border border-white/5">
+      <h2 className="text-lg font-bold mb-2">{t("yagiAntenna.title")}</h2>
+      <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
         <Trans
           ns="scene"
           i18nKey="yagiAntenna.desc"
           components={{ br: <br /> }}
         />
       </p>
-
-      <div className="mt-3 mb-2 space-y-1.5 text-xs border-t border-gray-600 pt-2">
+      <div className="space-y-1.5 text-xs border-t border-gray-600 pt-2">
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 bg-red-500 rounded-sm" />
           <span>{t("yagiAntenna.driven")}</span>
@@ -202,119 +232,183 @@ export default function YagiAntennaScene({
           <div className="w-3 h-3 border-2 border-green-500 rounded-sm" />
           <span>{t("yagiAntenna.pattern")}</span>
         </div>
-        <div className="flex items-center gap-2">
-          {/* Gradient Legend for E-field Strength */}
-          <div
-            className="w-16 h-3 rounded-sm"
-            style={{
-              background:
-                "linear-gradient(to right, #ef4444, #eab308, #22c55e, #3b82f6)",
-            }}
-          />
-          <span>{t("yagiAntenna.strength")}</span>
-        </div>
       </div>
-    </>
+      <div className="mt-4 pt-3 border-t border-gray-600">
+        <div className="flex justify-between items-end mb-1.5">
+          <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">
+            {t("common.simulation.strength")}
+          </span>
+          <span className="text-[9px] text-zinc-500 italic">
+            Normalized (E·r)
+          </span>
+        </div>
+        <div className="h-2 w-full rounded-full bg-gradient-to-r from-blue-600 via-green-500 via-yellow-400 to-red-600" />
+      </div>
+    </div>
   );
 
-  const ControlsContent = () => (
-    <div className="flex flex-col space-y-3">
-      <div className="pt-3 border-t border-white/10 md:border-none md:pt-0">
-        <div className="mb-2 text-xs md:text-sm font-medium text-zinc-200">
-          {t("common.controls.visualization")}
-        </div>
-        <div className="flex flex-col space-y-2">
-          <div className="flex items-center space-x-2">
-            <Switch
-              id={`${uniqueId}wave-mode`}
-              checked={showWaves}
-              onCheckedChange={setShowWaves}
-              className="data-[state=checked]:bg-primary-foreground/80 data-[state=unchecked]:bg-zinc-700 border-zinc-500"
-            />
-            <Label
-              htmlFor={`${uniqueId}wave-mode`}
-              className="text-xs md:text-sm text-zinc-300"
-            >
-              {t("common.controls.showWaves")}
-            </Label>
+  const ControlsPanel = () => (
+    <div className="p-4 bg-black/70 text-white rounded-lg w-full h-full border border-white/5">
+      <div className="flex flex-col space-y-4">
+        <div className="bg-zinc-900/50 p-3 rounded border border-white/5">
+          <div className="mb-2 text-[10px] uppercase font-bold tracking-wider text-zinc-500">
+            {t("common.simulation.analysis")}
           </div>
-          <div className="flex items-center space-x-2">
-            <Switch
-              id={`${uniqueId}pattern-mode`}
-              checked={showPattern}
-              onCheckedChange={setShowPattern}
-              className="data-[state=checked]:bg-primary-foreground/80 data-[state=unchecked]:bg-zinc-700 border-zinc-500"
-            />
-            <Label
-              htmlFor={`${uniqueId}pattern-mode`}
-              className="text-xs md:text-sm text-zinc-300"
-            >
-              {t("common.controls.showPattern")}
-            </Label>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <div className="text-[9px] text-zinc-400 mb-0.5">
+                {t("common.simulation.peakGain")}
+              </div>
+              <div className="text-xs font-mono text-green-400">
+                {isCalculating ? "..." : `${maxGain.toFixed(2)} dBi`}
+              </div>
+            </div>
+            <div>
+              <div className="text-[9px] text-zinc-400 mb-0.5">
+                {t("common.simulation.impedance")}
+              </div>
+              <div className="text-xs font-mono text-zinc-300">
+                {isCalculating
+                  ? "..."
+                  : impedance
+                    ? `${impedance.re.toFixed(1)}Ω`
+                    : "--"}
+              </div>
+            </div>
           </div>
         </div>
-      </div>
 
-      <div className="pt-3 border-t border-white/10">
-        <div className="mb-2 text-xs md:text-sm font-medium text-zinc-200">
-          {t("common.controls.speed")}
+        <div className="space-y-3">
+          <div className="pt-1">
+            <div className="mb-2 text-xs font-medium text-zinc-300">
+              {t("common.simulation.material")}
+            </div>
+            <RadioGroup
+              value={material}
+              onValueChange={setMaterial}
+              className="flex flex-row md:flex-col gap-3 md:gap-1.5"
+            >
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem
+                  value="aluminum"
+                  id={`${uniqueId}m-al`}
+                  className="peer size-3 border-zinc-500 data-[state=checked]:border-white data-[state=checked]:text-white"
+                />
+                <Label
+                  htmlFor={`${uniqueId}m-al`}
+                  className="text-[11px] cursor-pointer text-zinc-400 peer-data-[state=checked]:text-white"
+                >
+                  {t("common.simulation.aluminum")}
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem
+                  value="stainless_steel"
+                  id={`${uniqueId}m-ss`}
+                  className="peer size-3 border-zinc-500 data-[state=checked]:border-white data-[state=checked]:text-white"
+                />
+                <Label
+                  htmlFor={`${uniqueId}m-ss`}
+                  className="text-[11px] cursor-pointer text-zinc-400 peer-data-[state=checked]:text-white"
+                >
+                  {t("common.simulation.stainlessSteel")}
+                </Label>
+              </div>
+            </RadioGroup>
+          </div>
+
+          <div className="pt-2 border-t border-white/5">
+            <div className="mb-2 text-xs font-medium text-zinc-300">
+              {t("common.simulation.groundHeight")}
+            </div>
+            <div className="flex items-center space-x-3">
+              <input
+                type="range"
+                min="0"
+                max="2"
+                step="0.1"
+                value={groundHeight}
+                onChange={(e) => setGroundHeight(parseFloat(e.target.value))}
+                className="w-full accent-blue-500 h-1"
+              />
+              <span className="text-[10px] text-zinc-400 w-8 text-right font-mono">
+                {groundHeight === 0
+                  ? t("common.simulation.freeSpace")
+                  : groundHeight.toFixed(1)}
+              </span>
+            </div>
+          </div>
+
+          <div className="pt-2 border-t border-white/5">
+            <div className="mb-2 text-xs font-medium text-zinc-300">
+              {t("common.controls.speed")}
+            </div>
+            <RadioGroup
+              value={speedMode}
+              onValueChange={(v) =>
+                setSpeedMode(v as "slow" | "medium" | "fast")
+              }
+              className="flex gap-3"
+            >
+              {["slow", "medium", "fast"].map((s) => (
+                <div key={s} className="flex items-center space-x-1.5">
+                  <RadioGroupItem
+                    value={s}
+                    id={`${uniqueId}r-${s}`}
+                    className="peer size-3 border-zinc-500 data-[state=checked]:border-white data-[state=checked]:text-white"
+                  />
+                  <Label
+                    htmlFor={`${uniqueId}r-${s}`}
+                    className="text-[11px] cursor-pointer text-zinc-400 peer-data-[state=checked]:text-white"
+                  >
+                    {t(`common.controls.${s}` as any)}
+                  </Label>
+                </div>
+              ))}
+            </RadioGroup>
+          </div>
+
+          <div className="pt-2 border-t border-white/5">
+            <div className="flex flex-col space-y-2">
+              <div className="flex items-center justify-between group">
+                <Label
+                  htmlFor={`${uniqueId}wave-mode`}
+                  className="text-[11px] text-zinc-400 cursor-pointer peer-data-[state=checked]:text-white order-first"
+                >
+                  {t("common.controls.showWaves")}
+                </Label>
+                <Switch
+                  id={`${uniqueId}wave-mode`}
+                  checked={showWaves}
+                  onCheckedChange={setShowWaves}
+                  className="peer scale-75 data-[state=unchecked]:bg-zinc-700 data-[state=checked]:bg-blue-500"
+                />
+              </div>
+              <div className="flex items-center justify-between group">
+                <Label
+                  htmlFor={`${uniqueId}pattern-mode`}
+                  className="text-[11px] text-zinc-400 cursor-pointer peer-data-[state=checked]:text-white order-first"
+                >
+                  {t("common.controls.showPattern")}
+                </Label>
+                <Switch
+                  id={`${uniqueId}pattern-mode`}
+                  checked={showPattern}
+                  onCheckedChange={setShowPattern}
+                  className="peer scale-75 data-[state=unchecked]:bg-zinc-700 data-[state=checked]:bg-blue-500"
+                />
+              </div>
+            </div>
+          </div>
         </div>
-        <RadioGroup
-          defaultValue="medium"
-          value={speedMode}
-          onValueChange={(v) => setSpeedMode(v as "slow" | "medium" | "fast")}
-          className="flex gap-4"
-        >
-          <div className="flex items-center space-x-2">
-            <RadioGroupItem
-              value="slow"
-              id={`${uniqueId}r-slow`}
-              className="border-zinc-400 text-primary-foreground data-[state=checked]:bg-transparent data-[state=checked]:border-primary-foreground data-[state=checked]:text-input"
-            />
-            <Label
-              htmlFor={`${uniqueId}r-slow`}
-              className="text-xs cursor-pointer text-zinc-300"
-            >
-              {t("common.controls.slow")}
-            </Label>
-          </div>
-          <div className="flex items-center space-x-2">
-            <RadioGroupItem
-              value="medium"
-              id={`${uniqueId}r-medium`}
-              className="border-zinc-400 text-primary-foreground data-[state=checked]:bg-transparent data-[state=checked]:border-primary-foreground data-[state=checked]:text-input"
-            />
-            <Label
-              htmlFor={`${uniqueId}r-medium`}
-              className="text-xs cursor-pointer text-zinc-300"
-            >
-              {t("common.controls.medium")}
-            </Label>
-          </div>
-          <div className="flex items-center space-x-2">
-            <RadioGroupItem
-              value="fast"
-              id={`${uniqueId}r-fast`}
-              className="border-zinc-400 text-primary-foreground data-[state=checked]:bg-transparent data-[state=checked]:border-primary-foreground data-[state=checked]:text-input"
-            />
-            <Label
-              htmlFor={`${uniqueId}r-fast`}
-              className="text-xs cursor-pointer text-zinc-300"
-            >
-              {t("common.controls.fast")}
-            </Label>
-          </div>
-        </RadioGroup>
-      </div>
-      <div className="pt-3 border-t border-white/10">
+
         <Button
           variant="secondary"
           size="sm"
-          className="w-full"
+          className="w-full h-8 text-[11px] bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border-none"
           onClick={handleDownload}
         >
-          <Camera className="mr-2 size-4" />
-          {t("common.controls.download")}
+          <Camera className="mr-2 size-3.5" /> {t("common.controls.download")}
         </Button>
       </div>
     </div>
@@ -332,64 +426,61 @@ export default function YagiAntennaScene({
           frameloop={isThumbnail && !isHovered ? "demand" : "always"}
         >
           <color attach="background" args={["#111111"]} />
-          <fog attach="fog" args={["#111111", 10, 50]} />
-
+          <fog attach="fog" args={["#111111", 100, 1000]} />
           {!isThumbnail && <ArcballControls target={[0, 0, 0]} makeDefault />}
-
           <ambientLight intensity={0.5} color={0x404040} />
           <directionalLight
             position={[10, 10, 10]}
             intensity={1}
             color={0xffffff}
           />
-
           <axesHelper args={[5]} />
           <gridHelper
             args={[20, 20, 0x333333, 0x222222]}
-            position={[0, -2, 0]}
+            position={[0, gridY, 0]}
           />
 
-          <YagiAntenna />
-          {showPattern && <RadiationPattern />}
-          {/* Surface/Field Mode */}
-          {showWaves && (
-            <ElectricFieldWasm
-              antennaType="yagi"
-              polarizationType="horizontal"
-              speed={effectiveSpeed}
-              amplitudeScale={1.5}
-            />
-          )}
+          <group position={[0, 0, 0]}>
+            <YagiAntenna scale={visualScale} />
+            {showPattern && context && (
+              <RadiationPattern
+                context={context}
+                powerExponent={1.2}
+                baseOffset={0.05}
+              />
+            )}
+            {showWaves && context && (
+              <ElectricFieldNec2
+                context={context}
+                speed={effectiveSpeed}
+                amplitudeScale={1.2}
+                particleScale={0.7}
+                visualScale={visualScale}
+                powerExponent={0.8}
+                lowCutoff={0.25}
+              />
+            )}
+          </group>
         </Canvas>
 
+        {/* Desktop View Overlays */}
         {!isThumbnail && (
-          <>
-            <div className="hidden md:block absolute top-4 left-4 right-4 md:right-auto md:w-auto p-3 md:p-4 bg-black/70 text-white rounded-lg max-w-full md:max-w-xs pointer-events-none select-none">
-              <LegendContent />
+          <div className="hidden md:block">
+            <div className="absolute top-4 left-4 pointer-events-none select-none">
+              <LegendPanel />
             </div>
-
-            <div className="hidden md:block absolute bottom-4 right-4 p-4 bg-black/70 text-white rounded-lg pointer-events-auto">
-              <ControlsContent />
+            <div className="absolute bottom-4 right-4 pointer-events-auto w-64 max-h-[85%] overflow-y-auto">
+              <ControlsPanel />
             </div>
-
-            <div className="absolute bottom-4 left-4 text-gray-400 text-xs pointer-events-none select-none">
-              {t("common.created")}
-            </div>
-          </>
+          </div>
         )}
       </div>
 
+      {/* Mobile/H5 View - Shown below the Canvas */}
       {!isThumbnail && (
         <div className="flex flex-col gap-4 md:hidden">
-          {/* Mobile Controls below chart */}
-          <div className="bg-zinc-900 border rounded-lg p-4">
-            <ControlsContent />
-          </div>
-
-          {/* Mobile Legend below chart */}
-          <div className="bg-zinc-50 dark:bg-zinc-900 border rounded-lg p-4">
-            <LegendContent />
-          </div>
+          <LegendPanel />
+          <ControlsPanel />
         </div>
       )}
     </div>
