@@ -6,6 +6,7 @@ import createNec2Module from "../../public/wasm/nec2c.js";
 export class Nec2Context {
   private wires: any[] = [];
   private sources: any[] = [];
+  private loads: any[] = [];
   private frequency: number = 430.0;
   private groundHeight: number | null = null;
   private material: string = "aluminum";
@@ -25,6 +26,7 @@ export class Nec2Context {
   initialize(num_wires: number) {
     this.wires = [];
     this.sources = [];
+    this.loads = [];
     this.patternCache.clear();
     this.impedanceCache.clear();
     this.currents = [];
@@ -49,6 +51,10 @@ export class Nec2Context {
     this.sources.push({ tag, seg: seg_on_wire, real, imag });
   }
 
+  add_load(type: number, tag: number, seg_on_wire: number, real: number, imag: number) {
+    this.loads.push({ type, tag, seg: seg_on_wire, real, imag });
+  }
+
   async calculate() {
     const Module = await (createNec2Module as any)({
       locateFile: (path: string) => `/wasm/${path}`,
@@ -62,8 +68,15 @@ export class Nec2Context {
     }
     
     nec += `GE ${this.groundHeight !== null && this.groundHeight > 0 ? 1 : 0}\n`;
+    
+    // Default material loads
     if (this.material === "aluminum") nec += `LD 5 0 0 0 3.5E7\n`;
     else if (this.material === "stainless_steel") nec += `LD 5 0 0 0 1.1E6\n`;
+
+    // Custom loads
+    for (const l of this.loads) {
+      nec += `LD ${l.type} ${l.tag} ${l.seg} ${l.seg} ${l.real.toFixed(2)} ${l.imag.toFixed(7)}\n`;
+    }
 
     if (this.groundHeight !== null && this.groundHeight > 0) {
       nec += `GN 0 0 0 0 13 0.005\n`;
