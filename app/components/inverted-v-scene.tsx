@@ -452,9 +452,10 @@ export default function InvertedVAntennaScene({
                   context={context}
                   plane="XY"
                   visualScale={visualScale}
-                  amplitudeScale={1.8}
+                  amplitudeScale={1.5}
                   speed={effectiveSpeed}
                   particleScale={0.6}
+                  powerExponent={1.8}
                 />
               </group>
             )}          </Suspense>
