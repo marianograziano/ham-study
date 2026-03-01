@@ -281,7 +281,7 @@ export default function ElectromagneticPropagationScene({
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x050b14);
-    scene.fog = new THREE.FogExp2(0x050b14, 0.002);
+    scene.fog = new THREE.FogExp2(0x050b14, 0.0005);
 
     const camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 2000);
     const initialRadius = 160;

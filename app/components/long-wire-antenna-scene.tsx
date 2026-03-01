@@ -299,7 +299,7 @@ export default function LongWireAntennaScene({
       <div className={`relative w-full ${isThumbnail ? "h-full" : "h-[450px] md:h-[600px]"} border rounded-lg overflow-hidden bg-black touch-none`}>
         <Canvas ref={canvasRef} gl={{ preserveDrawingBuffer: true }} camera={{ position: [5, 10, 20], fov: 45 }} frameloop={isThumbnail && !isHovered ? "demand" : "always"}>
           <color attach="background" args={["#111111"]} />
-          <fog attach="fog" args={["#111111", 10, 60]} />
+          <fog attach="fog" args={["#111111", 100, 1000]} />
           {!isThumbnail && <ArcballControls target={[0, 0, 0]} makeDefault />}
           <ambientLight intensity={0.5} color={0x404040} />
           <directionalLight position={[10, 10, 10]} intensity={1} color={0xffffff} />

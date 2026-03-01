@@ -488,7 +488,7 @@ export default function HB9CVAntennaScene({
           frameloop={isThumbnail && !isHovered ? "demand" : "always"}
         >
           <color attach="background" args={["#111111"]} />
-          <fog attach="fog" args={["#111111", 10, 50]} />
+          <fog attach="fog" args={["#111111", 100, 1000]} />
           {!isThumbnail && <ArcballControls target={[0, 0, 0]} makeDefault />}
           <ambientLight intensity={0.5} color={0x404040} />
           <directionalLight

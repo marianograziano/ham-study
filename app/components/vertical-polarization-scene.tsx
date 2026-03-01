@@ -254,7 +254,7 @@ export default function VerticalPolarizationScene({
           frameloop={isThumbnail && !isHovered ? "demand" : "always"}
         >
           <color attach="background" args={["#111111"]} />
-          <fog attach="fog" args={["#111111", 10, 50]} />
+          <fog attach="fog" args={["#111111", 100, 1000]} />
 
           {!isThumbnail && <ArcballControls target={[0, 0, 0]} makeDefault />}
 
