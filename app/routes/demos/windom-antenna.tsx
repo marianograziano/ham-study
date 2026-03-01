@@ -198,23 +198,15 @@ export default function WindomAntennaPage() {
               <tbody>
                 <tr className="border-b dark:border-zinc-800">
                   <td className="p-4">{t(`${windom}.tableRow.feedPos`)}</td>
-                  <td className="p-4">
-                    {t(`${windom}.tableCell.dipoleFeed`)}
-                  </td>
+                  <td className="p-4">{t(`${windom}.tableCell.dipoleFeed`)}</td>
                   <td className="p-4 font-semibold text-primary">
                     {t(`${windom}.tableCell.windomFeed`)}
                   </td>
-                  <td className="p-4">
-                    {t(`${windom}.tableCell.efhwFeed`)}
-                  </td>
+                  <td className="p-4">{t(`${windom}.tableCell.efhwFeed`)}</td>
                 </tr>
                 <tr className="border-b dark:border-zinc-800">
-                  <td className="p-4">
-                    {t(`${windom}.tableRow.multiBand`)}
-                  </td>
-                  <td className="p-4">
-                    {t(`${windom}.tableCell.dipoleBand`)}
-                  </td>
+                  <td className="p-4">{t(`${windom}.tableRow.multiBand`)}</td>
+                  <td className="p-4">{t(`${windom}.tableCell.dipoleBand`)}</td>
                   <td className="p-4 font-semibold text-primary">
                     {t(`${windom}.tableCell.windomBand`)}
                   </td>
@@ -248,15 +240,9 @@ export default function WindomAntennaPage() {
                 </tr>
                 <tr>
                   <td className="p-4">{t(`${windom}.tableRow.cons`)}</td>
-                  <td className="p-4">
-                    {t(`${windom}.tableCell.dipoleCons`)}
-                  </td>
-                  <td className="p-4">
-                    {t(`${windom}.tableCell.windomCons`)}
-                  </td>
-                  <td className="p-4">
-                    {t(`${windom}.tableCell.efhwCons`)}
-                  </td>
+                  <td className="p-4">{t(`${windom}.tableCell.dipoleCons`)}</td>
+                  <td className="p-4">{t(`${windom}.tableCell.windomCons`)}</td>
+                  <td className="p-4">{t(`${windom}.tableCell.efhwCons`)}</td>
                 </tr>
               </tbody>
             </table>

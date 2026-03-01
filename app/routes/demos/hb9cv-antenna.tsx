@@ -207,9 +207,7 @@ export default function HB9CVAntennaPage() {
                       className="even:bg-zinc-50 dark:even:bg-zinc-900/50"
                     >
                       <td className="border border-zinc-200 dark:border-zinc-700 p-2 font-semibold">
-                        {t(
-                          `${hb9cv}.comparisonTable.rows.${rowKey}.feature`,
-                        )}
+                        {t(`${hb9cv}.comparisonTable.rows.${rowKey}.feature`)}
                       </td>
                       <td className="border border-zinc-200 dark:border-zinc-700 p-2">
                         <Trans

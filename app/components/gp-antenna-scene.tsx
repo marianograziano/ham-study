@@ -1,9 +1,14 @@
 import { Camera } from "@phosphor-icons/react";
 import { ArcballControls } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
-import { useEffect, useId, useState, useRef, Suspense } from "react";
+import { Suspense, useEffect, useId, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
-import { type BufferGeometry, SphereGeometry, Vector3, DoubleSide } from "three";
+import {
+  type BufferGeometry,
+  DoubleSide,
+  SphereGeometry,
+  Vector3,
+} from "three";
 import { Button } from "~/components/ui/button";
 import { Label } from "~/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
@@ -11,7 +16,13 @@ import { Switch } from "~/components/ui/switch";
 import { Nec2Context } from "~/utils/nec2-c-wasm";
 import { ElectricFieldNec2 } from "./electric-field-nec2";
 
-function GPAntenna({ radialAngle, mastHeight }: { radialAngle: "60" | "135", mastHeight: number }) {
+function GPAntenna({
+  radialAngle,
+  mastHeight,
+}: {
+  radialAngle: "60" | "135";
+  mastHeight: number;
+}) {
   const radials = 4;
   const radialLen = 2; // visual length
   const angleFromVertical =
@@ -56,7 +67,13 @@ function GPAntenna({ radialAngle, mastHeight }: { radialAngle: "60" | "135", mas
   );
 }
 
-function RadiationPattern({ context, mastHeight }: { context: Nec2Context | null, mastHeight: number }) {
+function RadiationPattern({
+  context,
+  mastHeight,
+}: {
+  context: Nec2Context | null;
+  mastHeight: number;
+}) {
   const [geometry, setGeometry] = useState<BufferGeometry | null>(null);
 
   useEffect(() => {
@@ -121,6 +138,12 @@ function RadiationPattern({ context, mastHeight }: { context: Nec2Context | null
   );
 }
 
+const frequency = 300.0;
+const lambda = 299.79 / frequency;
+const radiatorLength = 0.25 * lambda;
+const radialLength = 0.25 * lambda;
+const d_sim = 0.005;
+
 export default function GPAntennaScene({
   isThumbnail = false,
   isHovered = false,
@@ -133,33 +156,37 @@ export default function GPAntennaScene({
   const [showPattern, setShowPattern] = useState(true);
   const [radialAngle, setRadialAngle] = useState<"60" | "135">("135");
   const [groundHeight, setGroundHeight] = useState(0.0);
-  const [speedMode, setSpeedMode] = useState<"slow" | "medium" | "fast">("medium");
+  const [speedMode, setSpeedMode] = useState<"slow" | "medium" | "fast">(
+    "medium",
+  );
 
   const [context, setContext] = useState<Nec2Context | null>(null);
   const [isCalculating, setIsCalculating] = useState(false);
-  const [impedance, setImpedance] = useState<{ re: number; im: number } | null>(null);
+  const [impedance, setImpedance] = useState<{ re: number; im: number } | null>(
+    null,
+  );
   const [maxGain, setMaxGain] = useState<number>(0);
 
   const uniqueId = useId();
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const visualScale = 4;
-  const frequency = 300.0;
-  const lambda = 299.79 / frequency;
-  const radiatorLength = 0.25 * lambda;
-  const radialLength = 0.25 * lambda;
 
   const effectiveHeightLambda = groundHeight > 0 ? groundHeight : 0.3;
   const visualMastHeight = 3;
 
-  const angleRad = radialAngle === "135" ? (135 * Math.PI) / 180 : (60 * Math.PI) / 180;
-  
+  const angleRad =
+    radialAngle === "135" ? (135 * Math.PI) / 180 : (60 * Math.PI) / 180;
+
   // Logic to prevent radials from going below ground
-  const d_sim = 0.005;
-  const minCos = groundHeight > 0 ? (0.01 - effectiveHeightLambda) / (radialLength - d_sim) : -1.0;
-  const effectiveAngleRad = Math.cos(angleRad) < minCos 
-    ? Math.acos(Math.max(-1, Math.min(1, minCos)))
-    : angleRad;
+  const minCos =
+    groundHeight > 0
+      ? (0.01 - effectiveHeightLambda) / (radialLength - d_sim)
+      : -1.0;
+  const effectiveAngleRad =
+    Math.cos(angleRad) < minCos
+      ? Math.acos(Math.max(-1, Math.min(1, minCos)))
+      : angleRad;
 
   useEffect(() => {
     let active = true;
@@ -172,14 +199,27 @@ export default function GPAntennaScene({
         if (groundHeight > 0) ctx.set_ground(groundHeight);
 
         const h_m = groundHeight > 0 ? groundHeight * lambda : 0.3 * lambda;
-        
+
         // 1. Feed wire
         ctx.add_wire(0, 0, h_m - d_sim, 0, 0, h_m + d_sim, 0.002, 1, 1);
         ctx.add_voltage_source(1, 1, 1.0, 0.0);
 
         // 2. Radiator
-        const radSegments = Math.max(1, Math.floor((radiatorLength - d_sim) / 0.02));
-        ctx.add_wire(0, 0, h_m + d_sim, 0, 0, h_m + radiatorLength, 0.002, radSegments, 2);
+        const radSegments = Math.max(
+          1,
+          Math.floor((radiatorLength - d_sim) / 0.02),
+        );
+        ctx.add_wire(
+          0,
+          0,
+          h_m + d_sim,
+          0,
+          0,
+          h_m + radiatorLength,
+          0.002,
+          radSegments,
+          2,
+        );
 
         // 3. Radials
         const numRadials = 4;
@@ -191,8 +231,18 @@ export default function GPAntennaScene({
           const rxy = radLen * Math.sin(effectiveAngleRad);
           const dx = rxy * Math.cos(phi);
           const dy = rxy * Math.sin(phi);
-          
-          ctx.add_wire(0, 0, h_m - d_sim, dx, dy, h_m - d_sim + dz, 0.002, radialSegs, 3 + i);
+
+          ctx.add_wire(
+            0,
+            0,
+            h_m - d_sim,
+            dx,
+            dy,
+            h_m - d_sim + dz,
+            0.002,
+            radialSegs,
+            3 + i,
+          );
         }
 
         await ctx.calculate();
@@ -215,7 +265,7 @@ export default function GPAntennaScene({
       active = false;
       clearTimeout(timer);
     };
-  }, [radialAngle, effectiveAngleRad, groundHeight]);
+  }, [effectiveAngleRad, groundHeight]);
 
   const handleDownload = () => {
     if (canvasRef.current) {
@@ -260,10 +310,20 @@ export default function GPAntennaScene({
       </div>
       <div className="mt-4 pt-3 border-t border-gray-600">
         <div className="flex justify-between items-end mb-1.5">
-          <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">{t("common.simulation.strength")}</span>
-          <span className="text-[9px] text-zinc-500 italic">Normalized (E·r)</span>
+          <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">
+            {t("common.simulation.strength")}
+          </span>
+          <span className="text-[9px] text-zinc-500 italic">
+            Normalized (E·r)
+          </span>
         </div>
-        <div className="h-2 w-full rounded-full" style={{ background: "linear-gradient(to right, #3b82f6, #10b981, #eab308, #ef4444)" }} />
+        <div
+          className="h-2 w-full rounded-full"
+          style={{
+            background:
+              "linear-gradient(to right, #3b82f6, #10b981, #eab308, #ef4444)",
+          }}
+        />
       </div>
     </div>
   );
@@ -272,16 +332,28 @@ export default function GPAntennaScene({
     <div className="p-4 bg-black/70 text-white rounded-lg w-full h-full border border-white/5">
       <div className="flex flex-col space-y-4">
         <div className="bg-zinc-900/50 p-3 rounded border border-white/5">
-          <div className="mb-2 text-[10px] uppercase font-bold tracking-wider text-zinc-500">{t("common.simulation.analysis")}</div>
+          <div className="mb-2 text-[10px] uppercase font-bold tracking-wider text-zinc-500">
+            {t("common.simulation.analysis")}
+          </div>
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <div className="text-[9px] text-zinc-400 mb-0.5">{t("common.simulation.peakGain")}</div>
-              <div className="text-xs font-mono text-green-400">{isCalculating ? "..." : `${maxGain.toFixed(2)} dBi`}</div>
+              <div className="text-[9px] text-zinc-400 mb-0.5">
+                {t("common.simulation.peakGain")}
+              </div>
+              <div className="text-xs font-mono text-green-400">
+                {isCalculating ? "..." : `${maxGain.toFixed(2)} dBi`}
+              </div>
             </div>
             <div>
-              <div className="text-[9px] text-zinc-400 mb-0.5">{t("common.simulation.impedance")}</div>
+              <div className="text-[9px] text-zinc-400 mb-0.5">
+                {t("common.simulation.impedance")}
+              </div>
               <div className="text-xs font-mono text-zinc-300">
-                {isCalculating ? "..." : impedance ? `${impedance.re.toFixed(1)}Ω` : "--"}
+                {isCalculating
+                  ? "..."
+                  : impedance
+                    ? `${impedance.re.toFixed(1)}Ω`
+                    : "--"}
               </div>
             </div>
           </div>
@@ -289,7 +361,9 @@ export default function GPAntennaScene({
 
         <div className="space-y-3">
           <div className="pt-1">
-            <div className="mb-2 text-xs font-medium text-zinc-300">{t("gpAntenna.radialAngle")}</div>
+            <div className="mb-2 text-xs font-medium text-zinc-300">
+              {t("gpAntenna.radialAngle")}
+            </div>
             <RadioGroup
               value={radialAngle}
               onValueChange={(v) => setRadialAngle(v as "60" | "135")}
@@ -298,7 +372,7 @@ export default function GPAntennaScene({
               {[
                 { val: "60", label: t("gpAntenna.angle60") },
                 { val: "135", label: t("gpAntenna.angle135") },
-              ].map(({val, label}) => (
+              ].map(({ val, label }) => (
                 <div key={val} className="flex items-center space-x-2">
                   <RadioGroupItem
                     value={val}
@@ -317,7 +391,9 @@ export default function GPAntennaScene({
           </div>
 
           <div className="pt-2 border-t border-white/5">
-            <div className="mb-2 text-xs font-medium text-zinc-300">{t("common.simulation.groundHeight")}</div>
+            <div className="mb-2 text-xs font-medium text-zinc-300">
+              {t("common.simulation.groundHeight")}
+            </div>
             <div className="flex items-center space-x-3">
               <input
                 type="range"
@@ -325,20 +401,28 @@ export default function GPAntennaScene({
                 max="2"
                 step="0.1"
                 value={groundHeight}
-                onChange={(e) => setGroundHeight(Number.parseFloat(e.target.value))}
+                onChange={(e) =>
+                  setGroundHeight(Number.parseFloat(e.target.value))
+                }
                 className="w-full accent-blue-500 h-1"
               />
               <span className="text-[10px] text-zinc-400 w-8 text-right font-mono">
-                {groundHeight === 0 ? t("common.simulation.freeSpace") : groundHeight.toFixed(1)}
+                {groundHeight === 0
+                  ? t("common.simulation.freeSpace")
+                  : groundHeight.toFixed(1)}
               </span>
             </div>
           </div>
 
           <div className="pt-2 border-t border-white/5">
-            <div className="mb-2 text-xs font-medium text-zinc-300">{t("common.controls.speed")}</div>
+            <div className="mb-2 text-xs font-medium text-zinc-300">
+              {t("common.controls.speed")}
+            </div>
             <RadioGroup
               value={speedMode}
-              onValueChange={(v) => setSpeedMode(v as any)}
+              onValueChange={(v) =>
+                setSpeedMode(v as "slow" | "medium" | "fast")
+              }
               className="flex gap-3"
             >
               {["slow", "medium", "fast"].map((s) => (
@@ -414,7 +498,7 @@ export default function GPAntennaScene({
         <Canvas
           ref={canvasRef}
           gl={{ preserveDrawingBuffer: true }}
-          camera={{ position: [10, 5, 10], fov: 45 }}
+          camera={{ position: [0, 6, 18], fov: 45 }}
           frameloop={isThumbnail && !isHovered ? "demand" : "always"}
         >
           <color attach="background" args={["#111111"]} />
@@ -437,7 +521,12 @@ export default function GPAntennaScene({
 
           <GPAntenna radialAngle={radialAngle} mastHeight={visualMastHeight} />
           <Suspense fallback={null}>
-            {showPattern && <RadiationPattern context={context} mastHeight={visualMastHeight} />}
+            {showPattern && (
+              <RadiationPattern
+                context={context}
+                mastHeight={visualMastHeight}
+              />
+            )}
             {showWaves && context && (
               <group position={[0, visualMastHeight, 0]}>
                 <ElectricFieldNec2

@@ -153,7 +153,7 @@ function RadiationPattern({
       const visualBaseScale = 7.5 + Math.max(0, maxDbi) * 0.7;
 
       for (let i = 0; i < count; i++) {
-        const power = Math.pow(gains[i] / maxLinearG, powerExponent);
+        const power = (gains[i] / maxLinearG) ** powerExponent;
         const rad = (baseOffset + power * (1 - baseOffset)) * visualBaseScale;
         vertex.fromBufferAttribute(posAttribute, i);
         vertex.normalize();
@@ -488,7 +488,9 @@ export default function QuadAntennaScene({
             </div>
             <RadioGroup
               value={speedMode}
-              onValueChange={(v) => setSpeedMode(v as "slow" | "medium" | "fast")}
+              onValueChange={(v) =>
+                setSpeedMode(v as "slow" | "medium" | "fast")
+              }
               className="flex gap-3"
             >
               {["slow", "medium", "fast"].map((s) => (

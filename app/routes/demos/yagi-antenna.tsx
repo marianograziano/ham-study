@@ -181,7 +181,6 @@ export default function YagiAntennaPage() {
                         <Trans
                           ns="demos"
                           i18nKey={
-                            // biome-ignore lint/suspicious/noExplicitAny: Dynamic key
                             `${yagi}.theorySummaryTable.rows.${key}.type` as any
                           }
                           components={{
@@ -194,7 +193,6 @@ export default function YagiAntennaPage() {
                         <Trans
                           ns="demos"
                           i18nKey={
-                            // biome-ignore lint/suspicious/noExplicitAny: Dynamic key
                             `${yagi}.theorySummaryTable.rows.${key}.length` as any
                           }
                           components={{ M: <InlineMath /> }}
@@ -204,7 +202,6 @@ export default function YagiAntennaPage() {
                         <Trans
                           ns="demos"
                           i18nKey={
-                            // biome-ignore lint/suspicious/noExplicitAny: Dynamic key
                             `${yagi}.theorySummaryTable.rows.${key}.reactance` as any
                           }
                           components={{ M: <InlineMath /> }}
@@ -214,7 +211,6 @@ export default function YagiAntennaPage() {
                         <Trans
                           ns="demos"
                           i18nKey={
-                            // biome-ignore lint/suspicious/noExplicitAny: Dynamic key
                             `${yagi}.theorySummaryTable.rows.${key}.phase` as any
                           }
                           components={{ M: <InlineMath /> }}
@@ -224,7 +220,6 @@ export default function YagiAntennaPage() {
                         <Trans
                           ns="demos"
                           i18nKey={
-                            // biome-ignore lint/suspicious/noExplicitAny: Dynamic key
                             `${yagi}.theorySummaryTable.rows.${key}.function` as any
                           }
                           components={{ M: <InlineMath /> }}

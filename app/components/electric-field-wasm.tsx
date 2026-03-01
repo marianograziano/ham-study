@@ -33,9 +33,7 @@ export function ElectricFieldWasm(props: ElectricFieldWasmProps) {
     isInvertedV = false,
     rotation = [0, 0, 0],
     // axialRatio is accepted but currently not used by WASM - reserved for future enhancement
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    axialRatio,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    axialRatio: _axialRatio,
     groundHeight = 0.0,
   } = props;
 

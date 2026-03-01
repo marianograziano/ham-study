@@ -5,11 +5,11 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import {
   type BufferGeometry,
-  BufferGeometry as ThreeBufferGeometry,
   Line,
   LineBasicMaterial,
   LineCurve3,
   SphereGeometry,
+  BufferGeometry as ThreeBufferGeometry,
   Vector3,
 } from "three";
 import { Button } from "~/components/ui/button";
@@ -170,8 +170,6 @@ export default function EndFedAntennaScene({
 
   const uniqueId = useId();
   const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  const visualScale = 8;
 
   useEffect(() => {
     let active = true;
@@ -355,7 +353,9 @@ export default function EndFedAntennaScene({
             </div>
             <RadioGroup
               value={speedMode}
-              onValueChange={(v) => setSpeedMode(v as any)}
+              onValueChange={(v) =>
+                setSpeedMode(v as "slow" | "medium" | "fast")
+              }
               className="flex gap-3"
             >
               {["slow", "medium", "fast"].map((s) => (
@@ -416,8 +416,7 @@ export default function EndFedAntennaScene({
           className="w-full h-8 text-[11px] bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border-none mt-2"
           onClick={handleDownload}
         >
-          <Camera className="mr-2 size-3.5" />{" "}
-          {t("common.controls.download")}
+          <Camera className="mr-2 size-3.5" /> {t("common.controls.download")}
         </Button>
       </div>
     </div>

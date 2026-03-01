@@ -1,9 +1,14 @@
 import { Camera } from "@phosphor-icons/react";
 import { ArcballControls } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
-import { useEffect, useId, useMemo, useRef, useState, Suspense } from "react";
+import { Suspense, useEffect, useId, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
-import { type BufferGeometry, SphereGeometry, Vector3, DoubleSide } from "three";
+import {
+  type BufferGeometry,
+  DoubleSide,
+  SphereGeometry,
+  Vector3,
+} from "three";
 import { Button } from "~/components/ui/button";
 import { Label } from "~/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
@@ -11,13 +16,22 @@ import { Switch } from "~/components/ui/switch";
 import { Nec2Context } from "~/utils/nec2-c-wasm";
 import { ElectricFieldNec2 } from "./electric-field-nec2";
 
-const mastHeight = 3; // Mast height base
+const frequency = 300.0;
+const lambda = 299.79 / frequency;
 
-function PositiveVAntenna({ length, angle, mastHeight }: { length: number, angle: number, mastHeight: number }) {
+function PositiveVAntenna({
+  length,
+  angle,
+  mastHeight,
+}: {
+  length: number;
+  angle: number;
+  mastHeight: number;
+}) {
   const armLength = length / 2;
   // 计算末端坐标 (左右伸展 X，向上翘 Y)
   const xTip = armLength * Math.sin(angle);
-  const yTip = armLength * Math.cos(angle); 
+  const yTip = armLength * Math.cos(angle);
 
   return (
     <group position={[0, mastHeight, 0]}>
@@ -34,19 +48,13 @@ function PositiveVAntenna({ length, angle, mastHeight }: { length: number, angle
       </mesh>
 
       {/* Left Leg */}
-      <mesh
-        position={[-xTip / 2, yTip / 2, 0]}
-        rotation={[0, 0, angle]}
-      >
+      <mesh position={[-xTip / 2, yTip / 2, 0]} rotation={[0, 0, angle]}>
         <cylinderGeometry args={[0.02, 0.02, armLength, 16]} />
         <meshStandardMaterial color="#ef4444" />
       </mesh>
 
       {/* Right Leg */}
-      <mesh
-        position={[xTip / 2, yTip / 2, 0]}
-        rotation={[0, 0, -angle]}
-      >
+      <mesh position={[xTip / 2, yTip / 2, 0]} rotation={[0, 0, -angle]}>
         <cylinderGeometry args={[0.02, 0.02, armLength, 16]} />
         <meshStandardMaterial color="#ef4444" />
       </mesh>
@@ -54,7 +62,13 @@ function PositiveVAntenna({ length, angle, mastHeight }: { length: number, angle
   );
 }
 
-function RadiationPattern({ context, mastHeight }: { context: Nec2Context | null, mastHeight: number }) {
+function RadiationPattern({
+  context,
+  mastHeight,
+}: {
+  context: Nec2Context | null;
+  mastHeight: number;
+}) {
   const [geometry, setGeometry] = useState<BufferGeometry | null>(null);
 
   useEffect(() => {
@@ -132,12 +146,16 @@ export default function PositiveVAntennaScene({
   const [showPattern, setShowPattern] = useState(true);
   const [lengthFactor, setLengthFactor] = useState(0.5);
   const [groundHeight, setGroundHeight] = useState(0.0);
-  const [speedMode, setSpeedMode] = useState<"slow" | "medium" | "fast">("medium");
+  const [speedMode, setSpeedMode] = useState<"slow" | "medium" | "fast">(
+    "medium",
+  );
   const [armAngleDeg, setArmAngleDeg] = useState(45);
-  
+
   const [context, setContext] = useState<Nec2Context | null>(null);
   const [isCalculating, setIsCalculating] = useState(false);
-  const [impedance, setImpedance] = useState<{ re: number; im: number } | null>(null);
+  const [impedance, setImpedance] = useState<{ re: number; im: number } | null>(
+    null,
+  );
   const [maxGain, setMaxGain] = useState<number>(0);
 
   const uniqueId = useId();
@@ -145,8 +163,6 @@ export default function PositiveVAntennaScene({
 
   const visualScale = 4;
   const armAngleRad = (armAngleDeg * Math.PI) / 180;
-  const frequency = 300.0;
-  const lambda = 299.79 / frequency;
 
   // Use groundHeight if > 0, otherwise default to 0.3 lambda for visualization
   const effectiveHeightLambda = groundHeight > 0 ? groundHeight : 0.3;
@@ -160,11 +176,15 @@ export default function PositiveVAntennaScene({
   // cos(angle) >= (0.01*lambda - h_m) / armLength
   const simArmLength = (lengthFactor * lambda) / 2;
   const d_sim = 0.005;
-  const minCos = groundHeight > 0 ? (0.01 - effectiveHeightLambda) / (simArmLength - d_sim) : -1.0;
-  
-  const effectiveAngleRad = Math.cos(armAngleRad) < minCos 
-    ? Math.acos(Math.max(-1, Math.min(1, minCos)))
-    : armAngleRad;
+  const minCos =
+    groundHeight > 0
+      ? (0.01 - effectiveHeightLambda) / (simArmLength - d_sim)
+      : -1.0;
+
+  const effectiveAngleRad =
+    Math.cos(armAngleRad) < minCos
+      ? Math.acos(Math.max(-1, Math.min(1, minCos)))
+      : armAngleRad;
 
   useEffect(() => {
     let active = true;
@@ -177,18 +197,28 @@ export default function PositiveVAntennaScene({
         if (groundHeight > 0) ctx.set_ground(groundHeight);
 
         const armLength = (lengthFactor * lambda) / 2;
-        const d = 0.005; 
+        const d = 0.005;
         let armSegments = Math.floor((armLength - d) / 0.02);
         if (armSegments < 1) armSegments = 1;
 
-        const h_m = groundHeight > 0 ? groundHeight * lambda : 0.3 * lambda; 
-        
-        const xTip = (armLength - d) * Math.sin(effectiveAngleRad); 
+        const h_m = groundHeight > 0 ? groundHeight * lambda : 0.3 * lambda;
+
+        const xTip = (armLength - d) * Math.sin(effectiveAngleRad);
         const yTip = (armLength - d) * Math.cos(effectiveAngleRad);
 
         ctx.add_wire(-d, 0, h_m, d, 0, h_m, 0.001, 1, 1);
         ctx.add_wire(d, 0, h_m, xTip + d, 0, h_m + yTip, 0.001, armSegments, 2);
-        ctx.add_wire(-d, 0, h_m, -xTip - d, 0, h_m + yTip, 0.001, armSegments, 3);
+        ctx.add_wire(
+          -d,
+          0,
+          h_m,
+          -xTip - d,
+          0,
+          h_m + yTip,
+          0.001,
+          armSegments,
+          3,
+        );
 
         ctx.add_voltage_source(1, 1, 1.0, 0.0);
         await ctx.calculate();
@@ -256,10 +286,20 @@ export default function PositiveVAntennaScene({
       </div>
       <div className="mt-4 pt-3 border-t border-gray-600">
         <div className="flex justify-between items-end mb-1.5">
-          <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">{t("common.simulation.strength")}</span>
-          <span className="text-[9px] text-zinc-500 italic">Normalized (E·r)</span>
+          <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">
+            {t("common.simulation.strength")}
+          </span>
+          <span className="text-[9px] text-zinc-500 italic">
+            Normalized (E·r)
+          </span>
         </div>
-        <div className="h-2 w-full rounded-full" style={{ background: "linear-gradient(to right, #3b82f6, #10b981, #eab308, #ef4444)" }} />
+        <div
+          className="h-2 w-full rounded-full"
+          style={{
+            background:
+              "linear-gradient(to right, #3b82f6, #10b981, #eab308, #ef4444)",
+          }}
+        />
       </div>
     </div>
   );
@@ -268,16 +308,28 @@ export default function PositiveVAntennaScene({
     <div className="p-4 bg-black/70 text-white rounded-lg w-full h-full border border-white/5">
       <div className="flex flex-col space-y-4">
         <div className="bg-zinc-900/50 p-3 rounded border border-white/5">
-          <div className="mb-2 text-[10px] uppercase font-bold tracking-wider text-zinc-500">{t("common.simulation.analysis")}</div>
+          <div className="mb-2 text-[10px] uppercase font-bold tracking-wider text-zinc-500">
+            {t("common.simulation.analysis")}
+          </div>
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <div className="text-[9px] text-zinc-400 mb-0.5">{t("common.simulation.peakGain")}</div>
-              <div className="text-xs font-mono text-green-400">{isCalculating ? "..." : `${maxGain.toFixed(2)} dBi`}</div>
+              <div className="text-[9px] text-zinc-400 mb-0.5">
+                {t("common.simulation.peakGain")}
+              </div>
+              <div className="text-xs font-mono text-green-400">
+                {isCalculating ? "..." : `${maxGain.toFixed(2)} dBi`}
+              </div>
             </div>
             <div>
-              <div className="text-[9px] text-zinc-400 mb-0.5">{t("common.simulation.impedance")}</div>
+              <div className="text-[9px] text-zinc-400 mb-0.5">
+                {t("common.simulation.impedance")}
+              </div>
               <div className="text-xs font-mono text-zinc-300">
-                {isCalculating ? "..." : impedance ? `${impedance.re.toFixed(1)}Ω` : "--"}
+                {isCalculating
+                  ? "..."
+                  : impedance
+                    ? `${impedance.re.toFixed(1)}Ω`
+                    : "--"}
               </div>
             </div>
           </div>
@@ -285,7 +337,9 @@ export default function PositiveVAntennaScene({
 
         <div className="space-y-3">
           <div className="pt-1">
-            <div className="mb-2 text-xs font-medium text-zinc-300">{t("common.controls.length")}</div>
+            <div className="mb-2 text-xs font-medium text-zinc-300">
+              {t("common.controls.length")}
+            </div>
             <RadioGroup
               value={lengthFactor.toString()}
               onValueChange={(v) => setLengthFactor(Number.parseFloat(v))}
@@ -310,7 +364,9 @@ export default function PositiveVAntennaScene({
           </div>
 
           <div className="pt-2 border-t border-white/5">
-            <div className="mb-2 text-xs font-medium text-zinc-300">V-Angle: {armAngleDeg}°</div>
+            <div className="mb-2 text-xs font-medium text-zinc-300">
+              V-Angle: {armAngleDeg}°
+            </div>
             <div className="flex items-center space-x-3">
               <input
                 type="range"
@@ -318,14 +374,18 @@ export default function PositiveVAntennaScene({
                 max="150"
                 step="5"
                 value={armAngleDeg}
-                onChange={(e) => setArmAngleDeg(Number.parseFloat(e.target.value))}
+                onChange={(e) =>
+                  setArmAngleDeg(Number.parseFloat(e.target.value))
+                }
                 className="w-full accent-blue-500 h-1"
               />
             </div>
           </div>
 
           <div className="pt-2 border-t border-white/5">
-            <div className="mb-2 text-xs font-medium text-zinc-300">{t("common.simulation.groundHeight")}</div>
+            <div className="mb-2 text-xs font-medium text-zinc-300">
+              {t("common.simulation.groundHeight")}
+            </div>
             <div className="flex items-center space-x-3">
               <input
                 type="range"
@@ -333,20 +393,28 @@ export default function PositiveVAntennaScene({
                 max="2"
                 step="0.1"
                 value={groundHeight}
-                onChange={(e) => setGroundHeight(Number.parseFloat(e.target.value))}
+                onChange={(e) =>
+                  setGroundHeight(Number.parseFloat(e.target.value))
+                }
                 className="w-full accent-blue-500 h-1"
               />
               <span className="text-[10px] text-zinc-400 w-8 text-right font-mono">
-                {groundHeight === 0 ? t("common.simulation.freeSpace") : groundHeight.toFixed(1)}
+                {groundHeight === 0
+                  ? t("common.simulation.freeSpace")
+                  : groundHeight.toFixed(1)}
               </span>
             </div>
           </div>
 
           <div className="pt-2 border-t border-white/5">
-            <div className="mb-2 text-xs font-medium text-zinc-300">{t("common.controls.speed")}</div>
+            <div className="mb-2 text-xs font-medium text-zinc-300">
+              {t("common.controls.speed")}
+            </div>
             <RadioGroup
               value={speedMode}
-              onValueChange={(v) => setSpeedMode(v as any)}
+              onValueChange={(v) =>
+                setSpeedMode(v as "slow" | "medium" | "fast")
+              }
               className="flex gap-3"
             >
               {["slow", "medium", "fast"].map((s) => (
@@ -360,7 +428,7 @@ export default function PositiveVAntennaScene({
                     htmlFor={`${uniqueId}r-${s}`}
                     className="text-[11px] cursor-pointer text-zinc-400 peer-data-[state=checked]:text-white"
                   >
-                    {t(`common.controls.${s}`)}
+                    {t(`common.controls.${s}` as any)}
                   </Label>
                 </div>
               ))}
@@ -422,7 +490,7 @@ export default function PositiveVAntennaScene({
         <Canvas
           ref={canvasRef}
           gl={{ preserveDrawingBuffer: true }}
-          camera={{ position: [8, 5, 8], fov: 45 }}
+          camera={{ position: [3, 6, 18], fov: 45 }}
           frameloop={isThumbnail && !isHovered ? "demand" : "always"}
         >
           <color attach="background" args={["#111111"]} />
@@ -443,9 +511,18 @@ export default function PositiveVAntennaScene({
             position={[0, 0, 0]}
           />
 
-          <PositiveVAntenna length={physicalLength} angle={effectiveAngleRad} mastHeight={visualMastHeight} />
+          <PositiveVAntenna
+            length={physicalLength}
+            angle={effectiveAngleRad}
+            mastHeight={visualMastHeight}
+          />
           <Suspense fallback={null}>
-            {showPattern && <RadiationPattern context={context} mastHeight={visualMastHeight} />}
+            {showPattern && (
+              <RadiationPattern
+                context={context}
+                mastHeight={visualMastHeight}
+              />
+            )}
             {showWaves && context && (
               <group position={[0, visualMastHeight, 0]}>
                 <ElectricFieldNec2
@@ -458,7 +535,8 @@ export default function PositiveVAntennaScene({
                   powerExponent={1.8}
                 />
               </group>
-            )}          </Suspense>
+            )}{" "}
+          </Suspense>
         </Canvas>
 
         {!isThumbnail && (

@@ -1,6 +1,5 @@
 import { type ComponentType, type LazyExoticComponent, lazy } from "react";
 
-// biome-ignore lint/suspicious/noExplicitAny: React requires ComponentType<any> for lazy loading compatibility
 type AnyComponent = ComponentType<any>;
 
 /**

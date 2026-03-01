@@ -1,6 +1,6 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { type BufferGeometry, SphereGeometry, Vector3 } from "three";
-import { Nec2Context } from "~/utils/nec2-c-wasm";
+import type { Nec2Context } from "~/utils/nec2-c-wasm";
 
 interface RadiationPatternProps {
   context: Nec2Context | null;
@@ -9,11 +9,11 @@ interface RadiationPatternProps {
   opacity?: number;
 }
 
-export default function RadiationPattern({ 
-  context, 
-  scale = 10, 
+export default function RadiationPattern({
+  context,
+  scale = 10,
   color = "#22c55e",
-  opacity = 0.2
+  opacity = 0.2,
 }: RadiationPatternProps) {
   const [geometry, setGeometry] = useState<BufferGeometry | null>(null);
 
@@ -34,15 +34,15 @@ export default function RadiationPattern({
       for (let i = 0; i < count; i++) {
         vertex.fromBufferAttribute(posAttribute, i);
         vertex.normalize();
-        
+
         // Theta: 0 is Up (+Y in Three.js, +Z in NEC)
-        let theta = Math.acos(Math.max(-1, Math.min(1, vertex.y))); 
-        
+        const theta = Math.acos(Math.max(-1, Math.min(1, vertex.y)));
+
         // Phi: 0 is NEC +X (Three.js +X)
         // atan2(Three Z, Three X) -> Three Z is NEC +Y, Three X is NEC +X
-        let phi = Math.atan2(vertex.z, vertex.x); 
+        let phi = Math.atan2(vertex.z, vertex.x);
         if (phi < 0) phi += 2 * Math.PI;
-        
+
         thetas[i] = theta;
         phis[i] = phi;
       }
@@ -79,7 +79,12 @@ export default function RadiationPattern({
   return (
     <group>
       <mesh geometry={geometry}>
-        <meshBasicMaterial color={color} wireframe={true} transparent={true} opacity={opacity} />
+        <meshBasicMaterial
+          color={color}
+          wireframe={true}
+          transparent={true}
+          opacity={opacity}
+        />
       </mesh>
     </group>
   );

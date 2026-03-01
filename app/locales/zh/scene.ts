@@ -30,7 +30,7 @@ export default {
       groundHeight: "离地高度 (λ)",
       freeSpace: "自由空间",
       strength: "电场强度 (强 → 弱)",
-    }
+    },
   },
   circularPolarization: {
     title: "圆极化 (Circular Polarization)",

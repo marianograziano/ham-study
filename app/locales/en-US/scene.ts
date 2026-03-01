@@ -30,7 +30,7 @@ export default {
       groundHeight: "Ground Height (λ)",
       freeSpace: "Free Space",
       strength: "Field Strength (E·r)",
-    }
+    },
   },
   circularPolarization: {
     title: "Circular Polarization",

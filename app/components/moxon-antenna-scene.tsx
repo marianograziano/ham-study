@@ -26,7 +26,7 @@ function MoxonAntenna({ scale = 10 }: { scale?: number }) {
         <cylinderGeometry args={[0.05, 0.05, E, 16]} />
         <meshStandardMaterial color="#666" />
       </mesh>
-      
+
       {/* Driven Element - Straight */}
       <mesh position={[0, 0, 0]} rotation={[Math.PI / 2, 0, 0]}>
         <cylinderGeometry args={[radiusDriven, radiusDriven, A, 16]} />
@@ -37,7 +37,7 @@ function MoxonAntenna({ scale = 10 }: { scale?: number }) {
           <meshBasicMaterial color="#fff" />
         </mesh>
       </mesh>
-      
+
       {/* Driven Element - Tails */}
       <mesh position={[-B / 2, 0, A / 2]} rotation={[0, 0, Math.PI / 2]}>
         <cylinderGeometry args={[radiusDriven, radiusDriven, B, 16]} />
@@ -53,7 +53,7 @@ function MoxonAntenna({ scale = 10 }: { scale?: number }) {
         <cylinderGeometry args={[radiusReflector, radiusReflector, A, 16]} />
         <meshStandardMaterial color="#3b82f6" />
       </mesh>
-      
+
       {/* Reflector - Tails */}
       <mesh position={[-E + D / 2, 0, A / 2]} rotation={[0, 0, Math.PI / 2]}>
         <cylinderGeometry args={[radiusReflector, radiusReflector, D, 16]} />
@@ -92,8 +92,8 @@ function RadiationPattern({ context }: { context: Nec2Context | null }) {
       for (let i = 0; i < count; i++) {
         vertex.fromBufferAttribute(posAttribute, i);
         vertex.normalize();
-        let theta = Math.acos(Math.max(-1, Math.min(1, vertex.y))); 
-        let phi = Math.atan2(vertex.z, vertex.x); 
+        const theta = Math.acos(Math.max(-1, Math.min(1, vertex.y)));
+        let phi = Math.atan2(vertex.z, vertex.x);
         if (phi < 0) phi += 2 * Math.PI;
         thetas[i] = theta;
         phis[i] = phi;
@@ -129,7 +129,12 @@ function RadiationPattern({ context }: { context: Nec2Context | null }) {
   return (
     <group>
       <mesh geometry={geometry}>
-        <meshBasicMaterial color="#22c55e" wireframe={true} transparent={true} opacity={0.2} />
+        <meshBasicMaterial
+          color="#22c55e"
+          wireframe={true}
+          transparent={true}
+          opacity={0.2}
+        />
       </mesh>
     </group>
   );
@@ -147,16 +152,20 @@ export default function MoxonAntennaScene({
   const [material, setMaterial] = useState<string>("aluminum");
   const [showWaves, setShowWaves] = useState(true);
   const [showPattern, setShowPattern] = useState(true);
-  const [speedMode, setSpeedMode] = useState<"slow" | "medium" | "fast">("medium");
+  const [speedMode, setSpeedMode] = useState<"slow" | "medium" | "fast">(
+    "medium",
+  );
   const [context, setContext] = useState<Nec2Context | null>(null);
   const [isCalculating, setIsCalculating] = useState(false);
-  const [impedance, setImpedance] = useState<{ re: number; im: number } | null>(null);
+  const [impedance, setImpedance] = useState<{ re: number; im: number } | null>(
+    null,
+  );
   const [maxGain, setMaxGain] = useState<number>(0);
 
   const uniqueId = useId();
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  const visualScale = 10; 
+  const visualScale = 10;
 
   useEffect(() => {
     let active = true;
@@ -178,12 +187,12 @@ export default function MoxonAntennaScene({
         const D = 0.0627;
         const E = 0.1686;
 
-        ctx.add_wire(0, -A/2, h_m, 0, A/2, h_m, 0.003, 11, 1);
-        ctx.add_wire(0, A/2, h_m, -B, A/2, h_m, 0.003, 5, 2);
-        ctx.add_wire(0, -A/2, h_m, -B, -A/2, h_m, 0.003, 5, 3);
-        ctx.add_wire(-E, -A/2, h_m, -E, A/2, h_m, 0.003, 11, 4);
-        ctx.add_wire(-E, A/2, h_m, -E+D, A/2, h_m, 0.003, 5, 5);
-        ctx.add_wire(-E, -A/2, h_m, -E+D, -A/2, h_m, 0.003, 5, 6);
+        ctx.add_wire(0, -A / 2, h_m, 0, A / 2, h_m, 0.003, 11, 1);
+        ctx.add_wire(0, A / 2, h_m, -B, A / 2, h_m, 0.003, 5, 2);
+        ctx.add_wire(0, -A / 2, h_m, -B, -A / 2, h_m, 0.003, 5, 3);
+        ctx.add_wire(-E, -A / 2, h_m, -E, A / 2, h_m, 0.003, 11, 4);
+        ctx.add_wire(-E, A / 2, h_m, -E + D, A / 2, h_m, 0.003, 5, 5);
+        ctx.add_wire(-E, -A / 2, h_m, -E + D, -A / 2, h_m, 0.003, 5, 6);
 
         ctx.add_voltage_source(1, 6, 1.0, 0.0);
 
@@ -218,14 +227,21 @@ export default function MoxonAntennaScene({
     }
   };
 
-  const effectiveSpeed = isThumbnail && !isHovered ? 0 : { slow: 0.3, medium: 0.6, fast: 1.0 }[speedMode];
+  const effectiveSpeed =
+    isThumbnail && !isHovered
+      ? 0
+      : { slow: 0.3, medium: 0.6, fast: 1.0 }[speedMode];
   const gridY = -groundHeight * visualScale;
 
   const LegendPanel = () => (
     <div className="p-4 bg-black/70 text-white rounded-lg md:max-w-xs h-full border border-white/5">
       <h2 className="text-lg font-bold mb-2">{t("moxonAntenna.title")}</h2>
       <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
-        <Trans ns="scene" i18nKey="moxonAntenna.desc" components={{ br: <br /> }} />
+        <Trans
+          ns="scene"
+          i18nKey="moxonAntenna.desc"
+          components={{ br: <br /> }}
+        />
       </p>
       <div className="space-y-1.5 text-xs border-t border-gray-600 pt-2">
         <div className="flex items-center gap-2">
@@ -243,8 +259,12 @@ export default function MoxonAntennaScene({
       </div>
       <div className="mt-4 pt-3 border-t border-gray-600">
         <div className="flex justify-between items-end mb-1.5">
-          <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">{t("common.simulation.strength")}</span>
-          <span className="text-[9px] text-zinc-500 italic">Normalized (E·r)</span>
+          <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">
+            {t("common.simulation.strength")}
+          </span>
+          <span className="text-[9px] text-zinc-500 italic">
+            Normalized (E·r)
+          </span>
         </div>
         <div className="h-2 w-full rounded-full bg-gradient-to-r from-blue-600 via-green-500 via-yellow-400 to-red-600" />
       </div>
@@ -255,49 +275,118 @@ export default function MoxonAntennaScene({
     <div className="p-4 bg-black/70 text-white rounded-lg w-full h-full border border-white/5">
       <div className="flex flex-col space-y-4">
         <div className="bg-zinc-900/50 p-3 rounded border border-white/5">
-          <div className="mb-2 text-[10px] uppercase font-bold tracking-wider text-zinc-500">{t("common.simulation.analysis")}</div>
+          <div className="mb-2 text-[10px] uppercase font-bold tracking-wider text-zinc-500">
+            {t("common.simulation.analysis")}
+          </div>
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <div className="text-[9px] text-zinc-400 mb-0.5">{t("common.simulation.peakGain")}</div>
-              <div className="text-xs font-mono text-green-400">{isCalculating ? "..." : `${maxGain.toFixed(2)} dBi`}</div>
+              <div className="text-[9px] text-zinc-400 mb-0.5">
+                {t("common.simulation.peakGain")}
+              </div>
+              <div className="text-xs font-mono text-green-400">
+                {isCalculating ? "..." : `${maxGain.toFixed(2)} dBi`}
+              </div>
             </div>
             <div>
-              <div className="text-[9px] text-zinc-400 mb-0.5">{t("common.simulation.impedance")}</div>
-              <div className="text-xs font-mono text-zinc-300">{isCalculating ? "..." : impedance ? `${impedance.re.toFixed(1)}Ω` : "--"}</div>
+              <div className="text-[9px] text-zinc-400 mb-0.5">
+                {t("common.simulation.impedance")}
+              </div>
+              <div className="text-xs font-mono text-zinc-300">
+                {isCalculating
+                  ? "..."
+                  : impedance
+                    ? `${impedance.re.toFixed(1)}Ω`
+                    : "--"}
+              </div>
             </div>
           </div>
         </div>
 
         <div className="space-y-3">
           <div className="pt-1">
-            <div className="mb-2 text-xs font-medium text-zinc-300">{t("common.simulation.material")}</div>
-            <RadioGroup value={material} onValueChange={setMaterial} className="flex flex-row md:flex-col gap-3 md:gap-1.5">
+            <div className="mb-2 text-xs font-medium text-zinc-300">
+              {t("common.simulation.material")}
+            </div>
+            <RadioGroup
+              value={material}
+              onValueChange={setMaterial}
+              className="flex flex-row md:flex-col gap-3 md:gap-1.5"
+            >
               <div className="flex items-center space-x-2">
-                <RadioGroupItem value="aluminum" id={`${uniqueId}m-al`} className="peer size-3 border-zinc-500 data-[state=checked]:border-white data-[state=checked]:text-white" />
-                <Label htmlFor={`${uniqueId}m-al`} className="text-[11px] cursor-pointer text-zinc-400 peer-data-[state=checked]:text-white">{t("common.simulation.aluminum")}</Label>
+                <RadioGroupItem
+                  value="aluminum"
+                  id={`${uniqueId}m-al`}
+                  className="peer size-3 border-zinc-500 data-[state=checked]:border-white data-[state=checked]:text-white"
+                />
+                <Label
+                  htmlFor={`${uniqueId}m-al`}
+                  className="text-[11px] cursor-pointer text-zinc-400 peer-data-[state=checked]:text-white"
+                >
+                  {t("common.simulation.aluminum")}
+                </Label>
               </div>
               <div className="flex items-center space-x-2">
-                <RadioGroupItem value="stainless_steel" id={`${uniqueId}m-ss`} className="peer size-3 border-zinc-500 data-[state=checked]:border-white data-[state=checked]:text-white" />
-                <Label htmlFor={`${uniqueId}m-ss`} className="text-[11px] cursor-pointer text-zinc-400 peer-data-[state=checked]:text-white">{t("common.simulation.stainlessSteel")}</Label>
+                <RadioGroupItem
+                  value="stainless_steel"
+                  id={`${uniqueId}m-ss`}
+                  className="peer size-3 border-zinc-500 data-[state=checked]:border-white data-[state=checked]:text-white"
+                />
+                <Label
+                  htmlFor={`${uniqueId}m-ss`}
+                  className="text-[11px] cursor-pointer text-zinc-400 peer-data-[state=checked]:text-white"
+                >
+                  {t("common.simulation.stainlessSteel")}
+                </Label>
               </div>
             </RadioGroup>
           </div>
 
           <div className="pt-2 border-t border-white/5">
-            <div className="mb-2 text-xs font-medium text-zinc-300">{t("common.simulation.groundHeight")}</div>
+            <div className="mb-2 text-xs font-medium text-zinc-300">
+              {t("common.simulation.groundHeight")}
+            </div>
             <div className="flex items-center space-x-3">
-              <input type="range" min="0" max="2" step="0.1" value={groundHeight} onChange={(e) => setGroundHeight(parseFloat(e.target.value))} className="w-full accent-blue-500 h-1" />
-              <span className="text-[10px] text-zinc-400 w-8 text-right font-mono">{groundHeight === 0 ? t("common.simulation.freeSpace") : groundHeight.toFixed(1)}</span>
+              <input
+                type="range"
+                min="0"
+                max="2"
+                step="0.1"
+                value={groundHeight}
+                onChange={(e) => setGroundHeight(parseFloat(e.target.value))}
+                className="w-full accent-blue-500 h-1"
+              />
+              <span className="text-[10px] text-zinc-400 w-8 text-right font-mono">
+                {groundHeight === 0
+                  ? t("common.simulation.freeSpace")
+                  : groundHeight.toFixed(1)}
+              </span>
             </div>
           </div>
 
           <div className="pt-2 border-t border-white/5">
-            <div className="mb-2 text-xs font-medium text-zinc-300">{t("common.controls.speed")}</div>
-            <RadioGroup value={speedMode} onValueChange={(v) => setSpeedMode(v as any)} className="flex gap-3">
+            <div className="mb-2 text-xs font-medium text-zinc-300">
+              {t("common.controls.speed")}
+            </div>
+            <RadioGroup
+              value={speedMode}
+              onValueChange={(v) =>
+                setSpeedMode(v as "slow" | "medium" | "fast")
+              }
+              className="flex gap-3"
+            >
               {["slow", "medium", "fast"].map((s) => (
                 <div key={s} className="flex items-center space-x-1.5">
-                  <RadioGroupItem value={s} id={`${uniqueId}r-${s}`} className="peer size-3 border-zinc-500 data-[state=checked]:border-white data-[state=checked]:text-white" />
-                  <Label htmlFor={`${uniqueId}r-${s}`} className="text-[11px] cursor-pointer text-zinc-400 peer-data-[state=checked]:text-white">{t(`common.controls.${s}` as never)}</Label>
+                  <RadioGroupItem
+                    value={s}
+                    id={`${uniqueId}r-${s}`}
+                    className="peer size-3 border-zinc-500 data-[state=checked]:border-white data-[state=checked]:text-white"
+                  />
+                  <Label
+                    htmlFor={`${uniqueId}r-${s}`}
+                    className="text-[11px] cursor-pointer text-zinc-400 peer-data-[state=checked]:text-white"
+                  >
+                    {t(`common.controls.${s}` as any)}
+                  </Label>
                 </div>
               ))}
             </RadioGroup>
@@ -306,28 +395,43 @@ export default function MoxonAntennaScene({
           <div className="pt-2 border-t border-white/5">
             <div className="flex flex-col space-y-2">
               <div className="flex items-center justify-between group">
-                <Label htmlFor={`${uniqueId}wave-mode`} className="text-[11px] text-zinc-400 cursor-pointer peer-data-[state=checked]:text-white order-first">{t("common.controls.showWaves")}</Label>
-                <Switch 
-                  id={`${uniqueId}wave-mode`} 
-                  checked={showWaves} 
-                  onCheckedChange={setShowWaves} 
-                  className="peer scale-75 data-[state=unchecked]:bg-zinc-700 data-[state=checked]:bg-blue-500" 
+                <Label
+                  htmlFor={`${uniqueId}wave-mode`}
+                  className="text-[11px] text-zinc-400 cursor-pointer peer-data-[state=checked]:text-white order-first"
+                >
+                  {t("common.controls.showWaves")}
+                </Label>
+                <Switch
+                  id={`${uniqueId}wave-mode`}
+                  checked={showWaves}
+                  onCheckedChange={setShowWaves}
+                  className="peer scale-75 data-[state=unchecked]:bg-zinc-700 data-[state=checked]:bg-blue-500"
                 />
               </div>
               <div className="flex items-center justify-between group">
-                <Label htmlFor={`${uniqueId}pattern-mode`} className="text-[11px] text-zinc-400 cursor-pointer peer-data-[state=checked]:text-white order-first">{t("common.controls.showPattern")}</Label>
-                <Switch 
-                  id={`${uniqueId}pattern-mode`} 
-                  checked={showPattern} 
-                  onCheckedChange={setShowPattern} 
-                  className="peer scale-75 data-[state=unchecked]:bg-zinc-700 data-[state=checked]:bg-blue-500" 
+                <Label
+                  htmlFor={`${uniqueId}pattern-mode`}
+                  className="text-[11px] text-zinc-400 cursor-pointer peer-data-[state=checked]:text-white order-first"
+                >
+                  {t("common.controls.showPattern")}
+                </Label>
+                <Switch
+                  id={`${uniqueId}pattern-mode`}
+                  checked={showPattern}
+                  onCheckedChange={setShowPattern}
+                  className="peer scale-75 data-[state=unchecked]:bg-zinc-700 data-[state=checked]:bg-blue-500"
                 />
               </div>
             </div>
           </div>
         </div>
 
-        <Button variant="secondary" size="sm" className="w-full h-8 text-[11px] bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border-none" onClick={handleDownload}>
+        <Button
+          variant="secondary"
+          size="sm"
+          className="w-full h-8 text-[11px] bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border-none"
+          onClick={handleDownload}
+        >
           <Camera className="mr-2 size-3.5" /> {t("common.controls.download")}
         </Button>
       </div>
@@ -336,15 +440,29 @@ export default function MoxonAntennaScene({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className={`relative w-full ${isThumbnail ? "h-full" : "h-[450px] md:h-[600px]"} border rounded-lg overflow-hidden bg-black touch-none`}>
-        <Canvas ref={canvasRef} gl={{ preserveDrawingBuffer: true }} camera={{ position: [5, 10, 15], fov: 45 }} frameloop={isThumbnail && !isHovered ? "demand" : "always"}>
+      <div
+        className={`relative w-full ${isThumbnail ? "h-full" : "h-[450px] md:h-[600px]"} border rounded-lg overflow-hidden bg-black touch-none`}
+      >
+        <Canvas
+          ref={canvasRef}
+          gl={{ preserveDrawingBuffer: true }}
+          camera={{ position: [5, 10, 15], fov: 45 }}
+          frameloop={isThumbnail && !isHovered ? "demand" : "always"}
+        >
           <color attach="background" args={["#111111"]} />
           <fog attach="fog" args={["#111111", 100, 1000]} />
           {!isThumbnail && <ArcballControls target={[0, 0, 0]} makeDefault />}
           <ambientLight intensity={0.5} color={0x404040} />
-          <directionalLight position={[10, 10, 10]} intensity={1} color={0xffffff} />
+          <directionalLight
+            position={[10, 10, 10]}
+            intensity={1}
+            color={0xffffff}
+          />
           <axesHelper args={[5]} />
-          <gridHelper args={[20, 20, 0x333333, 0x222222]} position={[0, gridY, 0]} />
+          <gridHelper
+            args={[20, 20, 0x333333, 0x222222]}
+            position={[0, gridY, 0]}
+          />
 
           <group position={[0, 0, 0]}>
             <MoxonAntenna scale={visualScale} />

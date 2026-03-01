@@ -111,7 +111,7 @@ function RadiationPattern({
       for (let i = 0; i < count; i++) {
         vertex.fromBufferAttribute(posAttribute, i);
         vertex.normalize();
-        let theta = Math.acos(Math.max(-1, Math.min(1, vertex.y)));
+        const theta = Math.acos(Math.max(-1, Math.min(1, vertex.y)));
         let phi = Math.atan2(vertex.z, vertex.x);
         if (phi < 0) phi += 2 * Math.PI;
         thetas[i] = theta;
@@ -129,7 +129,7 @@ function RadiationPattern({
       const visualBaseScale = 7.5 + Math.max(0, maxDbi) * 0.7;
 
       for (let i = 0; i < count; i++) {
-        const power = Math.pow(gains[i] / maxLinearG, powerExponent);
+        const power = (gains[i] / maxLinearG) ** powerExponent;
         const rad = (baseOffset + power * (1 - baseOffset)) * visualBaseScale;
         vertex.fromBufferAttribute(posAttribute, i);
         vertex.normalize();
@@ -238,7 +238,7 @@ export default function HB9CVAntennaScene({
         // V1 = 1 + 0j
         // V2 = cos(225) + j sin(225) = -0.707 - 0.707j
         ctx.add_voltage_source(1, 6, 1.0, 0.0);
-        ctx.add_voltage_source(2, 6, -0.707, -0.707);
+        ctx.add_voltage_source(2, 6, -Math.SQRT1_2, -Math.SQRT1_2);
 
         await ctx.calculate();
 
@@ -417,7 +417,9 @@ export default function HB9CVAntennaScene({
             </div>
             <RadioGroup
               value={speedMode}
-              onValueChange={(v) => setSpeedMode(v as any)}
+              onValueChange={(v) =>
+                setSpeedMode(v as "slow" | "medium" | "fast")
+              }
               className="flex gap-3"
             >
               {["slow", "medium", "fast"].map((s) => (

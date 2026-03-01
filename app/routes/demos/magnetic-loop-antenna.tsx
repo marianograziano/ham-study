@@ -9,7 +9,9 @@ import resources from "~/locales";
 import { getLocale } from "~/middleware/i18next";
 import type { Route } from "./+types/magnetic-loop-antenna";
 
-const MagneticLoopAntennaScene = lazy(() => import("~/components/magnetic-loop-antenna-scene"));
+const MagneticLoopAntennaScene = lazy(
+  () => import("~/components/magnetic-loop-antenna-scene"),
+);
 
 export const loader = async ({ request }: Route.LoaderArgs) => {
   const locale = getLocale(request);
