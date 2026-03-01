@@ -28,35 +28,6 @@ interface PoyntingVectorFieldProps {
   amplitudeScale?: number;
 }
 
-function jsCalculateGain(antennaType: string, dir: Vector3): number {
-  const x = dir.x;
-  const z = dir.z;
-
-  switch (antennaType) {
-    case "vertical":
-    case "gp":
-      return 1.0;
-    case "horizontal":
-    case "inverted-v":
-    case "positive-v":
-    case "quad":
-      return Math.abs(z);
-    case "yagi":
-      return x > 0 ? x ** 2 : 0.1;
-    case "moxon": {
-      const gain = (1 + z) * 0.5;
-      return gain < 0.2 ? 0 : gain;
-    }
-    case "elliptical":
-    case "circular":
-      return x > 0 ? x ** 2 : 0;
-    case "end-fed":
-      return Math.abs(z);
-    default:
-      return 1.0;
-  }
-}
-
 export function PoyntingVectorField({
   antennaType,
   amplitudeScale = 1.0,
@@ -97,7 +68,9 @@ export function PoyntingVectorField({
 
     let gains: number[];
 
-    if (wasmReady.current) {
+    if (!wasmReady.current) {
+      gains = new Array(gridPositions.length).fill(0);
+    } else {
       try {
         const positionsX = gridPositions.map((p) => p.x);
         const positionsZ = gridPositions.map((p) => p.z);
@@ -109,16 +82,8 @@ export function PoyntingVectorField({
         );
       } catch {
         wasmReady.current = false;
-        gains = gridPositions.map((pos) => {
-          const dir = pos.clone().normalize();
-          return jsCalculateGain(antennaType, dir);
-        });
+        gains = new Array(gridPositions.length).fill(0);
       }
-    } else {
-      gains = gridPositions.map((pos) => {
-        const dir = pos.clone().normalize();
-        return jsCalculateGain(antennaType, dir);
-      });
     }
 
     let idx = 0;

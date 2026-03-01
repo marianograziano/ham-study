@@ -23,6 +23,7 @@ export default function DemosLayout() {
     "horizontal-polarization": "demoCards.horizontal.title",
     "circular-polarization": "demoCards.circular.title",
     "elliptical-polarization": "demoCards.elliptical.title",
+    "dipole-antenna": "demoCards.dipoleAntenna.title",
     "yagi-antenna": "demoCards.yagi.title",
     "inverted-v-antenna": "demoCards.invertedV.title",
     "gp-antenna": "demoCards.gp.title",
@@ -32,6 +33,9 @@ export default function DemosLayout() {
     "end-fed-antenna": "demoCards.endFed.title",
     "long-wire-antenna": "demoCards.longWireAntenna.title",
     "electromagnetic-propagation": "demoCards.electromagneticPropagation.title",
+    "windom-antenna": "demoCards.windomAntenna.title",
+    "hb9cv-antenna": "demoCards.hb9cv.title",
+    "magnetic-loop-antenna": "demoCards.magneticLoopAntenna.title",
   };
   const toolKeyMap: Record<string, string> = {
     "yagi-calculator": "tools.yagiCalculator.title",

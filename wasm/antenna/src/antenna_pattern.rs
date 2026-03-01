@@ -70,8 +70,8 @@ fn calculate_gain_internal(antenna: AntennaType, dir: [f64; 3]) -> f64 {
             // Windom: similar to dipole with offset
             z.abs()
         }
-        AntennaType::EndFed => {
-            // End-fed: similar to horizontal dipole
+        AntennaType::EndFed | AntennaType::InvertedV | AntennaType::PositiveV => {
+            // Similar to horizontal dipole in horizontal plane
             z.abs()
         }
     }
@@ -183,6 +183,8 @@ pub fn get_pattern_antenna_info(
         "long-wire" => (3.0, 60.0),
         "windom" => (2.5, 80.0),
         "end-fed" => (2.15, 78.0),
+        "inverted-v" => (2.0, 90.0),
+        "positive-v" => (2.0, 90.0),
         _ => (0.0, 360.0),
     };
 
@@ -193,5 +195,5 @@ pub fn get_pattern_antenna_info(
 /// List all supported antenna types as a comma-separated string
 #[wasm_bindgen]
 pub fn list_pattern_antenna_types() -> String {
-    "vertical,gp,dp,yagi,quad,moxon,hb9cv,magnetic-loop,long-wire,windom,end-fed".to_string()
+    "vertical,gp,dp,yagi,quad,moxon,hb9cv,magnetic-loop,long-wire,windom,end-fed,inverted-v,positive-v".to_string()
 }

@@ -66,55 +66,6 @@ export class SphericalSurfaceParams {
 }
 
 /**
- * Calculate antenna gain at a specific angle
- *
- * # Arguments
- * * `antenna_type` - Type of antenna ("vertical", "gp", "dp", "yagi", etc.)
- * * `theta` - Elevation angle in radians (0 = horizontal plane, π/2 = vertical)
- * * `phi` - Azimuth angle in radians (0 = forward direction)
- * * `antenna_length` - Antenna length in wavelengths (used for some antenna types)
- * * `active_harmonic` - Active harmonic number (used for EndFed, Windom)
- * * `is_inverted_v` - Inverted V flag (used for Windom)
- * * `radial_angle` - Radial angle string ("60", "135") for GP antennas
- *
- * # Returns
- * Normalized gain value (0.0 to 1.0+)
- */
-export function calculate_antenna_gain(antenna_type: string, theta: number, phi: number, antenna_length: number, active_harmonic: number, is_inverted_v: boolean, radial_angle: string, material?: string | null): number;
-
-/**
- * Calculate antenna gain for multiple angles in batch
- *
- * # Arguments
- * * `antenna_type` - Type of antenna
- * * `angles_theta` - Array of elevation angles in radians
- * * `angles_phi` - Array of azimuth angles in radians (same length as angles_theta)
- * * `antenna_length` - Antenna length in wavelengths
- * * `active_harmonic` - Active harmonic number
- * * `is_inverted_v` - Inverted V flag
- * * `radial_angle` - Radial angle string
- * * `material` - Antenna material (optional)
- * * `output` - Output buffer for gain values (must be same length as angles_theta)
- */
-export function calculate_antenna_gain_batch(antenna_type: string, angles_theta: Float64Array, angles_phi: Float64Array, antenna_length: number, active_harmonic: number, is_inverted_v: boolean, radial_angle: string, material: string | null | undefined, output: Float64Array): void;
-
-/**
- * Calculate antenna radiation pattern (360 degrees in azimuth)
- *
- * # Arguments
- * * `antenna_type` - Type of antenna
- * * `theta` - Fixed elevation angle in radians
- * * `antenna_length` - Antenna length in wavelengths
- * * `active_harmonic` - Active harmonic number
- * * `is_inverted_v` - Inverted V flag
- * * `radial_angle` - Radial angle string
- * * `material` - Antenna material (optional)
- * * `num_points` - Number of azimuth points to calculate (default 360)
- * * `output` - Output buffer for gain values (must have length >= num_points)
- */
-export function calculate_antenna_radiation_pattern(antenna_type: string, theta: number, antenna_length: number, active_harmonic: number, is_inverted_v: boolean, radial_angle: string, material: string | null | undefined, num_points: number, output: Float64Array): void;
-
-/**
  * Calculate boom correction factor and amount
  *
  * # Arguments
@@ -141,41 +92,13 @@ export function calculate_boom_correction_json(element_diameter: number, boom_di
  * * `active_harmonic` - Active harmonic number
  * * `is_inverted_v` - Inverted V flag for Windom antenna
  * * `time` - Current time for animation
+ * * `ground_height` - Antenna height above ground in wavelengths (0.0 = free space)
  * * `grid_size` - Size of the grid (grid_size x grid_size)
  * * `spacing` - Spacing between grid points
  * * `matrix_buffer` - Output buffer for instance matrices (16 floats per instance)
  * * `color_buffer` - Output buffer for instance colors (3 floats per instance)
  */
-export function calculate_electric_field(antenna_type: string, polarization_type: string, speed: number, amplitude_scale: number, is_rhcp: boolean, antenna_length: number, radial_angle: string, active_harmonic: number, is_inverted_v: boolean, time: number, grid_size: number, spacing: number, matrix_buffer: Float32Array, color_buffer: Float32Array): void;
-
-/**
- * Calculate electric field intensity for a single angle
- *
- * Uses numerical integration method, logic consistent with Balanis Antenna Theory.
- *
- * # Arguments
- * * `theta` - Angle off the axis (radians)
- * * `length` - Antenna length (in wavelengths lambda)
- * * `wave_type` - "traveling" or "standing"
- *
- * # Returns
- * Normalized electric field magnitude
- */
-export function calculate_field(theta: number, length: number, wave_type: string): number;
-
-/**
- * Calculate electric field intensity for multiple angles in batch
- *
- * This is more efficient than calling calculate_field multiple times
- * as it reduces JS<->WASM call overhead.
- *
- * # Arguments
- * * `angles` - Array of angles in radians
- * * `length` - Antenna length (in wavelengths lambda)
- * * `wave_type` - "traveling" or "standing"
- * * `output` - Output buffer for field magnitudes (must be same length as angles)
- */
-export function calculate_field_batch(angles: Float64Array, length: number, wave_type: string, output: Float64Array): void;
+export function calculate_electric_field(antenna_type: string, polarization_type: string, speed: number, amplitude_scale: number, is_rhcp: boolean, antenna_length: number, radial_angle: string, active_harmonic: number, is_inverted_v: boolean, time: number, ground_height: number, grid_size: number, spacing: number, matrix_buffer: Float32Array, color_buffer: Float32Array): void;
 
 /**
  * 计算地波最大角度 (弧度)
@@ -272,19 +195,6 @@ export function calculate_pattern_radiation(antenna_type: string, num_points: nu
  * 计算传播路径的统计信息
  */
 export function calculate_propagation_stats(params: PropagationParams): PropagationStats;
-
-/**
- * Calculate antenna radiation pattern (360 degrees)
- *
- * Returns normalized field magnitudes for angles 0 to 2π.
- *
- * # Arguments
- * * `length` - Antenna length (in wavelengths lambda)
- * * `wave_type` - "traveling" or "standing"
- * * `num_points` - Number of points to calculate (default 360)
- * * `output` - Output buffer for field magnitudes (must have length >= num_points)
- */
-export function calculate_radiation_pattern(length: number, wave_type: string, num_points: number, output: Float64Array): void;
 
 /**
  * 计算信号路径
@@ -441,22 +351,16 @@ export interface InitOutput {
     readonly __wbg_get_propagationstats_ground_wave_strength: (a: number) => number;
     readonly __wbg_get_propagationstats_incidence_angle: (a: number) => number;
     readonly __wbg_get_propagationstats_muf: (a: number) => number;
-    readonly calculate_antenna_gain: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number) => number;
-    readonly calculate_antenna_gain_batch: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: any) => void;
-    readonly calculate_antenna_radiation_pattern: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: any) => void;
     readonly calculate_moxon_factors_json: (a: number, b: number) => [number, number];
     readonly calculate_moxon_json: (a: number, b: number) => [number, number];
     readonly calculate_moxon_simple_json: (a: number, b: number) => [number, number];
-    readonly estimate_moxon_gain: () => number;
     readonly calculate_pattern_gain: (a: number, b: number, c: number, d: number, e: number) => number;
     readonly calculate_pattern_gain_grid: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: any) => void;
     readonly calculate_pattern_radiation: (a: number, b: number, c: number, d: number, e: number, f: number, g: any) => void;
+    readonly estimate_moxon_gain: () => number;
     readonly get_pattern_antenna_info: (a: number, b: number, c: number, d: number, e: any, f: number, g: number, h: any) => void;
     readonly list_pattern_antenna_types: () => [number, number];
-    readonly calculate_field: (a: number, b: number, c: number, d: number) => number;
-    readonly calculate_field_batch: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: any) => void;
-    readonly calculate_radiation_pattern: (a: number, b: number, c: number, d: number, e: number, f: number, g: any) => void;
-    readonly calculate_electric_field: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number, q: number, r: any, s: number, t: number, u: any) => void;
+    readonly calculate_electric_field: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number, q: number, r: number, s: any, t: number, u: number, v: any) => void;
     readonly __wbg_get_sphericalsurfaceparams_max_angle: (a: number) => number;
     readonly __wbg_get_sphericalsurfaceparams_radius: (a: number) => number;
     readonly __wbg_get_sphericalsurfaceparams_segments_r: (a: number) => number;

@@ -43,11 +43,12 @@ export const meta = ({ loaderData }: Route.MetaArgs) => {
 
 export default function LongWireAntennaPage() {
   const { t } = useTranslation("demos");
+  const ant = "longWireAntenna";
 
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-2xl font-bold">{t("longWireAntenna.title")}</h1>
+        <h1 className="text-2xl font-bold">{t(`${ant}.title`)}</h1>
         <p className="text-muted-foreground">{t("subtitle")}</p>
       </div>
 
@@ -72,43 +73,44 @@ export default function LongWireAntennaPage() {
 
         <div className="prose dark:prose-invert max-w-none">
           <h3>{t("aboutTitle")}</h3>
-          <p>{t("longWireAntenna.about")}</p>
+          <p>
+            <Trans
+              ns="demos"
+              i18nKey={`${ant}.about`}
+              components={{ strong: <strong /> }}
+            />
+          </p>
           <ul>
             <li>
               <Trans
                 ns="demos"
-                i18nKey="longWireAntenna.gain"
+                i18nKey={`${ant}.gain`}
                 components={{ strong: <strong /> }}
               />
             </li>
             <li>
               <Trans
                 ns="demos"
-                i18nKey="longWireAntenna.lobes"
+                i18nKey={`${ant}.lobes`}
                 components={{ strong: <strong /> }}
               />
             </li>
             <li>
               <Trans
                 ns="demos"
-                i18nKey="longWireAntenna.ground"
+                i18nKey={`${ant}.ground`}
                 components={{ strong: <strong /> }}
               />
             </li>
           </ul>
 
           <div className="prose dark:prose-invert max-w-none mb-8">
-            <h3>{t("longWireAntenna.theoryTitle", "Theoretical Analysis")}</h3>
-            <p>
-              {t(
-                "longWireAntenna.theoryDesc",
-                "The Long Wire Antenna, particularly when operating at multiple wavelengths, exhibits a complex radiation pattern governed by the standing wave distribution along the wire.",
-              )}
-            </p>
+            <h3>{t(`${ant}.theoryTitle`)}</h3>
+            <p>{t(`${ant}.theoryDesc`)}</p>
             <p>
               <Trans
                 ns="demos"
-                i18nKey="longWireAntenna.theoryFormulaIntro"
+                i18nKey={`${ant}.theoryFormulaIntro`}
                 components={{ M: <InlineMath /> }}
               />
             </p>
@@ -116,7 +118,7 @@ export default function LongWireAntennaPage() {
             <p>
               <Trans
                 ns="demos"
-                i18nKey="longWireAntenna.theoryFormulaExpl"
+                i18nKey={`${ant}.theoryFormulaExpl`}
                 components={{ M: <InlineMath /> }}
               />
             </p>
@@ -124,7 +126,7 @@ export default function LongWireAntennaPage() {
             <p>
               <Trans
                 ns="demos"
-                i18nKey="longWireAntenna.theoryResult"
+                i18nKey={`${ant}.theoryResult`}
                 components={{ M: <InlineMath /> }}
               />
             </p>
@@ -138,12 +140,12 @@ export default function LongWireAntennaPage() {
                   <p className="mb-2">
                     <Trans
                       ns="demos"
-                      i18nKey="longWireAntenna.physicsContent"
+                      i18nKey={`${ant}.physicsContent`}
                       components={{ strong: <strong /> }}
                     />
                   </p>
                   <p className="text-muted-foreground italic border-l-2 border-primary/20 pl-4 py-1">
-                    {t("longWireAntenna.physicsQuote")}
+                    {t(`${ant}.physicsQuote`)}
                   </p>
                 </>
               }

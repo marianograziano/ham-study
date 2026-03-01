@@ -1,17 +1,17 @@
 import { Camera } from "@phosphor-icons/react";
 import { ArcballControls } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
-import { useId, useMemo, useRef, useState } from "react";
-import { useTranslation } from "react-i18next";
-import { CatmullRomCurve3, DoubleSide, SphereGeometry, Vector3 } from "three";
+import { useEffect, useId, useRef, useState } from "react";
+import { Trans, useTranslation } from "react-i18next";
+import { type BufferGeometry, SphereGeometry, Vector3 } from "three";
 import { Button } from "~/components/ui/button";
 import { Label } from "~/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
 import { Switch } from "~/components/ui/switch";
-import { ElectricFieldWasm } from "./electric-field-wasm";
+import { Nec2Context } from "~/utils/nec2-c-wasm";
+import { ElectricFieldNec2 } from "./electric-field-nec2";
 
-// Dipole Geometry Component
-function DipoleStructure({
+function DipoleAntenna({
   length,
   isInvertedV,
 }: {
@@ -19,199 +19,101 @@ function DipoleStructure({
   isInvertedV: boolean;
 }) {
   const armLength = length / 2;
-  const angle = isInvertedV ? (120 * Math.PI) / 180 : Math.PI; // 120 degrees or 180 (straight)
-  const droopAngle = (Math.PI - angle) / 2;
-
-  // Cylinder geometry for arms
-  // Left Arm (Z-)
-  // Rotate around X? No, around Z usually if wire is X.
-  // Let's assume wire layout is usually along Z axis in our scenes (Horizontal).
-  // If "Horizontal", wire is along Z.
-  // Inverted V drops the ends (low Y). So rotate around X axis.
-
-  const rotation = isInvertedV ? droopAngle : 0;
+  const droopAngle = isInvertedV ? (30 * Math.PI) / 180 : 0;
 
   return (
     <group>
-      {/* Feedpoint */}
+      {/* Feedpoint - Fixed at origin */}
       <mesh position={[0, 0, 0]}>
         <boxGeometry args={[0.15, 0.15, 0.15]} />
         <meshStandardMaterial color="#fff" />
       </mesh>
 
-      {/* Arm 1 (+Z) */}
-      <group rotation={[rotation, 0, 0]}>
+      <group rotation={[droopAngle, 0, 0]}>
         <mesh position={[0, 0, armLength / 2]} rotation={[Math.PI / 2, 0, 0]}>
           <cylinderGeometry args={[0.03, 0.03, armLength, 16]} />
           <meshStandardMaterial color="#ef4444" />
         </mesh>
       </group>
 
-      {/* Arm 2 (-Z) */}
-      <group rotation={[-rotation, 0, 0]}>
+      <group rotation={[-droopAngle, 0, 0]}>
         <mesh position={[0, 0, -armLength / 2]} rotation={[Math.PI / 2, 0, 0]}>
           <cylinderGeometry args={[0.03, 0.03, armLength, 16]} />
           <meshStandardMaterial color="#3b82f6" />
         </mesh>
       </group>
-
-      {/* Current Distribution Visualization (Standing Wave) */}
-      <StandingWaveVisualizer length={length} isInvertedV={isInvertedV} />
     </group>
   );
 }
 
-function RadiationPattern({
-  length,
-  isInvertedV,
-}: {
-  length: number;
-  isInvertedV: boolean;
-}) {
-  const geometry = useMemo(() => {
-    // High resolution for smooth pattern
-    const geo = new SphereGeometry(1, 90, 45);
-    const posAttribute = geo.attributes.position;
-    const vertex = new Vector3();
-    const scale = 5; // Visual scale
+function RadiationPattern({ context }: { context: Nec2Context | null }) {
+  const [geometry, setGeometry] = useState<BufferGeometry | null>(null);
 
-    // L is total length in wavelengths
-    // The prop 'length' passed here is actually physical length in the scene (lengthFactor * visualScale)
-    // We need "length in wavelengths" (lengthFactor) for the formula.
-    // However, DipoleStructure receives 'physicalLength' which is lengthFactor * 6.
-    // We need to reverse this or pass lengthFactor directly.
-    // physicalLength = lengthFactor * 6. So L_lambda = length / 6.
-    const L_lambda = length / 6;
+  useEffect(() => {
+    if (!context) return;
 
-    // kL/2 = pi * L_lambda
-    const kL_2 = Math.PI * L_lambda;
+    const generateGeometry = () => {
+      const geo = new SphereGeometry(1, 60, 40);
+      const posAttribute = geo.attributes.position;
+      const vertex = new Vector3();
 
-    for (let i = 0; i < posAttribute.count; i++) {
-      vertex.fromBufferAttribute(posAttribute, i);
-      vertex.normalize();
+      const count = posAttribute.count;
+      const thetas = new Float64Array(count);
+      const phis = new Float64Array(count);
+      const gains = new Float64Array(count);
 
-      // Dipole axis is Z.
-      // Theta is angle with Z-axis. cos(theta) = z component of normalized vertex.
-      const cosTheta = vertex.z;
-      const sinTheta = Math.sqrt(1 - cosTheta * cosTheta);
-
-      // Formula: F(theta) = (cos(kL/2 * cos(theta)) - cos(kL/2)) / sin(theta)
-      // Avoid division by zero at poles (sinTheta = 0)
-      let gain = 0;
-      if (sinTheta > 0.001) {
-        const num = Math.cos(kL_2 * cosTheta) - Math.cos(kL_2);
-        gain = Math.abs(num / sinTheta);
-      } else {
-        // Limit at poles? For half-wave it's 0.
-        // For L=1 lambda, it might be non-zero?
-        // Let's just clamp.
-        gain = 0;
+      for (let i = 0; i < count; i++) {
+        vertex.fromBufferAttribute(posAttribute, i);
+        vertex.normalize();
+        const theta = Math.acos(Math.max(-1, Math.min(1, vertex.y)));
+        let phi = Math.atan2(vertex.z, vertex.x);
+        if (phi < 0) phi += 2 * Math.PI;
+        thetas[i] = theta;
+        phis[i] = phi;
       }
 
-      // Normalize gain for visualization consistency?
-      // Standard half-wave max gain is 1. (Normalized).
-      // The formula naturally produces nice values.
+      context.calculate_far_field_pattern_3d(thetas, phis, gains);
 
-      // Apply Inverted V distortion roughly?
-      // Inverted V tilts the lobes down (towards -Y?).
-      // The wire bends at X-axis rotating around X?
-      // Let's stick to ideal dipole pattern for now to avoid confusion,
-      // as the exact pattern of V is complex integral.
-      // Maybe reduce gain slightly to show it's less efficient?
-      if (isInvertedV) {
-        gain *= 0.9;
+      // 1. 找出最大线性值用于形状归一化
+      let maxLinearG = 0.01;
+      for (let i = 0; i < count; i++) {
+        if (gains[i] > maxLinearG) maxLinearG = gains[i];
       }
 
-      vertex.multiplyScalar(gain * scale);
-      posAttribute.setXYZ(i, vertex.x, vertex.y, vertex.z);
-    }
+      // 2. 根据 dBi 数值计算整体视觉比例 (dBi 是对数，适合做受控缩放)
+      // 2 dBi -> 约 8.9 units, 12 dBi -> 约 15.9 units
+      const maxDbi = context.get_max_gain();
+      const visualBaseScale = 7.5 + Math.max(0, maxDbi) * 0.7;
 
-    geo.computeVertexNormals();
-    geo.computeVertexNormals();
-    return geo;
-  }, [length, isInvertedV]);
+      for (let i = 0; i < count; i++) {
+        const power = gains[i] / maxLinearG;
+        // 内部形状：0.2基础 + 0.8 动态
+        const rad = (0.2 + power * 0.8) * visualBaseScale;
+        vertex.fromBufferAttribute(posAttribute, i);
+        vertex.normalize();
+        posAttribute.setXYZ(i, vertex.x * rad, vertex.y * rad, vertex.z * rad);
+      }
 
-  useMemo(() => {
-    return () => {
-      geometry.dispose();
+      geo.computeVertexNormals();
+      setGeometry(geo);
     };
-  }, [geometry]);
+
+    generateGeometry();
+  }, [context]);
+
+  if (!geometry) return null;
 
   return (
-    <mesh geometry={geometry}>
-      <meshBasicMaterial
-        color="#22c55e"
-        wireframe
-        transparent
-        opacity={0.3}
-        side={DoubleSide}
-      />
-    </mesh>
-  );
-}
-
-function StandingWaveVisualizer({
-  length,
-  isInvertedV,
-}: {
-  length: number;
-  isInvertedV: boolean;
-}) {
-  // Visualize Current: Sine wave standing on the wire
-  // Current I(z) = I_max * sin(k * (L/2 - |z|))
-  // For half wave: L = lambda/2. kL/2 = pi/2.
-  // I(z) ~ cos(k*z)? No, 0 at ends.
-  // Half wave: Max at center, 0 at ends.
-  // Shape is roughly sine arch.
-
-  // Construct a curve? Or just a dynamic mesh?
-  // Let's use a TubeGeometry along a path that bulges?
-  // Or simpler: A flat shape (plane) that scales?
-  // Let's use points to draw a line is simpler for visualization?
-  // Or just a shape.
-  // Let's use a dynamic custom geometry or simpler scaled spheres?
-  // A "Tube" following the standing wave envelope might be nice.
-
-  // Let's create points for a Line.
-  const points = useMemo(() => {
-    const pts = [];
-    const segments = 50;
-    const armLength = length / 2;
-    const droopAngle = isInvertedV ? (Math.PI - (120 * Math.PI) / 180) / 2 : 0;
-
-    for (let i = 0; i <= segments; i++) {
-      const t = (i / segments) * 2 - 1; // -1 to 1
-      const z = t * armLength;
-
-      // Physical position of wire point
-      // If Inverted V:
-      // y = -absZ * sin(droopAngle)
-      // newZ = z * cos(droopAngle)
-      // But wait, z wraps along the wire.
-
-      const wireY = -Math.abs(z) * Math.sin(droopAngle);
-      const wireZ = z * Math.cos(droopAngle);
-
-      // Standing Wave Height (Current Magnitude)
-      // Current is 0 at ends (|z| = armLength), Max at center (z=0)
-      // Shape: cos(pi/2 * z / armLength)
-      const magnitude = Math.cos((Math.PI / 2) * t);
-
-      // We displace UP from the wire (Y direction local to wire?)
-      // Global Up (Y) is fine.
-      pts.push(new Vector3(0, wireY + magnitude * 0.5, wireZ));
-    }
-    return pts; // This is just the "Current" line
-  }, [length, isInvertedV]);
-
-  // curve is just data (CatmullRomCurve3), doesn't need dispose.
-  const curve = useMemo(() => new CatmullRomCurve3(points), [points]);
-
-  return (
-    <mesh>
-      <tubeGeometry args={[curve, 64, 0.02, 8, false]} />
-      <meshBasicMaterial color="yellow" transparent opacity={0.6} />
-    </mesh>
+    <group>
+      <mesh geometry={geometry}>
+        <meshBasicMaterial
+          color="#22c55e"
+          wireframe={true}
+          transparent={true}
+          opacity={0.2}
+        />
+      </mesh>
+    </group>
   );
 }
 
@@ -223,17 +125,89 @@ export default function DipoleAntennaScene({
   isHovered?: boolean;
 }) {
   const { t } = useTranslation("scene");
+  const [groundHeight, setGroundHeight] = useState(0.0);
+  const [lengthFactor, setLengthFactor] = useState(0.5);
+  const [isInvertedV, setIsInvertedV] = useState(false);
+  const [material, setMaterial] = useState<string>("aluminum");
   const [showWaves, setShowWaves] = useState(true);
   const [showPattern, setShowPattern] = useState(true);
-  const [isInvertedV, setIsInvertedV] = useState(false);
-  // Length in "lambda". Standard is 0.5.
-  const [lengthFactor, setLengthFactor] = useState(0.5);
-
   const [speedMode, setSpeedMode] = useState<"slow" | "medium" | "fast">(
     "medium",
   );
+  const [context, setContext] = useState<Nec2Context | null>(null);
+  const [isCalculating, setIsCalculating] = useState(false);
+  const [impedance, setImpedance] = useState<{ re: number; im: number } | null>(
+    null,
+  );
+  const [maxGain, setMaxGain] = useState<number>(0);
+
   const uniqueId = useId();
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  const visualScale = 10;
+
+  useEffect(() => {
+    let active = true;
+    const runSimulation = async () => {
+      setIsCalculating(true);
+      try {
+        const ctx = new Nec2Context();
+        ctx.initialize(1);
+        const freq = 300.0;
+        ctx.set_frequency(freq);
+        ctx.set_material(material);
+
+        const lambda = 299.79 / freq;
+        const h_m = groundHeight * lambda;
+        if (groundHeight > 0) ctx.set_ground(groundHeight);
+
+        const totalLength = lengthFactor * lambda;
+        const armLength = totalLength / 2;
+        const droopAngle = isInvertedV ? (30 * Math.PI) / 180 : 0;
+
+        const yEnd = armLength * Math.cos(droopAngle);
+        const zEnd = -armLength * Math.sin(droopAngle);
+
+        if (!isInvertedV) {
+          ctx.add_wire(
+            0,
+            -totalLength / 2,
+            h_m,
+            0,
+            totalLength / 2,
+            h_m,
+            0.001,
+            19,
+            1,
+          );
+          ctx.add_voltage_source(1, 10, 1.0, 0.0);
+        } else {
+          ctx.add_wire(0, 0, h_m, 0, yEnd, h_m + zEnd, 0.001, 10, 1);
+          ctx.add_wire(0, 0, h_m, 0, -yEnd, h_m + zEnd, 0.001, 10, 2);
+          ctx.add_voltage_source(1, 1, 1.0, 0.0);
+        }
+
+        await ctx.calculate();
+
+        if (active) {
+          const zArr = ctx.get_impedance(1);
+          setImpedance({ re: zArr[0], im: zArr[1] });
+          setMaxGain(ctx.get_max_gain());
+          setContext(ctx);
+        }
+      } catch (err) {
+        console.error("NEC Simulation Error:", err);
+      } finally {
+        if (active) setIsCalculating(false);
+      }
+    };
+
+    const timer = setTimeout(runSimulation, 300);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [groundHeight, material, lengthFactor, isInvertedV]);
 
   const handleDownload = () => {
     if (canvasRef.current) {
@@ -244,194 +218,250 @@ export default function DipoleAntennaScene({
     }
   };
 
-  const speedMultiplier = {
-    slow: 0.3,
-    medium: 0.6,
-    fast: 1.0,
-  }[speedMode];
-
-  const effectiveSpeed = isThumbnail && !isHovered ? 0 : speedMultiplier;
-
-  // Physical length scale for visualization
-  // Let's say lambda = 10 units?
-  // We passed 'antennaLength' to E-field. In our E-field logic, we treated it as Lambda fraction.
-  // So we pass 'lengthFactor' directly.
-
-  // For Geometry:
-  // If lambda is standard, say 4 units.
-  // Arm length = lengthFactor * 4.
-  const visualScale = 6;
+  const effectiveSpeed =
+    isThumbnail && !isHovered
+      ? 0
+      : { slow: 0.3, medium: 0.6, fast: 1.0 }[speedMode];
   const physicalLength = lengthFactor * visualScale;
+  const gridY = -groundHeight * visualScale;
 
-  const ControlsContent = () => (
-    <div className="flex flex-col space-y-3">
-      <div className="pt-3 border-t border-white/10 md:border-none md:pt-0">
-        <div className="mb-2 text-xs md:text-sm font-medium text-zinc-200">
-          {t("common.controls.visualization")}
+  const LegendPanel = () => (
+    <div className="p-4 bg-black/70 text-white rounded-lg md:max-w-xs h-full border border-white/5">
+      <h2 className="text-lg font-bold mb-2">{t("dipoleAntenna.title")}</h2>
+      <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
+        <Trans
+          ns="scene"
+          i18nKey="dipoleAntenna.desc"
+          components={{ br: <br /> }}
+        />
+      </p>
+      <div className="space-y-1.5 text-xs border-t border-gray-600 pt-2">
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 bg-red-500 rounded-sm" />
+          <span>{t("dipoleAntenna.active")}</span>
         </div>
-        <div className="flex flex-col space-y-2">
-          {/* Inverted V Toggle */}
-          <div className="flex items-center space-x-2">
-            <Switch
-              id={`${uniqueId}inv-v-mode`}
-              checked={isInvertedV}
-              onCheckedChange={setIsInvertedV}
-              className="data-[state=checked]:bg-primary-foreground/80 data-[state=unchecked]:bg-zinc-700 border-zinc-500"
-            />
-            <Label
-              htmlFor={`${uniqueId}inv-v-mode`}
-              className="text-xs md:text-sm text-zinc-300"
-            >
-              {t("common.controls.invertedV")}
-            </Label>
-          </div>
-
-          {/* Show Waves Toggle */}
-          <div className="flex items-center space-x-2">
-            <Switch
-              id={`${uniqueId}wave-mode`}
-              checked={showWaves}
-              onCheckedChange={setShowWaves}
-              className="data-[state=checked]:bg-primary-foreground/80 data-[state=unchecked]:bg-zinc-700 border-zinc-500"
-            />
-            <Label
-              htmlFor={`${uniqueId}wave-mode`}
-              className="text-xs md:text-sm text-zinc-300"
-            >
-              {t("common.controls.showWaves")}
-            </Label>
-          </div>
-
-          {/* Show Pattern Toggle */}
-          <div className="flex items-center space-x-2">
-            <Switch
-              id={`${uniqueId}pattern-mode`}
-              checked={showPattern}
-              onCheckedChange={setShowPattern}
-              className="data-[state=checked]:bg-primary-foreground/80 data-[state=unchecked]:bg-zinc-700 border-zinc-500"
-            />
-            <Label
-              htmlFor={`${uniqueId}pattern-mode`}
-              className="text-xs md:text-sm text-zinc-300"
-            >
-              {t("common.controls.showPattern")}
-            </Label>
-          </div>
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 border-2 border-green-500 rounded-sm" />
+          <span>{t("dipoleAntenna.pattern")}</span>
         </div>
       </div>
-
-      <div className="pt-3 border-t border-white/10">
-        <div className="mb-2 text-xs md:text-sm font-medium text-zinc-200">
-          {t("common.controls.length")}
+      <div className="mt-4 pt-3 border-t border-gray-600">
+        <div className="flex justify-between items-end mb-1.5">
+          <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">
+            {t("common.simulation.strength")}
+          </span>
+          <span className="text-[9px] text-zinc-500 italic">
+            Normalized (E·r)
+          </span>
         </div>
-        <RadioGroup
-          defaultValue="0.5"
-          value={lengthFactor.toString()}
-          onValueChange={(v) => setLengthFactor(Number.parseFloat(v))}
-          className="flex gap-4"
-        >
-          <div className="flex items-center space-x-2">
-            <RadioGroupItem
-              value="0.5"
-              id={`${uniqueId}l-half`}
-              className="border-zinc-400 text-primary-foreground data-[state=checked]:bg-transparent data-[state=checked]:border-primary-foreground data-[state=checked]:text-input"
-            />
-            <Label
-              htmlFor={`${uniqueId}l-half`}
-              className="text-xs cursor-pointer text-zinc-300"
-            >
-              0.5λ
-            </Label>
-          </div>
-          <div className="flex items-center space-x-2">
-            <RadioGroupItem
-              value="1.0"
-              id={`${uniqueId}l-full`}
-              className="border-zinc-400 text-primary-foreground data-[state=checked]:bg-transparent data-[state=checked]:border-primary-foreground data-[state=checked]:text-input"
-            />
-            <Label
-              htmlFor={`${uniqueId}l-full`}
-              className="text-xs cursor-pointer text-zinc-300"
-            >
-              1.0λ
-            </Label>
-          </div>
-          <div className="flex items-center space-x-2">
-            <RadioGroupItem
-              value="1.5"
-              id={`${uniqueId}l-1.5`}
-              className="border-zinc-400 text-primary-foreground data-[state=checked]:bg-transparent data-[state=checked]:border-primary-foreground data-[state=checked]:text-input"
-            />
-            <Label
-              htmlFor={`${uniqueId}l-1.5`}
-              className="text-xs cursor-pointer text-zinc-300"
-            >
-              1.5λ
-            </Label>
-          </div>
-        </RadioGroup>
+        <div className="h-2 w-full rounded-full bg-gradient-to-r from-blue-600 via-green-500 via-yellow-400 to-red-600" />
       </div>
+    </div>
+  );
 
-      <div className="pt-3 border-t border-white/10">
-        <div className="mb-2 text-xs md:text-sm font-medium text-zinc-200">
-          {t("common.controls.speed")}
+  const ControlsPanel = () => (
+    <div className="p-4 bg-black/70 text-white rounded-lg w-full h-full border border-white/5">
+      <div className="flex flex-col space-y-4">
+        <div className="bg-zinc-900/50 p-3 rounded border border-white/5">
+          <div className="mb-2 text-[10px] uppercase font-bold tracking-wider text-zinc-500">
+            {t("common.simulation.analysis")}
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <div className="text-[9px] text-zinc-400 mb-0.5">
+                {t("common.simulation.peakGain")}
+              </div>
+              <div className="text-xs font-mono text-green-400">
+                {isCalculating ? "..." : `${maxGain.toFixed(2)} dBi`}
+              </div>
+            </div>
+            <div>
+              <div className="text-[9px] text-zinc-400 mb-0.5">
+                {t("common.simulation.impedance")}
+              </div>
+              <div className="text-xs font-mono text-zinc-300">
+                {isCalculating
+                  ? "..."
+                  : impedance
+                    ? `${impedance.re.toFixed(1)}Ω`
+                    : "--"}
+              </div>
+            </div>
+          </div>
         </div>
-        <RadioGroup
-          defaultValue="medium"
-          value={speedMode}
-          onValueChange={(v) => setSpeedMode(v as "slow" | "medium" | "fast")}
-          className="flex gap-4"
-        >
-          <div className="flex items-center space-x-2">
-            <RadioGroupItem
-              value="slow"
-              id={`${uniqueId}r-slow`}
-              className="border-zinc-400 text-primary-foreground data-[state=checked]:bg-transparent data-[state=checked]:border-primary-foreground data-[state=checked]:text-input"
-            />
-            <Label
-              htmlFor={`${uniqueId}r-slow`}
-              className="text-xs cursor-pointer text-zinc-300"
+
+        <div className="space-y-3">
+          <div className="pt-1">
+            <div className="mb-2 text-xs font-medium text-zinc-300">
+              {t("common.controls.length")}
+            </div>
+            <RadioGroup
+              value={lengthFactor.toString()}
+              onValueChange={(v) => setLengthFactor(parseFloat(v))}
+              className="flex gap-4"
             >
-              {t("common.controls.slow")}
-            </Label>
+              {[0.5, 1.0, 1.5].map((l) => (
+                <div key={l} className="flex items-center space-x-1.5">
+                  <RadioGroupItem
+                    value={l.toString()}
+                    id={`${uniqueId}l-${l}`}
+                    className="peer size-3 border-zinc-500 data-[state=checked]:border-white data-[state=checked]:text-white"
+                  />
+                  <Label
+                    htmlFor={`${uniqueId}l-${l}`}
+                    className="text-[11px] cursor-pointer text-zinc-400 peer-data-[state=checked]:text-white"
+                  >
+                    {l}λ
+                  </Label>
+                </div>
+              ))}
+            </RadioGroup>
           </div>
-          <div className="flex items-center space-x-2">
-            <RadioGroupItem
-              value="medium"
-              id={`${uniqueId}r-medium`}
-              className="border-zinc-400 text-primary-foreground data-[state=checked]:bg-transparent data-[state=checked]:border-primary-foreground data-[state=checked]:text-input"
-            />
-            <Label
-              htmlFor={`${uniqueId}r-medium`}
-              className="text-xs cursor-pointer text-zinc-300"
+
+          <div className="pt-2 border-t border-white/5">
+            <div className="mb-2 text-xs font-medium text-zinc-300">
+              {t("common.simulation.material")}
+            </div>
+            <RadioGroup
+              value={material}
+              onValueChange={setMaterial}
+              className="flex flex-row md:flex-col gap-3 md:gap-1.5"
             >
-              {t("common.controls.medium")}
-            </Label>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem
+                  value="aluminum"
+                  id={`${uniqueId}m-al`}
+                  className="peer size-3 border-zinc-500 data-[state=checked]:border-white data-[state=checked]:text-white"
+                />
+                <Label
+                  htmlFor={`${uniqueId}m-al`}
+                  className="text-[11px] cursor-pointer text-zinc-400 peer-data-[state=checked]:text-white"
+                >
+                  {t("common.simulation.aluminum")}
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem
+                  value="stainless_steel"
+                  id={`${uniqueId}m-ss`}
+                  className="peer size-3 border-zinc-500 data-[state=checked]:border-white data-[state=checked]:text-white"
+                />
+                <Label
+                  htmlFor={`${uniqueId}m-ss`}
+                  className="text-[11px] cursor-pointer text-zinc-400 peer-data-[state=checked]:text-white"
+                >
+                  {t("common.simulation.stainlessSteel")}
+                </Label>
+              </div>
+            </RadioGroup>
           </div>
-          <div className="flex items-center space-x-2">
-            <RadioGroupItem
-              value="fast"
-              id={`${uniqueId}r-fast`}
-              className="border-zinc-400 text-primary-foreground data-[state=checked]:bg-transparent data-[state=checked]:border-primary-foreground data-[state=checked]:text-input"
-            />
-            <Label
-              htmlFor={`${uniqueId}r-fast`}
-              className="text-xs cursor-pointer text-zinc-300"
+
+          <div className="pt-2 border-t border-white/5">
+            <div className="mb-2 text-xs font-medium text-zinc-300">
+              {t("common.simulation.groundHeight")}
+            </div>
+            <div className="flex items-center space-x-3">
+              <input
+                type="range"
+                min="0"
+                max="2"
+                step="0.1"
+                value={groundHeight}
+                onChange={(e) => setGroundHeight(parseFloat(e.target.value))}
+                className="w-full accent-blue-500 h-1"
+              />
+              <span className="text-[10px] text-zinc-400 w-8 text-right font-mono">
+                {groundHeight === 0
+                  ? t("common.simulation.freeSpace")
+                  : groundHeight.toFixed(1)}
+              </span>
+            </div>
+          </div>
+
+          <div className="pt-2 border-t border-white/5">
+            <div className="mb-2 text-xs font-medium text-zinc-300">
+              {t("common.controls.speed")}
+            </div>
+            <RadioGroup
+              value={speedMode}
+              onValueChange={(v) =>
+                setSpeedMode(v as "slow" | "medium" | "fast")
+              }
+              className="flex gap-3"
             >
-              {t("common.controls.fast")}
-            </Label>
+              {["slow", "medium", "fast"].map((s) => (
+                <div key={s} className="flex items-center space-x-1.5">
+                  <RadioGroupItem
+                    value={s}
+                    id={`${uniqueId}r-${s}`}
+                    className="peer size-3 border-zinc-500 data-[state=checked]:border-white data-[state=checked]:text-white"
+                  />
+                  <Label
+                    htmlFor={`${uniqueId}r-${s}`}
+                    className="text-[11px] cursor-pointer text-zinc-400 peer-data-[state=checked]:text-white"
+                  >
+                    {t(`common.controls.${s}` as any)}
+                  </Label>
+                </div>
+              ))}
+            </RadioGroup>
           </div>
-        </RadioGroup>
-      </div>
-      <div className="pt-3 border-t border-white/10">
+
+          <div className="pt-2 border-t border-white/5">
+            <div className="flex flex-col space-y-2">
+              <div className="flex items-center justify-between group">
+                <Label
+                  htmlFor={`${uniqueId}inv-v-mode`}
+                  className="text-[11px] text-zinc-400 cursor-pointer peer-data-[state=checked]:text-white order-first"
+                >
+                  {t("common.controls.invertedV")}
+                </Label>
+                <Switch
+                  id={`${uniqueId}inv-v-mode`}
+                  checked={isInvertedV}
+                  onCheckedChange={setIsInvertedV}
+                  className="peer scale-75 data-[state=unchecked]:bg-zinc-700 data-[state=checked]:bg-blue-500"
+                />
+              </div>
+              <div className="flex items-center justify-between group">
+                <Label
+                  htmlFor={`${uniqueId}wave-mode`}
+                  className="text-[11px] text-zinc-400 cursor-pointer peer-data-[state=checked]:text-white order-first"
+                >
+                  {t("common.controls.showWaves")}
+                </Label>
+                <Switch
+                  id={`${uniqueId}wave-mode`}
+                  checked={showWaves}
+                  onCheckedChange={setShowWaves}
+                  className="peer scale-75 data-[state=unchecked]:bg-zinc-700 data-[state=checked]:bg-blue-500"
+                />
+              </div>
+              <div className="flex items-center justify-between group">
+                <Label
+                  htmlFor={`${uniqueId}pattern-mode`}
+                  className="text-[11px] text-zinc-400 cursor-pointer peer-data-[state=checked]:text-white order-first"
+                >
+                  {t("common.controls.showPattern")}
+                </Label>
+                <Switch
+                  id={`${uniqueId}pattern-mode`}
+                  checked={showPattern}
+                  onCheckedChange={setShowPattern}
+                  className="peer scale-75 data-[state=unchecked]:bg-zinc-700 data-[state=checked]:bg-blue-500"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
         <Button
           variant="secondary"
           size="sm"
-          className="w-full"
+          className="w-full h-8 text-[11px] bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border-none"
           onClick={handleDownload}
         >
-          <Camera className="mr-2 size-4" />
-          {t("common.controls.download")}
+          <Camera className="mr-2 size-3.5" /> {t("common.controls.download")}
         </Button>
       </div>
     </div>
@@ -445,66 +475,55 @@ export default function DipoleAntennaScene({
         <Canvas
           ref={canvasRef}
           gl={{ preserveDrawingBuffer: true }}
-          camera={{ position: [5, 5, 10], fov: 45 }}
+          camera={{ position: [5, 10, 15], fov: 45 }}
           frameloop={isThumbnail && !isHovered ? "demand" : "always"}
         >
           <color attach="background" args={["#111111"]} />
-          <fog attach="fog" args={["#111111", 10, 50]} />
-
+          <fog attach="fog" args={["#111111", 100, 1000]} />
           {!isThumbnail && <ArcballControls target={[0, 0, 0]} makeDefault />}
-
           <ambientLight intensity={0.5} color={0x404040} />
           <directionalLight
             position={[10, 10, 10]}
             intensity={1}
             color={0xffffff}
           />
-
           <axesHelper args={[5]} />
           <gridHelper
             args={[20, 20, 0x333333, 0x222222]}
-            position={[0, -2, 0]}
+            position={[0, gridY, 0]}
           />
 
-          <DipoleStructure length={physicalLength} isInvertedV={isInvertedV} />
-
-          {showPattern && (
-            <RadiationPattern
-              length={physicalLength}
-              isInvertedV={isInvertedV}
-            />
-          )}
-
-          {showWaves && (
-            <ElectricFieldWasm
-              antennaType="dp"
-              polarizationType="horizontal"
-              speed={effectiveSpeed}
-              amplitudeScale={1.5}
-              antennaLength={lengthFactor} // Passing lambda fraction
-              radialAngle={isInvertedV ? "120" : "180"} // Just for potential use
-            />
-          )}
+          <group position={[0, 0, 0]}>
+            <DipoleAntenna length={physicalLength} isInvertedV={isInvertedV} />
+            {showPattern && context && <RadiationPattern context={context} />}
+            {showWaves && context && (
+              <ElectricFieldNec2
+                context={context}
+                speed={effectiveSpeed}
+                amplitudeScale={1.2}
+                visualScale={visualScale}
+                particleScale={0.6}
+              />
+            )}
+          </group>
         </Canvas>
 
         {!isThumbnail && (
-          <>
-            <div className="hidden md:block absolute bottom-4 right-4 p-4 bg-black/70 text-white rounded-lg pointer-events-auto">
-              <ControlsContent />
+          <div className="hidden md:block">
+            <div className="absolute top-4 left-4 pointer-events-none select-none">
+              <LegendPanel />
             </div>
-
-            <div className="absolute bottom-4 left-4 text-gray-400 text-xs pointer-events-none select-none">
-              {t("common.created")}
+            <div className="absolute bottom-4 right-4 pointer-events-auto w-64 max-h-[85%] overflow-y-auto">
+              <ControlsPanel />
             </div>
-          </>
+          </div>
         )}
       </div>
 
       {!isThumbnail && (
         <div className="flex flex-col gap-4 md:hidden">
-          <div className="bg-zinc-900 border rounded-lg p-4">
-            <ControlsContent />
-          </div>
+          <LegendPanel />
+          <ControlsPanel />
         </div>
       )}
     </div>

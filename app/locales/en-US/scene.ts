@@ -19,6 +19,18 @@ export default {
       download: "Download Screenshot",
       autoRotate: "Auto Rotate",
     },
+    simulation: {
+      analysis: "Simulation Analysis",
+      peakGain: "Peak Gain",
+      impedance: "Impedance",
+      material: "Material",
+      copper: "Copper",
+      aluminum: "Aluminum",
+      stainlessSteel: "Stainless Steel",
+      groundHeight: "Ground Height (λ)",
+      freeSpace: "Free Space",
+      strength: "Field Strength (E·r)",
+    },
   },
   circularPolarization: {
     title: "Circular Polarization",
@@ -110,8 +122,14 @@ export default {
     desc: "High gain and directional. Used for DXing and satellite tracking.",
     driven: "Driven Element",
     passive: "Reflector/Director",
-    pattern: "Radiation Pattern",
+    pattern: "Radiation Pattern (Pattern)",
     strength: "Field Strength",
+  },
+  dipoleAntenna: {
+    title: "Dipole Antenna",
+    desc: "The fundamental antenna. Two equal-length elements, center-fed. Basis for many complex antennas.<br/>Ideally suited for understanding polarization and impedance.",
+    active: "Driven Element",
+    pattern: "Radiation Pattern (Pattern)",
   },
   endFedAntenna: {
     title: "End-Fed Half Wave (EFHW)",
@@ -148,5 +166,12 @@ export default {
     pattern: "Radiation Pattern (Null on Axis)",
 
     strength: "E-Field Strength",
+  },
+  windomAntenna: {
+    title: "Windom Antenna",
+    desc: "Off-Center Fed Dipole (OCFD). Multi-band resonance with unique patterns.<br/>Popular for multi-band HF operations.",
+    wire: "Wire (Active)",
+    feed: "Feed Point",
+    pattern: "Radiation Pattern (Pattern)",
   },
 } satisfies typeof import("~/locales/zh/scene").default;

@@ -345,15 +345,44 @@ const gains = await calculatePatternGainGrid("yagi", positionsX, positionsZ, 0.5
 
 ## 后续建议
 
-### 阶段 4: 性能优化
+## 阶段 4: V型天线 NEC2 真实物理迁移 (已完成) ✅
+
+已将基于经验公式的天线场景迁移至真实的 NEC2 物理模拟核心：
+- `app/components/positive-v-scene.tsx`
+- `app/components/inverted-v-scene.tsx`
+
+**关键改进：**
+1. **采用 3 段导线 (3-segment wire) 的精密几何模型**：左臂、右臂，以及居中的激磁短线，从而确保两臂天线拥有完美且对等的对称性。
+2. **实时阻抗计算 (Live Impedance计算)**：首次为 V 型天线提供了真实的实部和虚部阻抗实时估测。
+3. **真实方向图与电场强度同步对齐 (E-Field Alignment)**：更新了 WASM 后端的电场计算引擎，使动态波纹（E-field particles）的强度分布逻辑与 NEC2 求解的 3D 远场增益完全同步。
+4. **地波与大地效应参数 (Ground Height)**：不再使用写死的基于球坐标的三角函数包络，而是调用 NEC2 从底层场方程直接求解得到的高精度远场数据，可以准确呈现离地高度变化导致的反弹干涉。
+
+---
+
+## 阶段 5: 其余天线物理迁移 (已完成) ✅
+
+已将剩余的天线场景全部迁移至基于 NEC2 的高精度物理仿真：
+- `app/components/quad-antenna-scene.tsx`
+- `app/components/yagi-antenna-scene.tsx`
+- `app/components/end-fed-antenna-scene.tsx`
+- `app/components/windom-antenna-scene.tsx`
+
+**关键改进：**
+1. **统一的 NEC2 核心**：所有主要天线类型现在均使用 `NecContext` 进行阻抗和 3D 方向图计算，彻底弃用了旧版的经验公式。
+2. **多单元与多波段支持**：
+    - **Quad**: 模拟双单元（激磁+反射）方形回路。
+    - **Yagi**: 三单元（反射+激磁+引向）八木阵列仿真。
+    - **End-fed/Windom**: 完整的谐波（Harmonic）模式支持，自动根据倍频调整 NEC 分段与计算参数。
+3. **实时交互 UI**：所有页面均配备了 **Live Impedance** 展示盒，并支持地高（Ground Height）对方向图影响的实时模拟。
+4. **性能对齐**：通过 WASM 计算批量远场数据，确保复杂的 MoM 求解不会造成页面 UI 卡顿。
+
+---
+
+## 阶段 6: 性能优化 与 扩展功能
 
 - 集成 Web Worker 进行批量计算
 - 添加几何体缓存
 - 实现计算结果缓存
-
-### 阶段 5: 扩展功能
-
-- 添加更多天线类型计算 (Log-Periodic, Discone)
 - 集成专业传播预测 (VOACAP)
 
 ---

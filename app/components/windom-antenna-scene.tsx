@@ -1,331 +1,136 @@
 import { Camera } from "@phosphor-icons/react";
 import { ArcballControls } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
-import { useId, useMemo, useRef, useState } from "react";
-import { useTranslation } from "react-i18next";
-import { CatmullRomCurve3, DoubleSide, SphereGeometry, Vector3 } from "three";
+import { useEffect, useId, useRef, useState } from "react";
+import { Trans, useTranslation } from "react-i18next";
+import { type BufferGeometry, SphereGeometry, Vector3 } from "three";
 import { Button } from "~/components/ui/button";
 import { Label } from "~/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
 import { Switch } from "~/components/ui/switch";
-import { ElectricFieldWasm } from "./electric-field-wasm";
+import { Nec2Context } from "~/utils/nec2-c-wasm";
+import { ElectricFieldNec2 } from "./electric-field-nec2";
 
-// Helper to get wire geometry points and currents
-function getWireSegments(
-  harmonic: number, // n = 1, 2, 3, 4...
-  visualScale: number,
-  isInvertedV: boolean,
-) {
-  const segments = 80; // Higher segment count for smoother waves
-  // Fixed physical visual length (The antenna doesn't grow, the frequency changes)
-  // But for visualization of "waves", it is often easier to keep the waves constant size and grow the antenna?
-  // No, the user explicitly said: "Fundamental, 2nd Harmonic...".
-  // Meaning the antenna is a fixed object, and we are exciting it at different frequencies.
-  // In our visualization, usually we keep the antenna size constant on screen.
-  // So: L = constant. Lambda shrinks.
-  // kL = n * pi.
-
-  const L = visualScale;
-  const feedPos = -L / 6; // Offset feed at 33% (approx 17% from center)
-
-  // Feed is properly at 33% from one end?
-  // Center is 0. Left is -L/2. Right is L/2.
-  // Total L.
-  // Feed relative to Left: (-L/6) - (-L/2) = -L/6 + 3L/6 = 2L/6 = L/3.
-  // Yes, Feed is at 33% from the Left end.
-
-  const apexZ = feedPos; // Inverted V apex is structurally at the feedpoint support
-
-  // Inverted V Drop
-  // 120 deg included angle.
-  const angle = isInvertedV ? (120 * Math.PI) / 180 : Math.PI;
-  const droopAngle = (Math.PI - angle) / 2;
-
-  const pts: { pos: Vector3; tangent: Vector3; current: number }[] = [];
-
-  const shortLen = L / 3;
-
-  for (let i = 0; i < segments; i++) {
-    const d = (i / (segments - 1)) * L; // distance from Left End
-
-    // 1. Position Calculation
-    let x = 0,
-      y = 0,
-      z = 0;
-    const tangent = new Vector3();
-
-    if (d < shortLen) {
-      // Left Arm (Short)
-      // Visual: From Apex extending Left
-      const distFromApex = shortLen - d;
-
-      // Vector pointing Left ( -Z ):
-      // If flat: (0, 0, -1)
-      // If Droop: Rotate down around X axis (Y becomes negative)
-      // Z: -cos(droop)
-      // Y: -sin(droop)
-      const nz = -Math.cos(isInvertedV ? droopAngle : 0);
-      const ny = -Math.sin(isInvertedV ? droopAngle : 0);
-
-      z = apexZ + distFromApex * nz;
-      y = distFromApex * ny;
-
-      // Tangent (direction of increasing d, i.e. Left->Right)
-      // is opposite to the "Apex->Left" vector.
-      tangent.set(0, -ny, -nz).normalize();
-    } else {
-      // Right Arm (Long)
-      const distFromApex = d - shortLen;
-
-      // Vector pointing Right ( +Z ):
-      const nz = Math.cos(isInvertedV ? droopAngle : 0);
-      const ny = -Math.sin(isInvertedV ? droopAngle : 0);
-
-      z = apexZ + distFromApex * nz;
-      y = distFromApex * ny;
-
-      // Tangent (Left->Right) is same as Apex->Right vector
-      tangent.set(0, ny, nz).normalize();
-    }
-
-    // 2. Current Calculation
-    // Windom is a standing wave antenna.
-    // Boundary conditions: Current is 0 at ends.
-    // I(d) ~ sin( k * d )
-    // Total length L corresponds to 'harmonic * lambda / 2'.
-    // So k * L = harmonic * pi.
-    // phase = d/L * (harmonic * pi) ?
-    // Check: d=0 -> sin(0)=0. d=L -> sin(harmonic*pi) = 0. Correct.
-
-    const phase = (d / L) * (harmonic * Math.PI);
-    const current = Math.sin(phase);
-
-    pts.push({
-      pos: new Vector3(x, y, z), // Scene uses Y=up, Z=wire axis
-      tangent: tangent,
-      current: current,
-    });
-  }
-
-  return pts;
-}
-
-function getInvertedVTilt(harmonic: number): number {
-  // Logic updated to "Empirical Visual Alignment" per user request.
-
-  // n=1: User requires "Red Line" angle ~30 deg (Symmetric to Droop).
-  if (harmonic === 1) {
-    return (30 * Math.PI) / 180;
-  }
-
-  // n >= 2: Use Physics-based "ThetaMax - Droop" logic,
-  // which correctly yields the flatter angles (21 deg, 0 deg) accepted by user.
-  let thetaMax = 90;
-  if (harmonic === 2) thetaMax = 51;
-  if (harmonic === 3) thetaMax = 37;
-  if (harmonic >= 4) thetaMax = 30;
-
-  // Droop Angle (30 deg)
-  const droop = 30;
-
-  // Rotation Angle = Resultant Angle from Horizon
-  // n=2: 51 - 30 = 21 (Matches "Almost Horizontal")
-  // n=4: 30 - 30 = 0 (Horizontal)
-  const rotDeg = thetaMax - droop;
-
-  return (rotDeg * Math.PI) / 180;
-}
-
-function WindomStructure({
-  harmonic,
-  isInvertedV,
-  visualScale,
+function WindomAntenna({
+  visualScale = 1.0,
+  isInvertedV = false,
+  length = 10.14, // meters for 14.1MHz
 }: {
-  harmonic: number;
-  isInvertedV: boolean;
-  visualScale: number;
+  visualScale?: number;
+  isInvertedV?: boolean;
+  length?: number;
+  groundHeight?: number;
 }) {
-  const segments = useMemo(
-    () => getWireSegments(harmonic, visualScale, isInvertedV),
-    [harmonic, isInvertedV, visualScale],
-  );
+  const shortLen = length / 3;
+  const longLen = length - shortLen;
+  const droopAngle = isInvertedV ? (30 * Math.PI) / 180 : 0;
 
-  const curvePoints = segments.map((s) => s.pos);
-  const curve = useMemo(() => new CatmullRomCurve3(curvePoints), [curvePoints]);
-
-  // Standing Wave visualization
-  // Displace visually in Y (up/down) to show magnitude
-  const wavePoints = useMemo(() => {
-    return segments.map((s) => {
-      // Add 'current * scale' to the Y position
-      return new Vector3(s.pos.x, s.pos.y + s.current * 0.5, s.pos.z);
-    });
-  }, [segments]);
-  const waveCurve = useMemo(
-    () => new CatmullRomCurve3(wavePoints),
-    [wavePoints],
-  );
-
-  // Feedpoint position (Static visual marker)
-  const feedZ = -visualScale / 6;
-
+  // Align with NEC simulation: Wire is horizontal.
+  // We'll place it along Three.js Z-axis which will map to NEC Y-axis.
   return (
     <group>
-      {/* The Physical Wire */}
-      <mesh>
-        <tubeGeometry args={[curve, 64, 0.03, 8, false]} />
-        <meshStandardMaterial color="#3b82f6" />
-      </mesh>
-
-      {/* Feedpoint Box */}
-      <mesh position={[0, 0, feedZ]}>
-        <boxGeometry args={[0.25, 0.25, 0.25]} />
-        <meshStandardMaterial color="#ffffff" />
-      </mesh>
-
-      {/* Current/Standing Wave Visualization (Yellow Line) */}
-      <mesh>
-        <tubeGeometry args={[waveCurve, 64, 0.02, 8, false]} />
-        <meshBasicMaterial color="#facc15" transparent opacity={0.8} />
+      {/* Short Leg - tilted if inverted V */}
+      <group rotation={[droopAngle, 0, 0]}>
+        <mesh
+          position={[0, 0, (-shortLen * visualScale) / 2]}
+          rotation={[Math.PI / 2, 0, 0]}
+        >
+          <cylinderGeometry args={[0.03, 0.03, shortLen * visualScale, 16]} />
+          <meshStandardMaterial color="#3b82f6" />
+        </mesh>
+      </group>
+      {/* Long Leg */}
+      <group rotation={[-droopAngle, 0, 0]}>
+        <mesh
+          position={[0, 0, (longLen * visualScale) / 2]}
+          rotation={[Math.PI / 2, 0, 0]}
+        >
+          <cylinderGeometry args={[0.03, 0.03, longLen * visualScale, 16]} />
+          <meshStandardMaterial color="#3b82f6" />
+        </mesh>
+      </group>
+      {/* Feed Point */}
+      <mesh position={[0, 0, 0]}>
+        <boxGeometry args={[0.15, 0.15, 0.15]} />
+        <meshBasicMaterial color="#fff" />
       </mesh>
     </group>
   );
 }
 
-function RadiationPattern({
-  harmonic,
-  isInvertedV,
-  visualScale,
-}: {
-  harmonic: number;
-  isInvertedV: boolean;
-  visualScale: number;
-}) {
-  const geometry = useMemo(() => {
-    const geo = new SphereGeometry(1, 72, 36);
-    const posAttribute = geo.attributes.position;
-    const vertex = new Vector3();
-    const scale = 5;
+function RadiationPattern({ context }: { context: Nec2Context | null }) {
+  const [geometry, setGeometry] = useState<BufferGeometry | null>(null);
 
-    const segments = getWireSegments(harmonic, visualScale, isInvertedV);
+  useEffect(() => {
+    if (!context) return;
 
-    // k is wavenumber.
-    // L_physical = visualScale.
-    // But L represents 'harmonic' half-wavelengths.
-    // L = n * (lambda / 2)
-    // => lambda = 2L / n
-    // k = 2pi / lambda = 2pi / (2L/n) = n * pi / L.
-    const k = (harmonic * Math.PI) / visualScale;
+    const generateGeometry = () => {
+      const geo = new SphereGeometry(1, 60, 40);
+      const posAttribute = geo.attributes.position;
+      const vertex = new Vector3();
 
-    // We calculate Far Field pattern by integrating current contribution
-    let maxGain = 0;
-    const gains = new Float32Array(posAttribute.count);
+      const count = posAttribute.count;
+      const thetas = new Float64Array(count);
+      const phis = new Float64Array(count);
+      const gains = new Float64Array(count);
 
-    for (let i = 0; i < posAttribute.count; i++) {
-      vertex.fromBufferAttribute(posAttribute, i);
-      const dir = vertex.normalize(); // Direction vector r_hat
+      for (let i = 0; i < count; i++) {
+        vertex.fromBufferAttribute(posAttribute, i);
+        vertex.normalize();
+        // Map Three.js(X,Y,Z) back to NEC(X,Y,Z)
+        // Three X -> NEC X
+        // Three Y -> NEC Z
+        // Three Z -> NEC Y
+        // Wait, for pattern calculation we need spherical coords in NEC frame
+        // In NEC frame: Z is UP, X/Y are horizontal.
+        // In Three frame: Y is UP, X/Z are horizontal.
+        // So: Three Y <-> NEC Z, Three X <-> NEC X, Three Z <-> NEC Y.
 
-      // Calculate Vector Potential A ~ Sum( I * exp(j k r.r') )
-      // Ignore constants, we just want relative pattern shape
-
-      // Sum Re/Im parts of the vector integral
-      let rx = 0,
-        ry = 0,
-        rz = 0; // Real parts of vector
-      let ix = 0,
-        iy = 0,
-        iz = 0; // Im parts of vector
-
-      for (const seg of segments) {
-        // Phase shift k * (r . r')
-        // r . r' = dot product of direction and source position
-        const phase = k * dir.dot(seg.pos);
-        const cp = Math.cos(phase);
-        const sp = Math.sin(phase);
-
-        const I = seg.current; // Magnitude and sign of current
-        const tx = seg.tangent.x;
-        const ty = seg.tangent.y;
-        const tz = seg.tangent.z;
-
-        // Vector current phasor: J = I * tangent * e^(j phase)
-        // J_re = I * tangent * cos(phase)
-        // J_im = I * tangent * sin(phase)
-
-        rx += I * tx * cp;
-        ry += I * ty * cp;
-        rz += I * tz * cp;
-
-        ix += I * tx * sp;
-        iy += I * ty * sp;
-        iz += I * tz * sp;
+        const theta = Math.acos(Math.max(-1, Math.min(1, vertex.y)));
+        let phi = Math.atan2(vertex.z, vertex.x);
+        if (phi < 0) phi += 2 * Math.PI;
+        thetas[i] = theta;
+        phis[i] = phi;
       }
 
-      // The Electric Field E_theta/phi is proportional to the component of A
-      // perpendicular to r.
-      // E ~ (A - (A.r)r)
-      // Let A_vec = (rx + j ix, ry + j iy, rz + j iz)
+      context.calculate_far_field_pattern_3d(thetas, phis, gains);
 
-      // A_dot_r_re = rx*dx + ry*dy + rz*dz
-      const AdotR_re = rx * dir.x + ry * dir.y + rz * dir.z;
-      const AdotR_im = ix * dir.x + iy * dir.y + iz * dir.z;
+      let maxLinearG = 0.01;
+      for (let i = 0; i < count; i++) {
+        if (gains[i] > maxLinearG) maxLinearG = gains[i];
+      }
 
-      // A_perp_re = A_re - AdotR_re * dir
-      const Aperp_x_re = rx - AdotR_re * dir.x;
-      const Aperp_y_re = ry - AdotR_re * dir.y;
-      const Aperp_z_re = rz - AdotR_re * dir.z;
+      const maxDbi = context.get_max_gain();
+      const visualBaseScale = 5.0 + Math.max(0, maxDbi) * 0.5;
 
-      const Aperp_x_im = ix - AdotR_im * dir.x;
-      const Aperp_y_im = iy - AdotR_im * dir.y;
-      const Aperp_z_im = iz - AdotR_im * dir.z;
+      for (let i = 0; i < count; i++) {
+        const power = gains[i] / maxLinearG;
+        const rad = (0.2 + power * 0.8) * visualBaseScale;
+        vertex.fromBufferAttribute(posAttribute, i);
+        vertex.normalize();
+        posAttribute.setXYZ(i, vertex.x * rad, vertex.y * rad, vertex.z * rad);
+      }
 
-      // Magnitude squared
-      const magSq =
-        Aperp_x_re ** 2 +
-        Aperp_y_re ** 2 +
-        Aperp_z_re ** 2 +
-        (Aperp_x_im ** 2 + Aperp_y_im ** 2 + Aperp_z_im ** 2);
-
-      const gain = Math.sqrt(magSq);
-      gains[i] = gain;
-      if (gain > maxGain) maxGain = gain;
-    }
-
-    // Apply gains to vertex positions
-    for (let i = 0; i < posAttribute.count; i++) {
-      vertex.fromBufferAttribute(posAttribute, i);
-      vertex.normalize();
-
-      let normalized = 0;
-      if (maxGain > 0.00001) normalized = gains[i] / maxGain;
-
-      // Shaping for visuals
-      const rad = normalized ** 0.8 * scale;
-      vertex.multiplyScalar(rad);
-
-      posAttribute.setXYZ(i, vertex.x, vertex.y, vertex.z);
-    }
-
-    geo.computeVertexNormals();
-    return geo;
-  }, [harmonic, isInvertedV, visualScale]);
-
-  useMemo(() => {
-    return () => {
-      geometry.dispose();
+      geo.computeVertexNormals();
+      setGeometry(geo);
     };
-  }, [geometry]);
+
+    generateGeometry();
+  }, [context]);
+
+  if (!geometry) return null;
 
   return (
-    <mesh geometry={geometry}>
-      <meshBasicMaterial
-        color="#22c55e"
-        wireframe
-        transparent
-        opacity={0.3}
-        side={DoubleSide}
-      />
-    </mesh>
+    <group>
+      <mesh geometry={geometry}>
+        <meshBasicMaterial
+          color="#22c55e"
+          wireframe={true}
+          transparent={true}
+          opacity={0.2}
+        />
+      </mesh>
+    </group>
   );
 }
 
@@ -337,20 +142,104 @@ export default function WindomAntennaScene({
   isHovered?: boolean;
 }) {
   const { t } = useTranslation("scene");
-
-  // State
+  const [groundHeight, setGroundHeight] = useState(0.0);
+  const [material, setMaterial] = useState<string>("aluminum");
   const [showWaves, setShowWaves] = useState(true);
   const [showPattern, setShowPattern] = useState(true);
   const [isInvertedV, setIsInvertedV] = useState(false);
-
-  // Harmonic Mode (1 = Fund, 2, 3, 4)
   const [harmonic, setHarmonic] = useState(1);
-
   const [speedMode, setSpeedMode] = useState<"slow" | "medium" | "fast">(
     "medium",
   );
+  const [context, setContext] = useState<Nec2Context | null>(null);
+  const [isCalculating, setIsCalculating] = useState(false);
+  const [impedance, setImpedance] = useState<{ re: number; im: number } | null>(
+    null,
+  );
+  const [maxGain, setMaxGain] = useState<number>(0);
+
   const uniqueId = useId();
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  const visualScale = 1.0;
+
+  useEffect(() => {
+    let active = true;
+    const runSimulation = async () => {
+      setIsCalculating(true);
+      try {
+        const ctx = new Nec2Context();
+        ctx.initialize(1);
+
+        // Use 14.1MHz as base frequency for Windom (20m band)
+        const baseFreq = 14.1;
+        const freq = baseFreq * harmonic;
+        ctx.set_frequency(freq);
+        ctx.set_material(material);
+
+        const lambda = 299.79 / baseFreq; // Use base lambda for geometry
+        const h_m = groundHeight > 0 ? groundHeight * lambda : 10;
+        if (groundHeight > 0) ctx.set_ground(groundHeight);
+
+        const totalLen = 143 / baseFreq;
+        const shortLen = totalLen / 3;
+        const longLen = totalLen - shortLen;
+
+        const angle = isInvertedV ? (30 * Math.PI) / 180 : 0;
+        const sinA = Math.sin(angle);
+        const cosA = Math.cos(angle);
+
+        // Feed point at (0, 0, h_m)
+        // Short leg along -Y and -Z (if inverted V)
+        // NEC: Z is up, Y is along the wire
+        ctx.add_wire(
+          0,
+          0,
+          h_m,
+          0,
+          -shortLen * cosA,
+          h_m - shortLen * sinA,
+          0.001,
+          15,
+          1,
+        );
+        // Long leg along +Y and -Z
+        ctx.add_wire(
+          0,
+          0,
+          h_m,
+          0,
+          longLen * cosA,
+          h_m - longLen * sinA,
+          0.001,
+          25,
+          2,
+        );
+
+        // Voltage source at the feed point (segment 1 of wire 1)
+        ctx.add_voltage_source(1, 1, 1.0, 0.0);
+
+        await ctx.calculate();
+
+        if (active) {
+          const zArr = ctx.get_impedance(1);
+          setImpedance({ re: zArr[0], im: zArr[1] });
+          setMaxGain(ctx.get_max_gain());
+          setContext(ctx);
+        }
+      } catch (err) {
+        console.error("NEC Simulation Error:", err);
+      } finally {
+        if (active) setIsCalculating(false);
+      }
+    };
+
+    const timer = setTimeout(runSimulation, 300);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [groundHeight, material, isInvertedV, harmonic]);
 
   const handleDownload = () => {
     if (canvasRef.current) {
@@ -361,196 +250,253 @@ export default function WindomAntennaScene({
     }
   };
 
-  const speedMultiplier = {
-    slow: 0.3,
-    medium: 0.6,
-    fast: 1.0,
-  }[speedMode];
+  const effectiveSpeed =
+    isThumbnail && !isHovered
+      ? 0
+      : { slow: 0.3, medium: 0.6, fast: 1.0 }[speedMode];
+  const lambda_base = 299.79 / 14.1;
+  const gridY = -groundHeight * lambda_base * visualScale;
 
-  const effectiveSpeed = isThumbnail && !isHovered ? 0 : speedMultiplier;
-  const visualScale = 6;
-
-  // For the ElectricFieldInstanced which uses 'antennaLength' prop (usually lambda counts),
-  // we need to pass something that produces 'harmonic' lobes.
-  // The 'end-fed' logic in ElectricFieldInstanced uses `activeHarmonic`.
-  // Perfect.
-
-  const ControlsContent = () => (
-    <div className="flex flex-col space-y-3">
-      {/* Visual Toggles */}
-      <div className="pt-3 border-t border-white/10 md:border-none md:pt-0">
-        <div className="mb-2 text-xs md:text-sm font-medium text-zinc-200">
-          {t("common.controls.visualization")}
+  const LegendPanel = () => (
+    <div className="p-4 bg-black/70 text-white rounded-lg md:max-w-xs h-full border border-white/5">
+      <h2 className="text-lg font-bold mb-2">{t("windomAntenna.title")}</h2>
+      <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
+        <Trans
+          ns="scene"
+          i18nKey="windomAntenna.desc"
+          components={{ br: <br /> }}
+        />
+      </p>
+      <div className="space-y-1.5 text-xs border-t border-gray-600 pt-2">
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 bg-blue-500 rounded-sm" />
+          <span>{t("windomAntenna.wire")}</span>
         </div>
-        <div className="flex flex-col space-y-2">
-          <div className="flex items-center space-x-2">
-            <Switch
-              id={`${uniqueId}inv-v`}
-              checked={isInvertedV}
-              onCheckedChange={setIsInvertedV}
-              className="data-[state=checked]:bg-primary-foreground/80 data-[state=unchecked]:bg-zinc-700 border-zinc-500"
-            />
-            <Label
-              htmlFor={`${uniqueId}inv-v`}
-              className="text-xs md:text-sm text-zinc-300"
-            >
-              {t("common.controls.invertedV")}
-            </Label>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Switch
-              id={`${uniqueId}waves`}
-              checked={showWaves}
-              onCheckedChange={setShowWaves}
-              className="data-[state=checked]:bg-primary-foreground/80 data-[state=unchecked]:bg-zinc-700 border-zinc-500"
-            />
-            <Label
-              htmlFor={`${uniqueId}waves`}
-              className="text-xs md:text-sm text-zinc-300"
-            >
-              {t("common.controls.showWaves")}
-            </Label>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Switch
-              id={`${uniqueId}pattern`}
-              checked={showPattern}
-              onCheckedChange={setShowPattern}
-              className="data-[state=checked]:bg-primary-foreground/80 data-[state=unchecked]:bg-zinc-700 border-zinc-500"
-            />
-            <Label
-              htmlFor={`${uniqueId}pattern`}
-              className="text-xs md:text-sm text-zinc-300"
-            >
-              {t("common.controls.showPattern")}
-            </Label>
-          </div>
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 bg-white rounded-sm" />
+          <span>{t("windomAntenna.feed")}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 border-2 border-green-500 rounded-sm" />
+          <span>{t("windomAntenna.pattern")}</span>
         </div>
       </div>
-
-      {/* Harmonic Selection */}
-      <div className="pt-3 border-t border-white/10">
-        <div className="mb-2 text-xs md:text-sm font-medium text-zinc-200">
-          {t("common.controls.harmonicMode")}
+      <div className="mt-4 pt-3 border-t border-gray-600">
+        <div className="flex justify-between items-end mb-1.5">
+          <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">
+            {t("common.simulation.strength")}
+          </span>
+          <span className="text-[9px] text-zinc-500 italic">
+            Normalized (E·r)
+          </span>
         </div>
-        <RadioGroup
-          value={harmonic.toString()}
-          onValueChange={(v) => setHarmonic(Number.parseInt(v, 10))}
-          className="flex flex-wrap flex-col gap-2"
-        >
-          <div className="flex items-center space-x-2">
-            <RadioGroupItem
-              value="1"
-              id={`${uniqueId}h1`}
-              className="border-zinc-400 text-primary-foreground data-[state=checked]:bg-transparent data-[state=checked]:border-primary-foreground data-[state=checked]:text-input"
-            />
-            <Label
-              htmlFor={`${uniqueId}h1`}
-              className="text-xs cursor-pointer text-zinc-300"
-            >
-              {t("common.controls.harmonic1")}
-            </Label>
-          </div>
-          <div className="flex items-center space-x-2">
-            <RadioGroupItem
-              value="2"
-              id={`${uniqueId}h2`}
-              className="border-zinc-400 text-primary-foreground data-[state=checked]:bg-transparent data-[state=checked]:border-primary-foreground data-[state=checked]:text-input"
-            />
-            <Label
-              htmlFor={`${uniqueId}h2`}
-              className="text-xs cursor-pointer text-zinc-300"
-            >
-              {t("common.controls.harmonic2")}
-            </Label>
-          </div>
-          <div className="flex items-center space-x-2">
-            <RadioGroupItem
-              value="3"
-              id={`${uniqueId}h3`}
-              className="border-zinc-400 text-primary-foreground data-[state=checked]:bg-transparent data-[state=checked]:border-primary-foreground data-[state=checked]:text-input"
-            />
-            <Label
-              htmlFor={`${uniqueId}h3`}
-              className="text-xs cursor-pointer text-zinc-300"
-            >
-              {t("common.controls.harmonic3")}
-            </Label>
-          </div>
-          <div className="flex items-center space-x-2">
-            <RadioGroupItem
-              value="4"
-              id={`${uniqueId}h4`}
-              className="border-zinc-400 text-primary-foreground data-[state=checked]:bg-transparent data-[state=checked]:border-primary-foreground data-[state=checked]:text-input"
-            />
-            <Label
-              htmlFor={`${uniqueId}h4`}
-              className="text-xs cursor-pointer text-zinc-300"
-            >
-              {t("common.controls.harmonic4")}
-            </Label>
-          </div>
-        </RadioGroup>
+        <div className="h-2 w-full rounded-full bg-gradient-to-r from-blue-600 via-green-500 via-yellow-400 to-red-600" />
       </div>
+    </div>
+  );
 
-      {/* Speed */}
-      <div className="pt-3 border-t border-white/10">
-        <div className="mb-2 text-xs md:text-sm font-medium text-zinc-200">
-          {t("common.controls.speed")}
+  const ControlsPanel = () => (
+    <div className="p-4 bg-black/70 text-white rounded-lg w-full h-full border border-white/5">
+      <div className="flex flex-col space-y-4">
+        <div className="bg-zinc-900/50 p-3 rounded border border-white/5">
+          <div className="mb-2 text-[10px] uppercase font-bold tracking-wider text-zinc-500">
+            {t("common.simulation.analysis")}
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <div className="text-[9px] text-zinc-400 mb-0.5">
+                {t("common.simulation.peakGain")}
+              </div>
+              <div className="text-xs font-mono text-green-400">
+                {isCalculating ? "..." : `${maxGain.toFixed(2)} dBi`}
+              </div>
+            </div>
+            <div>
+              <div className="text-[9px] text-zinc-400 mb-0.5">
+                {t("common.simulation.impedance")}
+              </div>
+              <div className="text-xs font-mono text-zinc-300">
+                {isCalculating
+                  ? "..."
+                  : impedance
+                    ? `${impedance.re.toFixed(1)}Ω`
+                    : "--"}
+              </div>
+            </div>
+          </div>
         </div>
-        <RadioGroup
-          value={speedMode}
-          onValueChange={(v: never) => setSpeedMode(v)}
-          className="flex gap-2"
+
+        <div className="space-y-3">
+          <div className="pt-1">
+            <div className="mb-2 text-xs font-medium text-zinc-300">
+              {t("common.controls.harmonicMode")}
+            </div>
+            <RadioGroup
+              value={harmonic.toString()}
+              onValueChange={(v) => setHarmonic(parseInt(v, 10))}
+              className="grid grid-cols-2 gap-2"
+            >
+              {[1, 2, 3, 4].map((h) => (
+                <div key={h} className="flex items-center space-x-2">
+                  <RadioGroupItem
+                    value={h.toString()}
+                    id={`${uniqueId}h${h}`}
+                    className="peer size-3 border-zinc-500 data-[state=checked]:border-white data-[state=checked]:text-white"
+                  />
+                  <Label
+                    htmlFor={`${uniqueId}h${h}`}
+                    className="text-[11px] cursor-pointer text-zinc-400 peer-data-[state=checked]:text-white"
+                  >
+                    {t(`common.controls.harmonic${h}` as any)}
+                  </Label>
+                </div>
+              ))}
+            </RadioGroup>
+          </div>
+
+          <div className="pt-2 border-t border-white/5">
+            <div className="mb-2 text-xs font-medium text-zinc-300">
+              {t("common.simulation.material")}
+            </div>
+            <RadioGroup
+              value={material}
+              onValueChange={setMaterial}
+              className="flex flex-row md:flex-col gap-3 md:gap-1.5"
+            >
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem
+                  value="aluminum"
+                  id={`${uniqueId}m-al`}
+                  className="peer size-3 border-zinc-500 data-[state=checked]:border-white data-[state=checked]:text-white"
+                />
+                <Label
+                  htmlFor={`${uniqueId}m-al`}
+                  className="text-[11px] cursor-pointer text-zinc-400 peer-data-[state=checked]:text-white"
+                >
+                  {t("common.simulation.aluminum")}
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem
+                  value="stainless_steel"
+                  id={`${uniqueId}m-ss`}
+                  className="peer size-3 border-zinc-500 data-[state=checked]:border-white data-[state=checked]:text-white"
+                />
+                <Label
+                  htmlFor={`${uniqueId}m-ss`}
+                  className="text-[11px] cursor-pointer text-zinc-400 peer-data-[state=checked]:text-white"
+                >
+                  {t("common.simulation.stainlessSteel")}
+                </Label>
+              </div>
+            </RadioGroup>
+          </div>
+
+          <div className="pt-2 border-t border-white/5">
+            <div className="mb-2 text-xs font-medium text-zinc-300">
+              {t("common.simulation.groundHeight")}
+            </div>
+            <div className="flex items-center space-x-3">
+              <input
+                type="range"
+                min="0"
+                max="2"
+                step="0.1"
+                value={groundHeight}
+                onChange={(e) => setGroundHeight(parseFloat(e.target.value))}
+                className="w-full accent-blue-500 h-1"
+              />
+              <span className="text-[10px] text-zinc-400 w-8 text-right font-mono">
+                {groundHeight === 0
+                  ? t("common.simulation.freeSpace")
+                  : groundHeight.toFixed(1)}
+              </span>
+            </div>
+          </div>
+
+          <div className="pt-2 border-t border-white/5">
+            <div className="mb-2 text-xs font-medium text-zinc-300">
+              {t("common.controls.speed")}
+            </div>
+            <RadioGroup
+              value={speedMode}
+              onValueChange={(v) =>
+                setSpeedMode(v as "slow" | "medium" | "fast")
+              }
+              className="flex gap-3"
+            >
+              {["slow", "medium", "fast"].map((s) => (
+                <div key={s} className="flex items-center space-x-1.5">
+                  <RadioGroupItem
+                    value={s}
+                    id={`${uniqueId}r-${s}`}
+                    className="peer size-3 border-zinc-500 data-[state=checked]:border-white data-[state=checked]:text-white"
+                  />
+                  <Label
+                    htmlFor={`${uniqueId}r-${s}`}
+                    className="text-[11px] cursor-pointer text-zinc-400 peer-data-[state=checked]:text-white"
+                  >
+                    {t(`common.controls.${s}` as any)}
+                  </Label>
+                </div>
+              ))}
+            </RadioGroup>
+          </div>
+
+          <div className="pt-2 border-t border-white/5 space-y-2">
+            <div className="flex items-center justify-between group">
+              <Label
+                htmlFor={`${uniqueId}inv-v`}
+                className="text-[11px] text-zinc-400 cursor-pointer peer-data-[state=checked]:text-white order-first"
+              >
+                {t("common.controls.invertedV")}
+              </Label>
+              <Switch
+                id={`${uniqueId}inv-v`}
+                checked={isInvertedV}
+                onCheckedChange={setIsInvertedV}
+                className="peer scale-75 data-[state=unchecked]:bg-zinc-700 data-[state=checked]:bg-blue-500"
+              />
+            </div>
+            <div className="flex items-center justify-between group">
+              <Label
+                htmlFor={`${uniqueId}wave-mode`}
+                className="text-[11px] text-zinc-400 cursor-pointer peer-data-[state=checked]:text-white order-first"
+              >
+                {t("common.controls.showWaves")}
+              </Label>
+              <Switch
+                id={`${uniqueId}wave-mode`}
+                checked={showWaves}
+                onCheckedChange={setShowWaves}
+                className="peer scale-75 data-[state=unchecked]:bg-zinc-700 data-[state=checked]:bg-blue-500"
+              />
+            </div>
+            <div className="flex items-center justify-between group">
+              <Label
+                htmlFor={`${uniqueId}pattern-mode`}
+                className="text-[11px] text-zinc-400 cursor-pointer peer-data-[state=checked]:text-white order-first"
+              >
+                {t("common.controls.showPattern")}
+              </Label>
+              <Switch
+                id={`${uniqueId}pattern-mode`}
+                checked={showPattern}
+                onCheckedChange={setShowPattern}
+                className="peer scale-75 data-[state=unchecked]:bg-zinc-700 data-[state=checked]:bg-blue-500"
+              />
+            </div>
+          </div>
+        </div>
+
+        <Button
+          variant="secondary"
+          size="sm"
+          className="w-full h-8 text-[11px] bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border-none"
+          onClick={handleDownload}
         >
-          <div className="flex items-center space-x-2">
-            <RadioGroupItem
-              value="slow"
-              id={`${uniqueId}slow`}
-              className="border-zinc-400 text-primary-foreground"
-            />
-            <Label
-              htmlFor={`${uniqueId}slow`}
-              className="text-xs text-zinc-300"
-            >
-              {t("common.controls.slow")}
-            </Label>
-          </div>
-          <div className="flex items-center space-x-2">
-            <RadioGroupItem
-              value="medium"
-              id={`${uniqueId}med`}
-              className="border-zinc-400 text-primary-foreground"
-            />
-            <Label htmlFor={`${uniqueId}med`} className="text-xs text-zinc-300">
-              {t("common.controls.medium")}
-            </Label>
-          </div>
-          <div className="flex items-center space-x-2">
-            <RadioGroupItem
-              value="fast"
-              id={`${uniqueId}fast`}
-              className="border-zinc-400 text-primary-foreground"
-            />
-            <Label
-              htmlFor={`${uniqueId}fast`}
-              className="text-xs text-zinc-300"
-            >
-              {t("common.controls.fast")}
-            </Label>
-          </div>
-        </RadioGroup>
-        <div className="pt-3 border-t border-white/10">
-          <Button
-            variant="secondary"
-            size="sm"
-            className="w-full"
-            onClick={handleDownload}
-          >
-            <Camera className="mr-2 size-4" />
-            {t("common.controls.download")}
-          </Button>
-        </div>
+          <Camera className="mr-2 size-3.5" /> {t("common.controls.download")}
+        </Button>
       </div>
     </div>
   );
@@ -563,68 +509,57 @@ export default function WindomAntennaScene({
         <Canvas
           ref={canvasRef}
           gl={{ preserveDrawingBuffer: true }}
-          camera={{ position: [5, 5, 10], fov: 45 }}
+          camera={{ position: [15, 15, 20], fov: 45 }}
           frameloop={isThumbnail && !isHovered ? "demand" : "always"}
         >
           <color attach="background" args={["#111111"]} />
-          <fog attach="fog" args={["#111111", 10, 50]} />
-
+          <fog attach="fog" args={["#111111", 100, 1000]} />
           {!isThumbnail && <ArcballControls target={[0, 0, 0]} makeDefault />}
-
           <ambientLight intensity={0.5} />
           <directionalLight position={[10, 10, 10]} intensity={1} />
-
-          <gridHelper
-            args={[20, 20, 0x333333, 0x222222]}
-            position={[0, -2, 0]}
-          />
           <axesHelper args={[5]} />
-
-          <WindomStructure
-            harmonic={harmonic}
-            isInvertedV={isInvertedV}
-            visualScale={visualScale}
+          <gridHelper
+            args={[100, 20, 0x333333, 0x222222]}
+            position={[0, gridY, 0]}
           />
 
-          {showPattern && (
-            <RadiationPattern
-              harmonic={harmonic}
-              isInvertedV={isInvertedV}
+          <group position={[0, 0, 0]}>
+            <WindomAntenna
               visualScale={visualScale}
-            />
-          )}
-
-          {showWaves && (
-            <ElectricFieldWasm
-              antennaType="windom" // Uses End-Fed/Windom harmonic logic
-              polarizationType="horizontal"
-              speed={effectiveSpeed}
-              amplitudeScale={1.5}
-              activeHarmonic={harmonic}
-              antennaLength={harmonic * 0.5} // Length factor roughly n * 0.5 lambda
               isInvertedV={isInvertedV}
-              rotation={
-                isInvertedV ? [getInvertedVTilt(harmonic), 0, 0] : [0, 0, 0]
-              }
+              length={143 / 14.1}
+              groundHeight={groundHeight}
             />
-          )}
+            {showPattern && context && <RadiationPattern context={context} />}
+            {showWaves && context && (
+              <ElectricFieldNec2
+                context={context}
+                speed={effectiveSpeed}
+                amplitudeScale={1.0}
+                particleScale={0.6}
+                plane="YZ"
+                visualScale={visualScale}
+              />
+            )}
+          </group>
         </Canvas>
 
         {!isThumbnail && (
-          <>
-            <div className="hidden md:block absolute bottom-4 right-4 p-4 bg-black/70 text-white rounded-lg">
-              <ControlsContent />
+          <div className="hidden md:block">
+            <div className="absolute top-4 left-4 pointer-events-none">
+              <LegendPanel />
             </div>
-            <div className="absolute bottom-4 left-4 text-gray-400 text-xs pointer-events-none select-none">
-              {t("common.created")}
+            <div className="absolute bottom-4 right-4 pointer-events-auto w-64">
+              <ControlsPanel />
             </div>
-          </>
+          </div>
         )}
       </div>
 
       {!isThumbnail && (
-        <div className="md:hidden bg-zinc-900 border rounded-lg p-4">
-          <ControlsContent />
+        <div className="flex flex-col gap-4 md:hidden">
+          <LegendPanel />
+          <ControlsPanel />
         </div>
       )}
     </div>

@@ -158,5 +158,5 @@ export async function calculateBoomCorrection(
 
 export async function estimateYagiGain(elementCount: number): Promise<number> {
   await ensureInitialized();
-  return estimate_yagi_gain(elementCount);
+  return estimate_yagi_gain(elementCount, "aluminum");
 }
