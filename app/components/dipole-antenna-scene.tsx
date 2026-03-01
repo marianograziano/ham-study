@@ -350,7 +350,12 @@ export default function DipoleAntennaScene({
             <DipoleAntenna length={physicalLength} isInvertedV={isInvertedV} />
             {showPattern && context && <RadiationPattern context={context} />}
             {showWaves && context && (
-              <ElectricFieldNec2 context={context} speed={effectiveSpeed} amplitudeScale={1.2} />
+              <ElectricFieldNec2
+                context={context}
+                speed={effectiveSpeed}
+                amplitudeScale={1.2}
+                visualScale={visualScale}
+              />
             )}
           </group>
         </Canvas>

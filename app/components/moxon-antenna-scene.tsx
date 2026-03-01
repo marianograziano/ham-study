@@ -350,7 +350,13 @@ export default function MoxonAntennaScene({
             <MoxonAntenna scale={visualScale} />
             {showPattern && context && <RadiationPattern context={context} />}
             {showWaves && context && (
-              <ElectricFieldNec2 context={context} speed={effectiveSpeed} amplitudeScale={1.2} particleScale={0.7} />
+              <ElectricFieldNec2
+                context={context}
+                speed={effectiveSpeed}
+                amplitudeScale={1.2}
+                particleScale={0.7}
+                visualScale={visualScale}
+              />
             )}
           </group>
         </Canvas>

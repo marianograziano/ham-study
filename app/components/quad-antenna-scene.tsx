@@ -108,7 +108,15 @@ function QuadAntenna({
   );
 }
 
-function RadiationPattern({ context }: { context: Nec2Context | null }) {
+function RadiationPattern({
+  context,
+  powerExponent = 1.0,
+  baseOffset = 0.2,
+}: {
+  context: Nec2Context | null;
+  powerExponent?: number;
+  baseOffset?: number;
+}) {
   const [geometry, setGeometry] = useState<BufferGeometry | null>(null);
 
   useEffect(() => {
@@ -145,8 +153,8 @@ function RadiationPattern({ context }: { context: Nec2Context | null }) {
       const visualBaseScale = 7.5 + Math.max(0, maxDbi) * 0.7;
 
       for (let i = 0; i < count; i++) {
-        const power = gains[i] / maxLinearG;
-        const rad = (0.2 + power * 0.8) * visualBaseScale;
+        const power = Math.pow(gains[i] / maxLinearG, powerExponent);
+        const rad = (baseOffset + power * (1 - baseOffset)) * visualBaseScale;
         vertex.fromBufferAttribute(posAttribute, i);
         vertex.normalize();
         posAttribute.setXYZ(i, vertex.x * rad, vertex.y * rad, vertex.z * rad);
@@ -157,7 +165,7 @@ function RadiationPattern({ context }: { context: Nec2Context | null }) {
     };
 
     generateGeometry();
-  }, [context]);
+  }, [context, powerExponent, baseOffset]);
 
   if (!geometry) return null;
 
@@ -579,13 +587,23 @@ export default function QuadAntennaScene({
               scale={visualScale}
               poleLength={poleLength}
             />
-            {showPattern && context && <RadiationPattern context={context} />}
+            {showPattern && context && (
+              <RadiationPattern
+                context={context}
+                powerExponent={1.2}
+                baseOffset={0.05}
+              />
+            )}
             {showWaves && context && (
               <ElectricFieldNec2
                 context={context}
                 speed={effectiveSpeed}
-                amplitudeScale={2.5}
+                amplitudeScale={1.5}
                 particleScale={0.7}
+                visualScale={visualScale}
+                powerExponent={0.65}
+                lowCutoff={0.2}
+                followMainLobe={true}
               />
             )}
           </group>

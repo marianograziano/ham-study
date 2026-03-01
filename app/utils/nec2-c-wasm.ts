@@ -16,6 +16,8 @@ export class Nec2Context {
     ux: number, uy: number, uz: number
   }> = [];
   private maxGainDbi: number = 0;
+  private maxGainTheta: number = 90;
+  private maxGainPhi: number = 0;
   private center: {x: number, y: number, z: number} = {x: 0, y: 0, z: 0};
 
   constructor() {}
@@ -97,6 +99,8 @@ export class Nec2Context {
     this.impedanceCache.clear();
     this.currents = [];
     this.maxGainDbi = -99;
+    this.maxGainTheta = 90;
+    this.maxGainPhi = 0;
     const lines = data.split("\n");
     let section: 'none' | 'impedance' | 'pattern' | 'current' = 'none';
 
@@ -151,7 +155,11 @@ export class Nec2Context {
             // Typical line: THETA PHI VERT_DB HORIZ_DB TOTAL_DB
             if (parts.length >= 5 && !isNaN(parseFloat(parts[0]))) {
                 const rawGainDbi = parseFloat(parts[4]);
-                if (rawGainDbi > this.maxGainDbi) this.maxGainDbi = rawGainDbi;
+                if (rawGainDbi > this.maxGainDbi) {
+                    this.maxGainDbi = rawGainDbi;
+                    this.maxGainTheta = parseFloat(parts[0]);
+                    this.maxGainPhi = parseFloat(parts[1]);
+                }
                 const gain = Math.pow(10, Math.max(-40, rawGainDbi) / 10);
                 this.patternCache.set(`${Math.round(parseFloat(parts[0]))},${Math.round(parseFloat(parts[1]))}`, gain);
             }
@@ -170,30 +178,44 @@ export class Nec2Context {
   get_impedance(tag: number) { return this.impedanceCache.get(tag) ? [this.impedanceCache.get(tag)!.re, this.impedanceCache.get(tag)!.im] : [50, 0]; }
   get_currents() { return this.currents; }
   get_max_gain() { return this.maxGainDbi; }
+  get_max_gain_direction() { return { theta: this.maxGainTheta, phi: this.maxGainPhi }; }
   get_center() { return this.center; }
   get_frequency() { return this.frequency; }
 
   get_max_field_reference(): number {
-    let maxAmp = 0.001;
     const lambda = 299.79 / this.frequency;
-    const r_sample = Math.max(lambda, 10.0); // Ensure far-field sampling
+    const r_sample = Math.max(lambda, 10.0);
 
-    for (let theta = 0; theta <= Math.PI; theta += Math.PI / 12) {
-        for (let phi = 0; phi < Math.PI * 2; phi += Math.PI / 12) {
-            const x = this.center.x + r_sample * Math.sin(theta) * Math.cos(phi);
-            const y = this.center.y + r_sample * Math.sin(theta) * Math.sin(phi);
-            const z = this.center.z + r_sample * Math.cos(theta);
-            const { amplitude } = this.calculate_field_and_amplitude(x, y, z, 0);
-            const compensated = amplitude * (r_sample + 0.1);
-            if (compensated > maxAmp) maxAmp = compensated;
+    const thetaRad = (this.maxGainTheta * Math.PI) / 180;
+    const phiRad = (this.maxGainPhi * Math.PI) / 180;
+
+    const x = this.center.x + r_sample * Math.sin(thetaRad) * Math.cos(phiRad);
+    const y = this.center.y + r_sample * Math.sin(thetaRad) * Math.sin(phiRad);
+    const z = this.center.z + r_sample * Math.cos(thetaRad);
+
+    const { amplitude } = this.calculate_field_and_amplitude(x, y, z, 0);
+    let maxAmp = amplitude * (r_sample + 0.1);
+
+    if (maxAmp < 0.0001) {
+        for (let t = 0; t <= Math.PI; t += Math.PI / 6) {
+            for (let p = 0; p < Math.PI * 2; p += Math.PI / 6) {
+                const tx = this.center.x + r_sample * Math.sin(t) * Math.cos(p);
+                const ty = this.center.y + r_sample * Math.sin(t) * Math.sin(p);
+                const tz = this.center.z + r_sample * Math.cos(t);
+                if (this.groundHeight !== null && this.groundHeight > 0 && tz < 0) continue;
+                const { amplitude: amp } = this.calculate_field_and_amplitude(tx, ty, tz, 0);
+                const comp = amp * (r_sample + 0.1);
+                if (comp > maxAmp) maxAmp = comp;
+            }
         }
     }
-    return maxAmp;
+    
+    console.log(`[NEC2] MaxGain: ${this.maxGainDbi.toFixed(2)}dBi at T=${this.maxGainTheta} P=${this.maxGainPhi}, RefField: ${maxAmp.toFixed(4)}`);
+    return Math.max(0.001, maxAmp);
   }
 
   /**
    * 计算指定坐标点（物理单位米）的瞬时场强和振幅
-   * 使用矢量叠加法，以准确体现干涉和零点（Nulls）
    */
   calculate_field_and_amplitude(x: number, y: number, z: number, time_phase: number): { instantaneous: number, amplitude: number } {
     let ex_re = 0, ex_im = 0;
@@ -204,14 +226,12 @@ export class Nec2Context {
     const hasGround = this.groundHeight !== null && this.groundHeight > 0;
 
     for (const c of this.currents) {
-        // --- 1. 直接场 (Direct Field) ---
         const dx = x - c.x;
         const dy = y - c.y;
         const dz = z - c.z;
         const r_dist = Math.sqrt(dx*dx + dy*dy + dz*dz) + 0.01;
         const rx = dx / r_dist, ry = dy / r_dist, rz = dz / r_dist;
 
-        // 远场近似：E ∝ I * [L - (L·R)R]
         const dot = c.ux * rx + c.uy * ry + c.uz * rz;
         const lp_x = c.ux - dot * rx;
         const lp_y = c.uy - dot * ry;
@@ -229,13 +249,11 @@ export class Nec2Context {
         ez_re += factor * lp_z * cosP;
         ez_im += factor * lp_z * sinP;
 
-        // --- 2. 地面反射场 (Ground Reflected Field) ---
         if (hasGround) {
-            const dz_img = z + c.z; // 镜像源在 -c.z，观察点在 z，距离 z - (-c.z) = z+c.z
+            const dz_img = z + c.z;
             const r_img = Math.sqrt(dx*dx + dy*dy + dz_img*dz_img) + 0.01;
             const rxi = dx / r_img, ryi = dy / r_img, rzi = dz_img / r_img;
             
-            // 镜像段的电流方向：水平分量反向，垂直分量同向 (Ideal ground)
             const iux = -c.ux, iuy = -c.uy, iuz = c.uz;
             const doti = iux * rxi + iuy * ryi + iuz * rzi;
             const lpix = iux - doti * rxi;
@@ -256,24 +274,20 @@ export class Nec2Context {
         }
     }
 
-    // 计算幅值 (Vector magnitude)
     const amplitude = Math.sqrt(
         ex_re*ex_re + ex_im*ex_im + 
         ey_re*ey_re + ey_im*ey_im + 
         ez_re*ez_re + ez_im*ez_im
     );
 
-    // 计算瞬时值：通过实部和虚部的旋转投影得到
-    // 我们取最大主方向的投影来保证波动的视觉效果最强
     const instX = ex_re * Math.cos(time_phase) - ex_im * Math.sin(time_phase);
     const instY = ey_re * Math.cos(time_phase) - ey_im * Math.sin(time_phase);
     const instZ = ez_re * Math.cos(time_phase) - ez_im * Math.sin(time_phase);
-    
-    // 使用代数和来保留波形的相位（正负起伏），不再除以 sqrt(3)
     const instantaneous = instX + instY + instZ;
 
     return { instantaneous, amplitude };
   }
+  
   calculate_far_field_pattern_3d(thetas: Float64Array, phis: Float64Array, output: Float64Array) {
     for (let i = 0; i < thetas.length; i++) {
         const t = Math.min(180, Math.max(0, Math.round(thetas[i] * 180 / Math.PI / 5) * 5));

@@ -470,10 +470,10 @@ export default function MagneticLoopAntennaScene({
               <ElectricFieldNec2
                 context={context}
                 speed={effectiveSpeed}
-                amplitudeScale={15.0}
+                amplitudeScale={1.5}
                 particleScale={0.7}
                 plane="XZ"
-                visualScale={1.0}
+                visualScale={visualScale}
               />
             )}
 
