@@ -444,9 +444,10 @@ export default function GPAntennaScene({
                   context={context}
                   plane="XY"
                   visualScale={visualScale}
-                  amplitudeScale={2.0}
+                  amplitudeScale={2.5}
                   speed={effectiveSpeed}
                   particleScale={0.6}
+                  powerExponent={1.8}
                 />
               </group>
             )}

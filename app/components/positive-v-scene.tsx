@@ -452,7 +452,7 @@ export default function PositiveVAntennaScene({
                   context={context}
                   plane="XY"
                   visualScale={visualScale}
-                  amplitudeScale={1.5}
+                  amplitudeScale={2.5}
                   speed={effectiveSpeed}
                   particleScale={0.6}
                   powerExponent={1.8}

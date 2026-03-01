@@ -456,10 +456,11 @@ export default function EndFedAntennaScene({
               <ElectricFieldNec2
                 context={context}
                 speed={effectiveSpeed}
-                amplitudeScale={10.0}
+                amplitudeScale={15.0}
                 particleScale={0.6}
                 plane="XY"
                 visualScale={2}
+                powerExponent={1.8}
               />
             )}
           </group>
