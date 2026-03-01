@@ -438,6 +438,8 @@ export default {
     },
     copyright: "© {{year}} BG8ROM. All rights reserved.",
     credits: "特別感謝",
+    acknowledgements: "鳴謝",
+    authorKJ7LNW: "NEC2 仿真引擎基於 KJ7LNW/nec2c",
   },
   meta: {
     siteName: "業餘無線電可視化",
